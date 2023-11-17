@@ -14,7 +14,6 @@ var Version = "0.0.1"
 var productId = "terraform-provider-platform/" + Version
 
 var _ provider.Provider = (*platformProvider)(nil)
-var _ provider.ProviderWithMetadata = (*platformProvider)(nil)
 
 type platformProvider struct{}
 

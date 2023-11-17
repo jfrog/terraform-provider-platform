@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	provider "github.com/jfrog/terraform-provider-platform/pkg/platform/provider"
+	"github.com/jfrog/terraform-provider-platform/pkg/platform"
 )
 
 // Run the docs generation tool, check its repository for more information on how it works and how docs
@@ -24,7 +24,7 @@ func main() {
 		Debug:   debug,
 	}
 
-	err := providerserver.Serve(context.Background(), provider.New(), opts)
+	err := providerserver.Serve(context.Background(), platform.New(), opts)
 
 	if err != nil {
 		log.Fatal(err.Error())
