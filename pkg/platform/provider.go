@@ -149,14 +149,14 @@ func (p *PlatformProvider) Schema(ctx context.Context, req provider.SchemaReques
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"url": schema.StringAttribute{
-				Description: "JFROG Platform URL.",
+				Description: "JFrog Platform URL.",
 				Optional:    true,
 				Validators: []validator.String{
 					validator_string.IsURLHttpOrHttps(),
 				},
 			},
 			"access_token": schema.StringAttribute{
-				Description: "This is a access token that can be given to you by your admin under `User Management -> Access Tokens`. If not set, the 'api_key' attribute value will be used.",
+				Description: "This is a access token that can be given to you by your admin under `Platform Configuration -> User Management -> Access Tokens`.",
 				Optional:    true,
 				Sensitive:   true,
 				Validators: []validator.String{

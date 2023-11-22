@@ -107,6 +107,6 @@ provider "platform" {
 
 ### Optional
 
-- `access_token` (String, Sensitive) This is a access token that can be given to you by your admin under `User Management -> Access Tokens`. If not set, the 'api_key' attribute value will be used.
+- `access_token` (String, Sensitive) This is a access token that can be given to you by your admin under `Platform Configuration -> User Management -> Access Tokens`.
 - `check_license` (Boolean) Toggle for pre-flight checking of Artifactory Pro and Enterprise license. Default to `true`.
-- `url` (String) JFROG Platform URL.
+- `url` (String) JFrog Platform URL.
