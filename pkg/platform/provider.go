@@ -6,7 +6,6 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
-	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -23,39 +22,30 @@ var Version = "0.0.1"
 // needs to be exported so make file can update this
 var productId = "terraform-provider-platform/" + Version
 
-var _ provider.Provider = (*platformProvider)(nil)
+var _ provider.Provider = (*PlatformProvider)(nil)
 
-type platformProvider struct {
+type PlatformProvider struct {
+	Meta util.ProvderMetadata
+}
+
+type platformProviderModel struct {
 	Url          types.String `tfsdk:"url"`
 	AccessToken  types.String `tfsdk:"access_token"`
 	CheckLicense types.Bool   `tfsdk:"check_license"`
 }
 
-func New() func() provider.Provider {
+func NewProvider() func() provider.Provider {
 	return func() provider.Provider {
-		return &platformProvider{}
+		return &PlatformProvider{}
 	}
 }
 
-func (p *platformProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	// check if Terraform version is >=1.0.0, i.e. support protocol v6
-	supportProtocolV6, err := util.CheckVersion(req.TerraformVersion, "1.0.0")
-	if err != nil {
-		resp.Diagnostics.Append(diag.NewWarningDiagnostic("failed to check Terraform version", err.Error()))
-	}
-
-	if !supportProtocolV6 {
-		resp.Diagnostics.Append(diag.NewWarningDiagnostic(
-			"Terraform CLI version deprecation",
-			"Terraform version older than 1.0 will no longer be supported in Q1 2024. Please upgrade to latest Terraform CLI.",
-		))
-	}
-
+func (p *PlatformProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	// Check environment variables, first available OS variable will be assigned to the var
-	url := util.CheckEnvVars([]string{"JFROG_URL", "ARTIFACTORY_URL"}, "")
-	accessToken := util.CheckEnvVars([]string{"JFROG_ACCESS_TOKEN", "ARTIFACTORY_ACCESS_TOKEN"}, "")
+	url := util.CheckEnvVars([]string{"JFROG_URL"}, "")
+	accessToken := util.CheckEnvVars([]string{"JFROG_ACCESS_TOKEN"}, "")
 
-	var config platformProvider
+	var config platformProviderModel
 
 	// Read configuration data into model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
@@ -72,9 +62,7 @@ func (p *platformProvider) Configure(ctx context.Context, req provider.Configure
 	if accessToken == "" {
 		resp.Diagnostics.AddError(
 			"Missing JFrog Access Token",
-			"While configuring the provider, the Access Token was not found in "+
-				"the JFROG_ACCESS_TOKEN/ARTIFACTORY_ACCESS_TOKEN environment variable or provider "+
-				"configuration block access_token attribute.",
+			"While configuring the provider, the Access Token was not found in the JFROG_ACCESS_TOKEN environment variable or provider configuration block access_token attribute.",
 		)
 		return
 	}
@@ -86,9 +74,7 @@ func (p *platformProvider) Configure(ctx context.Context, req provider.Configure
 	if url == "" {
 		resp.Diagnostics.AddError(
 			"Missing URL Configuration",
-			"While configuring the provider, the url was not found in "+
-				"the JFROG_URL/ARTIFACTORY_URL environment variable or provider "+
-				"configuration block url attribute.",
+			"While configuring the provider, the url was not found in the JFROG_URL environment variable or provider configuration block url attribute.",
 		)
 		return
 	}
@@ -131,39 +117,39 @@ func (p *platformProvider) Configure(ctx context.Context, req provider.Configure
 	featureUsage := fmt.Sprintf("Terraform/%s", req.TerraformVersion)
 	util.SendUsage(ctx, restyBase, productId, featureUsage)
 
-	resp.DataSourceData = util.ProvderMetadata{
+	meta := util.ProvderMetadata{
 		Client:             restyBase,
 		ArtifactoryVersion: version,
 	}
 
-	resp.ResourceData = util.ProvderMetadata{
-		Client:             restyBase,
-		ArtifactoryVersion: version,
-	}
+	p.Meta = meta
+
+	resp.DataSourceData = meta
+	resp.ResourceData = meta
 }
 
-func (p *platformProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
+func (p *PlatformProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
 	resp.TypeName = "platform"
 	resp.Version = Version
 }
 
-func (p *platformProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
+func (p *PlatformProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		// NewDataSource,
 	}
 }
 
-func (p *platformProvider) Resources(ctx context.Context) []func() resource.Resource {
+func (p *PlatformProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
-		// NewResourceWorkerService,
+		NewWorkerServiceResource,
 	}
 }
 
-func (p *platformProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
+func (p *PlatformProvider) Schema(ctx context.Context, req provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"url": schema.StringAttribute{
-				Description: "Artifactory URL.",
+				Description: "JFROG Platform URL.",
 				Optional:    true,
 				Validators: []validator.String{
 					validator_string.IsURLHttpOrHttps(),
