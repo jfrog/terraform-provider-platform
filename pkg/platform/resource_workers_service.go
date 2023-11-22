@@ -2,7 +2,9 @@ package platform
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -17,9 +19,19 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/jfrog/terraform-provider-shared/util"
 	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
+	"github.com/samber/lo"
 )
 
 const WorkersServiceEndpoint = "worker/api/v1/workers"
+
+var validActions = []string{
+	"BEFORE_DOWNLOAD",
+	"AFTER_DOWNLOAD",
+	"BEFORE_UPLOAD",
+	"AFTER_CREATE",
+	"AFTER_BUILD_INFO_SAVE",
+	"AFTER_MOVE",
+}
 
 var _ resource.Resource = (*workersServiceResource)(nil)
 
@@ -59,15 +71,8 @@ func (r *workersServiceResource) Schema(ctx context.Context, req resource.Schema
 			},
 			"action": schema.StringAttribute{
 				Required:    true,
-				Description: "The worker action with which the worker is associated",
-				Validators: []validator.String{stringvalidator.OneOf(
-					"BEFORE_DOWNLOAD",
-					"AFTER_DOWNLOAD",
-					"BEFORE_UPLOAD",
-					"AFTER_CREATE",
-					"AFTER_BUILD_INFO_SAVE",
-					"AFTER_MOVE",
-				)},
+				Description: fmt.Sprintf("The worker action with which the worker is associated. Valid values: %s", strings.Join(validActions, ", ")),
+				Validators:  []validator.String{stringvalidator.OneOf(validActions...)},
 			},
 			"filter_criteria": schema.SingleNestedAttribute{
 				Required:    true,
@@ -97,7 +102,7 @@ func (r *workersServiceResource) Schema(ctx context.Context, req resource.Schema
 			},
 			"secrets": schema.SetNestedAttribute{
 				Optional:    true,
-				Description: `The secrets to be added to the worker. You must provide the secret in the following format.\n\n{\n  "key": string,\n  "value": string\n}`,
+				Description: "The secrets to be added to the worker.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"key": schema.StringAttribute{
@@ -112,27 +117,7 @@ func (r *workersServiceResource) Schema(ctx context.Context, req resource.Schema
 				},
 			},
 		},
-	}
-}
-
-func (r workersServiceResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var data workersServiceResourceModel
-
-	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	if !data.Enabled.ValueBool() {
-		return
-	}
-
-	if data.Enabled.ValueBool() && (data.FilterCriteria.IsNull() || data.FilterCriteria.IsUnknown()) {
-		resp.Diagnostics.AddAttributeError(
-			path.Root("filter_criteria"),
-			"Missing Attribute Configuration",
-			"Expected filter_criteria to be configured when enabled is set to 'true'.",
-		)
+		Description: "Provides a JFrog [Workers Service](https://jfrog.com/help/r/jfrog-platform-administration-documentation/workers-service) resource. This can be used to create and manage Workers Service.\n\n!>JFrog Workers Service is only available for JFrog Cloud customers to use free of charge during the beta period. The API may not be backward compatible after the beta period is over. Be aware of this caveat when you create workers during this period.",
 	}
 }
 
@@ -156,7 +141,7 @@ type artifactFilterCriteriaResourceModel struct {
 	ExcludePatterns types.Set `tfsdk:"exclude_patterns"`
 }
 
-func (r *workersServiceResourceModel) toAPIModel(ctx context.Context, apiModel *WorkersServiceAPIModel) (ds diag.Diagnostics) {
+func (r *workersServiceResourceModel) toAPIModel(ctx context.Context, apiModel *WorkersServiceAPIModel, secretKeysToBeRemoved []string) (ds diag.Diagnostics) {
 	var filterCriteria filterCriteriaResourceModel
 	ds.Append(r.FilterCriteria.As(ctx, &filterCriteria, basetypes.ObjectAsOptions{})...)
 	if ds.HasError() {
@@ -178,13 +163,22 @@ func (r *workersServiceResourceModel) toAPIModel(ctx context.Context, apiModel *
 	var excludePatterns []string
 	artifactFilterCriteria.ExcludePatterns.ElementsAs(ctx, &excludePatterns, false)
 
-	var secrets []secretAPIModel
-	for _, secret := range r.Secrets.Elements() {
-		attr := secret.(types.Object).Attributes()
+	secrets := lo.Map[attr.Value](
+		r.Secrets.Elements(),
+		func(elem attr.Value, index int) secretAPIModel {
+			attr := elem.(types.Object).Attributes()
 
+			return secretAPIModel{
+				Key:   attr["key"].(types.String).ValueString(),
+				Value: attr["value"].(types.String).ValueString(),
+			}
+		},
+	)
+
+	for _, secretKeyToBeRemoved := range secretKeysToBeRemoved {
 		s := secretAPIModel{
-			Key:   attr["key"].(types.String).ValueString(),
-			Value: attr["value"].(types.String).ValueString(),
+			Key:              secretKeyToBeRemoved,
+			MarkedForRemoval: true,
 		}
 
 		secrets = append(secrets, s)
@@ -342,7 +336,7 @@ func (r *workersServiceResource) Create(ctx context.Context, req resource.Create
 	}
 
 	var workersService WorkersServiceAPIModel
-	resp.Diagnostics.Append(plan.toAPIModel(ctx, &workersService)...)
+	resp.Diagnostics.Append(plan.toAPIModel(ctx, &workersService, []string{})...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -407,22 +401,43 @@ func (r *workersServiceResource) Update(ctx context.Context, req resource.Update
 	var plan workersServiceResourceModel
 	var state workersServiceResourceModel
 
-	diags := req.Config.Get(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(req.Config.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	diags = req.State.Get(ctx, &state)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// plan.Secrets.
+	planSecrets := lo.Map[attr.Value](
+		plan.Secrets.Elements(),
+		func(elem attr.Value, index int) secretAPIModel {
+			attrs := elem.(types.Object).Attributes()
+			return secretAPIModel{
+				Key: attrs["key"].(types.String).ValueString(),
+			}
+		},
+	)
+
+	stateSecrets := lo.Map[attr.Value](state.Secrets.Elements(), func(elem attr.Value, index int) secretAPIModel {
+		attrs := elem.(types.Object).Attributes()
+		return secretAPIModel{
+			Key: attrs["key"].(types.String).ValueString(),
+		}
+	})
+
+	_, secretsToBeRemoved := lo.Difference[secretAPIModel](planSecrets, stateSecrets)
+	secretKeysToBeRemovedKeys := lo.Map[secretAPIModel](
+		secretsToBeRemoved,
+		func(x secretAPIModel, index int) string {
+			return x.Key
+		},
+	)
 
 	var workersService WorkersServiceAPIModel
-	resp.Diagnostics.Append(plan.toAPIModel(ctx, &workersService)...)
+	resp.Diagnostics.Append(plan.toAPIModel(ctx, &workersService, secretKeysToBeRemovedKeys)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -441,8 +456,7 @@ func (r *workersServiceResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	diags = resp.State.Set(ctx, &plan)
-	resp.Diagnostics.Append(diags...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *workersServiceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
