@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -15,6 +17,11 @@ import (
 const testSourceCode = "export default async (context: PlatformContext, data: BeforeDownloadRequest): Promise<BeforeDownloadResponse> => { console.log(await context.clients.platformHttp.get('/artifactory/api/system/ping')); console.log(await axios.get('https://my.external.resource')); return { status: 'DOWNLOAD_PROCEED', message: 'proceed', } }"
 
 func TestAccWorkersService_full(t *testing.T) {
+	jfrogURL := os.Getenv("JFROG_URL")
+	if !strings.HasSuffix(jfrogURL, "jfrog.io") {
+		t.Skipf("JFROG_URL '%s' is not a cloud instance. Workers Service is only available on cloud.", jfrogURL)
+	}
+
 	_, fqrn, workersServiceName := testutil.MkNames("test-workers-service-", "platform_workers_service")
 	_, _, repoKey := testutil.MkNames("test-repo-local-", "artifactory_local_generic_repository")
 
