@@ -1,12 +1,8 @@
 terraform {
   required_providers {
-    artifactory = {
-      source  = "registry.terraform.io/jfrog/artifactory"
-      version = "9.9.0"
-    }
     platform = {
       source  = "registry.terraform.io/jfrog/platform"
-      version = "1.0.0"
+      version = "0.0.1"
     }
   }
 }
@@ -16,18 +12,9 @@ variable "jfrog_url" {
   default = "http://localhost:8081"
 }
 
-provider "artifactory" {
-  url = "${var.jfrog_url}"
-  // supply JFROG_ACCESS_TOKEN as env var
-}
-
 provider "platform" {
   url = "${var.jfrog_url}"
   // supply JFROG_ACCESS_TOKEN as env var
-}
-
-resource "artifactory_local_generic_repository" "my-generic-local" {
-  key = "my-generic-local"
 }
 
 resource "platform_workers_service" "my-workers-service" {
@@ -39,7 +26,7 @@ resource "platform_workers_service" "my-workers-service" {
 
   filter_criteria = {
     artifact_filter_criteria = {
-      repo_keys = [artifactory_local_generic_repository.my-generic-local.key]
+      repo_keys = ["my-generic-local"]
     }
   }
 
