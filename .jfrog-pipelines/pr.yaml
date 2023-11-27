@@ -158,7 +158,7 @@ pipelines:
             - name: partnership_slack
             - name: partnership_github
           inputSteps:
-            - name: build_and_run_tf_provider_matrix
+            - name: build_and_run_tf_provider
           inputResources:
             - name: terraform_provider_platform
         execution:
