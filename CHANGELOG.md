@@ -1,4 +1,4 @@
-## 1.0.1 (Nov 28, 2023)
+## 1.0.1 (Nov 28, 2023). Tested on Artifactory 7.71.5 with Terraform CLI v1.6.4
 
 IMPROVEMENTS:
 
