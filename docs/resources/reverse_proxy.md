@@ -47,3 +47,11 @@ resource "platform_reverse_proxy" "my-reverse-proxy" {
 - `ssl_certificate_path` (String) The full path of the certificate file on the web server, e.g. `/etc/ssl/certs/myserver.crt`. Must be set when `use_https` is set to `true`
 - `ssl_key_path` (String) The full path of the key file on the web server, e.g. `/etc/ssl/private/myserver.key`. Must be set when `use_https` is set to `true`
 - `use_https` (Boolean) When set, Artifactory will be accessible via HTTPS at the corresponding port that is set. Only settable when `server_provider` is set to `NIGNIX` or `APACHE`
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+terraform import platform_reverse_proxy.my-reverse-proxy DIRECT
+```

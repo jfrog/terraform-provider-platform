@@ -1,0 +1,1 @@
+terraform import platform_reverse_proxy.my-reverse-proxy DIRECT
