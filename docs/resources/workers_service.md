@@ -86,3 +86,11 @@ Required:
 
 - `key` (String) The name of the secret.
 - `value` (String) The name of the secret.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+terraform import platform_workers_service.my-worker-service my-worker-service-key
+```
