@@ -14,7 +14,7 @@ terraform {
 
 variable "jfrog_url" {
   type = string
-  default = "https://partnership.jfrog.io"
+  default = "https://myinstance.jfrog.io"
 }
 
 provider "platform" {
