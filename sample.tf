@@ -2,12 +2,12 @@ terraform {
   required_providers {
     platform = {
       source  = "registry.terraform.io/jfrog/platform"
-      version = "1.0.3"
+      version = "1.0.2"
     }
 
     artifactory = {
       source  = "registry.terraform.io/jfrog/artifactory"
-      version = "10.0.0"
+      version = "10.0.2"
     }
   }
 }
@@ -18,6 +18,11 @@ variable "jfrog_url" {
 }
 
 provider "platform" {
+  url = "${var.jfrog_url}"
+  // supply JFROG_ACCESS_TOKEN as env var
+}
+
+provider "artifactory" {
   url = "${var.jfrog_url}"
   // supply JFROG_ACCESS_TOKEN as env var
 }
