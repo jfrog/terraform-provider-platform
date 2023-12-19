@@ -20,7 +20,16 @@ resource "platform_workers_service" "my-workers-service" {
   key         = "my-workers-service"
   enabled     = true
   description = "My workers service"
-  source_code = "export default async (context: PlatformContext, data: BeforeDownloadRequest): Promise<BeforeDownloadResponse> => { console.log(await context.clients.platformHttp.get('/artifactory/api/system/ping')); console.log(await axios.get('https://my.external.resource')); return { status: 'DOWNLOAD_PROCEED', message: 'proceed', } }"
+  source_code = <<EOT
+export default async (context: PlatformContext, data: BeforeDownloadRequest): Promise<BeforeDownloadResponse> => {
+  console.log(await context.clients.platformHttp.get('/artifactory/api/system/ping'));
+  console.log(await axios.get('https://my.external.resource'));
+  return {
+    status: 'DOWNLOAD_PROCEED',
+    message: 'proceed',
+  }
+}
+EOT
   action      = "BEFORE_DOWNLOAD"
 
   filter_criteria = {

@@ -2,14 +2,14 @@ terraform {
   required_providers {
     platform = {
       source  = "registry.terraform.io/jfrog/platform"
-      version = "1.0.0"
+      version = "1.0.2"
     }
   }
 }
 
 variable "jfrog_url" {
   type = string
-  default = "http://localhost:8081"
+  default = "https://my.jfrog.io"
 }
 
 provider "platform" {
@@ -21,8 +21,17 @@ resource "platform_workers_service" "my-workers-service" {
   key         = "my-workers-service"
   enabled     = true
   description = "My workers service"
-  source_code = "export default async (context: PlatformContext, data: BeforeDownloadRequest): Promise<BeforeDownloadResponse> => { console.log(await context.clients.platformHttp.get('/artifactory/api/system/ping')); console.log(await axios.get('https://my.external.resource')); return { status: 'DOWNLOAD_PROCEED', message: 'proceed', } }"
-  action      = "BEFORE_DOWNLOAD"
+  source_code = <<EOT
+export default async (context: PlatformContext, data: BeforeDownloadRequest): Promise<BeforeDownloadResponse> => {
+  console.log(await context.clients.platform Http.get('/artifactory/api/system/ping'));
+  console.log(await axios.get('https://my.external.resource'));
+  return {
+    status: 'DOWNLOAD_PROCEED',
+    message: 'proceed',
+  }
+}
+EOT
+  action = "BEFORE_DOWNLOAD"
 
   filter_criteria = {
     artifact_filter_criteria = {
