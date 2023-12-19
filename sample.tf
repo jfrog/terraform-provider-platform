@@ -4,31 +4,17 @@ terraform {
       source  = "registry.terraform.io/jfrog/platform"
       version = "1.0.2"
     }
-
-    artifactory = {
-      source  = "registry.terraform.io/jfrog/artifactory"
-      version = "10.0.2"
-    }
   }
 }
 
 variable "jfrog_url" {
   type = string
-  default = "https://myinstance.jfrog.io"
+  default = "https://partnership.jfrog.io"
 }
 
 provider "platform" {
   url = "${var.jfrog_url}"
   // supply JFROG_ACCESS_TOKEN as env var
-}
-
-provider "artifactory" {
-  url = "${var.jfrog_url}"
-  // supply JFROG_ACCESS_TOKEN as env var
-}
-
-resource "artifactory_local_generic_repository" "my-generic-local" {
-  key = "my-generic-local"
 }
 
 resource "platform_workers_service" "my-workers-service" {
@@ -37,7 +23,7 @@ resource "platform_workers_service" "my-workers-service" {
   description = "My workers service"
   source_code = <<EOT
 export default async (context: PlatformContext, data: BeforeDownloadRequest): Promise<BeforeDownloadResponse> => {
-  console.log(await context.clients.platformHttp.get('/artifactory/api/system/ping'));
+  console.log(await context.clients.platform Http.get('/artifactory/api/system/ping'));
   console.log(await axios.get('https://my.external.resource'));
   return {
     status: 'DOWNLOAD_PROCEED',
@@ -45,11 +31,11 @@ export default async (context: PlatformContext, data: BeforeDownloadRequest): Pr
   }
 }
 EOT
-  action      = "BEFORE_DOWNLOAD"
+  action = "BEFORE_DOWNLOAD"
 
   filter_criteria = {
     artifact_filter_criteria = {
-      repo_keys = [artifactory_local_generic_repository.my-generic-local.key]
+      repo_keys = ["my-generic-local"]
     }
   }
 
