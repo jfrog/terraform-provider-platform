@@ -211,7 +211,7 @@ pipelines:
                 export DESCRIPTION="All tests passed successfully."
                 git clone https://${int_partnership_github_token}@github.com/jfrog/terraform-provider-shared.git
                 ./terraform-provider-shared/scripts/github-status.sh ${res_terraform_provider_platform_gitProvider_token} ${res_terraform_provider_platform_gitRepoFullName} ${res_terraform_provider_platform_commitSha}
-                send_notification partnership_slack --text "<${res_terraform_provider_platform_gitRepoRepositoryHttpsUrl}|Terraform Provider>. A new PR was submitted by *${PR_COMMITTER}* - <${PR_URL}|${PR_TITLE}>, branch *${PR_BRANCH}*. Changes tested successfully. <@U01H1SLSPA8> or <@UNDRUL1EU> please, review and merge."
+                send_notification partnership_slack --text "<${res_terraform_provider_platform_gitRepoRepositoryHttpsUrl}|Terraform Provider Platform>. A new PR was submitted by *${PR_COMMITTER}* - <${PR_URL}|${PR_TITLE}>, branch *${PR_BRANCH}*. Changes tested successfully. <@U01H1SLSPA8> or <@UNDRUL1EU> please, review and merge."
               fi
           onFailure:
             - echo "Failure, sending status to GitHub and Slack."
