@@ -38,6 +38,7 @@ pipelines:
             - name: partnership_slack
             - name: partnership_github
             - name: partnership_rt_cluster_license
+            - name: partnership_rt_test_licenses
           inputResources:
             - name: terraform_provider_platform
           environmentVariables:
@@ -84,6 +85,10 @@ pipelines:
             - cat sample.tf
             - echo "Save RT licenses from the variable to the license file"
             - echo ${int_partnership_rt_cluster_license_5licenses} > scripts/artifactory.lic
+            - echo ${int_partnership_rt_test_licenses_1} > scripts/artifactory_test_1.lic
+            - export JFROG_LICENSE_PATH_1=${res_terraform_provider_platform_resourcePath}/scripts/artifactory_test_1.lic
+            - echo ${int_partnership_rt_test_licenses_2} > scripts/artifactory_test_2.lic
+            - export JFROG_LICENSE_PATH_2=${res_terraform_provider_platform_resourcePath}/scripts/artifactory_test_2.lic
             - echo "Set Artifactory version, run RT in a container"
             - >-
               if [[ ${USE_LATEST_RT_VERSION} == "true" ]]; then
