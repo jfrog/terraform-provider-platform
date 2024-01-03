@@ -1,3 +1,9 @@
+## 1.2.0 (Jan 4, 2023)
+
+FEATURES:
+
+* **New Resource:** `platform_license`: PR: [#20](https://github.com/jfrog/terraform-provider-platform/pull/20) Issue: [#12](https://github.com/jfrog/terraform-provider-platform/issues/12)
+
 ## 1.1.0 (Dec 14, 2023). Tested on Artifactory 7.71.10 with Terraform CLI v1.6.6
 
 FEATURES:
