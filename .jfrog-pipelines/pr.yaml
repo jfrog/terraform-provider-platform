@@ -38,6 +38,7 @@ pipelines:
             - name: partnership_slack
             - name: partnership_github
             - name: partnership_rt_cluster_license
+            - name: partnership_rt_test_licenses
           inputResources:
             - name: terraform_provider_platform
           environmentVariables:
@@ -84,6 +85,10 @@ pipelines:
             - cat sample.tf
             - echo "Save RT licenses from the variable to the license file"
             - echo ${int_partnership_rt_cluster_license_5licenses} > scripts/artifactory.lic
+            - echo ${int_partnership_rt_test_licenses_1} > scripts/artifactory_test_1.lic
+            - export JFROG_LICENSE_PATH_1=${res_terraform_provider_platform_resourcePath}/scripts/artifactory_test_1.lic
+            - echo ${int_partnership_rt_test_licenses_2} > scripts/artifactory_test_2.lic
+            - export JFROG_LICENSE_PATH_2=${res_terraform_provider_platform_resourcePath}/scripts/artifactory_test_2.lic
             - echo "Set Artifactory version, run RT in a container"
             - >-
               if [[ ${USE_LATEST_RT_VERSION} == "true" ]]; then
@@ -206,7 +211,7 @@ pipelines:
                 export DESCRIPTION="All tests passed successfully."
                 git clone https://${int_partnership_github_token}@github.com/jfrog/terraform-provider-shared.git
                 ./terraform-provider-shared/scripts/github-status.sh ${res_terraform_provider_platform_gitProvider_token} ${res_terraform_provider_platform_gitRepoFullName} ${res_terraform_provider_platform_commitSha}
-                send_notification partnership_slack --text "<${res_terraform_provider_platform_gitRepoRepositoryHttpsUrl}|Terraform Provider>. A new PR was submitted by *${PR_COMMITTER}* - <${PR_URL}|${PR_TITLE}>, branch *${PR_BRANCH}*. Changes tested successfully. <@U01H1SLSPA8> or <@UNDRUL1EU> please, review and merge."
+                send_notification partnership_slack --text "<${res_terraform_provider_platform_gitRepoRepositoryHttpsUrl}|Terraform Provider Platform>. A new PR was submitted by *${PR_COMMITTER}* - <${PR_URL}|${PR_TITLE}>, branch *${PR_BRANCH}*. Changes tested successfully. <@U01H1SLSPA8> or <@UNDRUL1EU> please, review and merge."
               fi
           onFailure:
             - echo "Failure, sending status to GitHub and Slack."
