@@ -1,0 +1,1 @@
+terraform import platform_permission.my-permission my-permission-name
