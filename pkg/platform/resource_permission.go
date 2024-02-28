@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/mapvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -13,19 +12,20 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/jfrog/terraform-provider-shared/util"
 	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
+	"github.com/samber/lo"
 )
 
-const permissionEndpoint = "/access/api/v2/permissions"
+const PermissionEndpoint = "/access/api/v2/permissions"
 
 var _ resource.Resource = (*permissionResource)(nil)
 
@@ -41,36 +41,39 @@ func (r *permissionResource) Metadata(_ context.Context, req resource.MetadataRe
 	resp.TypeName = req.ProviderTypeName + "_permission"
 }
 
-var actionsMapValidators = []validator.Map{
-	mapvalidator.ValueSetsAre(
-		setvalidator.SizeAtLeast(1),
-		setvalidator.ValueStringsAre(stringvalidator.OneOf([]string{"WRITE", "MANAGE", "SCAN", "DELETE", "READ", "ANNOTATE", "EXECUTE"}...)),
-	),
+var usersGroupsAttributeSchema = func(description string) schema.SetNestedAttribute {
+	return schema.SetNestedAttribute{
+		NestedObject: schema.NestedAttributeObject{
+			Attributes: map[string]schema.Attribute{
+				"name": schema.StringAttribute{
+					Required: true,
+				},
+				"permissions": schema.SetAttribute{
+					ElementType: types.StringType,
+					Required:    true,
+					Validators: []validator.Set{
+						setvalidator.ValueStringsAre(stringvalidator.OneOf([]string{"WRITE", "MANAGE", "SCAN", "DELETE", "READ", "ANNOTATE", "EXECUTE"}...)),
+					},
+					PlanModifiers: []planmodifier.Set{
+						setplanmodifier.UseStateForUnknown(),
+					},
+					MarkdownDescription: description,
+				},
+			},
+		},
+		Optional: true,
+		PlanModifiers: []planmodifier.Set{
+			setplanmodifier.UseStateForUnknown(),
+		},
+	}
 }
 
 var actionsAttributeSchema = func(description string) schema.SingleNestedAttribute {
 	return schema.SingleNestedAttribute{
 		Optional: true,
-		// Computed: true,
 		Attributes: map[string]schema.Attribute{
-			"users": schema.MapAttribute{
-				ElementType: types.SetType{ElemType: types.StringType},
-				Optional:    true,
-				Validators:  actionsMapValidators,
-				PlanModifiers: []planmodifier.Map{
-					mapplanmodifier.UseStateForUnknown(),
-				},
-				MarkdownDescription: description,
-			},
-			"groups": schema.MapAttribute{
-				ElementType: types.SetType{ElemType: types.StringType},
-				Optional:    true,
-				Validators:  actionsMapValidators,
-				PlanModifiers: []planmodifier.Map{
-					mapplanmodifier.UseStateForUnknown(),
-				},
-				MarkdownDescription: description,
-			},
+			"users":  usersGroupsAttributeSchema(description),
+			"groups": usersGroupsAttributeSchema(description),
 		},
 		PlanModifiers: []planmodifier.Object{
 			objectplanmodifier.UseStateForUnknown(),
@@ -78,11 +81,21 @@ var actionsAttributeSchema = func(description string) schema.SingleNestedAttribu
 	}
 }
 
-var targetAttributeSchema = func(includeDescription, excludeDescription string) schema.MapNestedAttribute {
-	return schema.MapNestedAttribute{
+var targetAttributeSchema = func(isBuild bool, nameDescription, includeDescription, excludeDescription string) schema.SetNestedAttribute {
+	nameValidators := []validator.String{}
+	if isBuild {
+		nameValidators = append(nameValidators, stringvalidator.OneOf([]string{"artifactory-build-info"}...))
+	}
+
+	attr := schema.SetNestedAttribute{
 		Required: true,
 		NestedObject: schema.NestedAttributeObject{
 			Attributes: map[string]schema.Attribute{
+				"name": schema.StringAttribute{
+					Required:            true,
+					Validators:          nameValidators,
+					MarkdownDescription: nameDescription,
+				},
 				"include_patterns": schema.SetAttribute{
 					ElementType: types.StringType,
 					Optional:    true,
@@ -93,19 +106,33 @@ var targetAttributeSchema = func(includeDescription, excludeDescription string) 
 					Validators: []validator.Set{
 						setvalidator.SizeAtLeast(1),
 					},
+					PlanModifiers: []planmodifier.Set{
+						setplanmodifier.UseStateForUnknown(),
+					},
 					MarkdownDescription: includeDescription,
 				},
 				"exclude_patterns": schema.SetAttribute{
-					ElementType:         types.StringType,
-					Optional:            true,
-					MarkdownDescription: excludeDescription,
+					ElementType: types.StringType,
+					Optional:    true,
 					Validators: []validator.Set{
 						setvalidator.SizeAtLeast(1),
 					},
+					PlanModifiers: []planmodifier.Set{
+						setplanmodifier.UseStateForUnknown(),
+					},
+					MarkdownDescription: excludeDescription,
 				},
 			},
 		},
 	}
+
+	if isBuild {
+		attr.Validators = []validator.Set{
+			setvalidator.SizeAtMost(1),
+		}
+	}
+
+	return attr
 }
 
 func (r *permissionResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -130,6 +157,8 @@ func (r *permissionResource) Schema(ctx context.Context, req resource.SchemaRequ
 							"**MANAGE**: Allows changing the permission settings for other users in this permission target. It does not permit adding/removing resources to the permission target.",
 					),
 					"targets": targetAttributeSchema(
+						false,
+						"Specify repository key as name. Use `ANY_LOCAL`, `ANY_REMOTE`, or `ANY_DISTRIBUTION` for any repository type.",
 						"Simple comma separated wildcard patterns for **existing and future** repository artifact paths (with no leading slash). Ant-style path expressions are supported (*, **, ?). For example: `org/apache/**`",
 						"Simple comma separated wildcard patterns for **existing and future** repository artifact paths (with no leading slash). Ant-style path expressions are supported (*, **, ?). For example: `org/apache/**`",
 					),
@@ -148,6 +177,8 @@ func (r *permissionResource) Schema(ctx context.Context, req resource.SchemaRequ
 							"**MANAGE**: Allows changing build info permission settings for other users in this permission target. It does not permit adding/removing resources to the permission target.",
 					),
 					"targets": targetAttributeSchema(
+						true,
+						"Only `artifactory-build-info` is allowed for name. Specify build name as part of the `include_patterns` or `exclude_patterns`.",
 						"Use Ant-style wildcard patterns to specify **existing and future** build names (i.e. artifact paths) in the build info repository (without a leading slash) that will be included in this permission target. Ant-style path expressions are supported (*, **, ?). For example, an `apache/**` pattern will include the \"apache\" build info in the permission.",
 						"Use Ant-style wildcard patterns to specify **existing and future** build names (i.e. artifact paths) in the build info repository (without a leading slash) that will be excluded from this permission target. Ant-style path expressions are supported (*, **, ?). For example, an `apache/**` pattern will exclude the \"apache\" build info from the permission.",
 					),
@@ -167,6 +198,8 @@ func (r *permissionResource) Schema(ctx context.Context, req resource.SchemaRequ
 							"**MANAGE**: Allows changing Release Bundle permission settings for other users in this permission target. It does not permit adding/removing resources to the permission target.",
 					),
 					"targets": targetAttributeSchema(
+						false,
+						"Specify release bundle repository key as name.",
 						"Simple wildcard patterns for **existing and future** Release Bundle names. Ant-style path expressions are supported (*, **, ?). For example: `product_*/**`",
 						"Simple wildcard patterns for **existing and future** Release Bundle names. Ant-style path expressions are supported (*, **, ?). For example: `product_*/**`",
 					),
@@ -182,6 +215,8 @@ func (r *permissionResource) Schema(ctx context.Context, req resource.SchemaRequ
 							"**MANAGE**: Adds and deletes users who can distribute Release Bundles on assigned destinations.",
 					),
 					"targets": targetAttributeSchema(
+						false,
+						"Specify destination name as name. Use `*` to include all destinations.",
 						"Simple wildcard patterns for existing and future JPD or city names. Ant-style path expressions are supported (*, **, ?). For example: `site_*` or `New*`",
 						"Simple wildcard patterns for existing and future JPD or city names. Ant-style path expressions are supported (*, **, ?). For example: `site_*` or `New*`",
 					),
@@ -197,6 +232,8 @@ func (r *permissionResource) Schema(ctx context.Context, req resource.SchemaRequ
 							"**MANAGE**: Create and edit pipeline sources.",
 					),
 					"targets": targetAttributeSchema(
+						false,
+						"Specify pipeline source name as name. Use `*` to include all pipeline sources.",
 						"Use Ant-style wildcard patterns to specify the full repository name of the **existing and future** pipeline sources that will be included in this permission. The pattern should have the following format: `{FULL_REPOSITORY_NAME_PATTERN}/**`. Ant-style path expressions are supported (*, **, ?). For example, the pattern `*/*test*/**` will include all repositories that contain the word \"test\" regardless of the repository owner.",
 						"Use Ant-style wildcard patterns to specify the full repository name of the **existing and future** pipeline sources that will be excluded from this permission. The pattern should have the following format: `{FULL_REPOSITORY_NAME_PATTERN}/**`. Ant-style path expressions are supported (*, **, ?). For example, the pattern `*/*test*/**` will exclude all repositories that contain the word \"test\" regardless of the repository owner.",
 					),
@@ -231,17 +268,23 @@ type permissionResourceModel struct {
 
 type permissionActionsTargetsResourceModel struct {
 	Actions types.Object `tfsdk:"actions"`
-	Targets types.Map    `tfsdk:"targets"`
+	Targets types.Set    `tfsdk:"targets"`
 }
 
 type permissionActionsResourceModel struct {
-	Users  types.Map `tfsdk:"users"`
-	Groups types.Map `tfsdk:"groups"`
+	Users  types.Set `tfsdk:"users"`
+	Groups types.Set `tfsdk:"groups"`
+}
+
+type permissionUsersGroupsResourceModel struct {
+	Name        types.String `tfsdk:"name"`
+	Permissions types.Set    `tfsdk:"permissions"`
 }
 
 type permissionTargetsResourceModel struct {
-	IncludePatterns types.Set `tfsdk:"include_patterns"`
-	ExcludePatterns types.Set `tfsdk:"exclude_patterns"`
+	Name            types.String `tfsdk:"name"`
+	IncludePatterns types.Set    `tfsdk:"include_patterns"`
+	ExcludePatterns types.Set    `tfsdk:"exclude_patterns"`
 }
 
 func (r *permissionResourceModel) toResourceAPIModel(ctx context.Context, tfResource types.Object, apiResource *permissionActionsTargetsAPIModel) (ds diag.Diagnostics) {
@@ -261,29 +304,29 @@ func (r *permissionResourceModel) toResourceAPIModel(ctx context.Context, tfReso
 
 		users := make(map[string][]string)
 		if !actionsResource.Users.IsNull() {
-			var usersResource map[string]types.Set
-			ds.Append(actionsResource.Users.ElementsAs(ctx, &usersResource, false)...)
+			var usersResources []permissionUsersGroupsResourceModel
+			ds.Append(actionsResource.Users.ElementsAs(ctx, &usersResources, false)...)
 			if ds.HasError() {
 				return
 			}
-			for k, v := range usersResource {
+			for _, us := range usersResources {
 				var permissions []string
-				v.ElementsAs(ctx, &permissions, false)
-				users[k] = permissions
+				us.Permissions.ElementsAs(ctx, &permissions, false)
+				users[us.Name.ValueString()] = permissions
 			}
 		}
 
 		groups := make(map[string][]string)
 		if !actionsResource.Groups.IsNull() {
-			var groupsResource map[string]types.Set
-			ds.Append(actionsResource.Groups.ElementsAs(ctx, &groupsResource, false)...)
+			var groupsResources []permissionUsersGroupsResourceModel
+			ds.Append(actionsResource.Groups.ElementsAs(ctx, &groupsResources, false)...)
 			if ds.HasError() {
 				return
 			}
-			for k, v := range groupsResource {
+			for _, gs := range groupsResources {
 				var permissions []string
-				v.ElementsAs(ctx, &permissions, false)
-				groups[k] = permissions
+				gs.Permissions.ElementsAs(ctx, &permissions, false)
+				groups[gs.Name.ValueString()] = permissions
 			}
 		}
 
@@ -293,20 +336,20 @@ func (r *permissionResourceModel) toResourceAPIModel(ctx context.Context, tfReso
 		}
 	}
 
-	var targetsResource map[string]permissionTargetsResourceModel
+	var targetsResource []permissionTargetsResourceModel
 	ds.Append(resource.Targets.ElementsAs(ctx, &targetsResource, false)...)
 	if ds.HasError() {
 		return
 	}
 
-	targets := make(map[string]permissionTargetsAPIModel)
-	for k, v := range targetsResource {
+	targets := map[string]permissionTargetsAPIModel{}
+	for _, tr := range targetsResource {
 		var includePatterns []string
 		var excludePatterns []string
-		v.IncludePatterns.ElementsAs(ctx, &includePatterns, false)
-		v.ExcludePatterns.ElementsAs(ctx, &excludePatterns, false)
+		tr.IncludePatterns.ElementsAs(ctx, &includePatterns, false)
+		tr.ExcludePatterns.ElementsAs(ctx, &excludePatterns, false)
 
-		targets[k] = permissionTargetsAPIModel{
+		targets[tr.Name.ValueString()] = permissionTargetsAPIModel{
 			IncludePatterns: includePatterns,
 			ExcludePatterns: excludePatterns,
 		}
@@ -320,7 +363,7 @@ func (r *permissionResourceModel) toResourceAPIModel(ctx context.Context, tfReso
 	return
 }
 
-func (r *permissionResourceModel) toAPIModel(ctx context.Context, apiModel *permissionAPIModel) (ds diag.Diagnostics) {
+func (r *permissionResourceModel) toAPIModel(ctx context.Context, apiModel *PermissionAPIModel) (ds diag.Diagnostics) {
 	resources := make(map[string]*permissionActionsTargetsAPIModel)
 
 	if !r.Artifact.IsNull() {
@@ -353,7 +396,7 @@ func (r *permissionResourceModel) toAPIModel(ctx context.Context, apiModel *perm
 		resources["pipeline_source"] = &pipelineSource
 	}
 
-	*apiModel = permissionAPIModel{
+	*apiModel = PermissionAPIModel{
 		Name:      r.Name.ValueString(),
 		Resources: resources,
 	}
@@ -361,31 +404,83 @@ func (r *permissionResourceModel) toAPIModel(ctx context.Context, apiModel *perm
 	return nil
 }
 
-var permissionResourceModelAttributeTypes types.MapType = types.MapType{
-	ElemType: types.SetType{
-		ElemType: types.StringType,
+var usersGroupsResourceModelAttributeTypes types.ObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"name":        types.StringType,
+		"permissions": types.SetType{ElemType: types.StringType},
 	},
 }
 
 var actionsResourceModelAttributeTypes map[string]attr.Type = map[string]attr.Type{
-	"users":  permissionResourceModelAttributeTypes,
-	"groups": permissionResourceModelAttributeTypes,
+	"users":  types.SetType{ElemType: usersGroupsResourceModelAttributeTypes},
+	"groups": types.SetType{ElemType: usersGroupsResourceModelAttributeTypes},
+}
+
+var targetResourceModelAttributeType map[string]attr.Type = map[string]attr.Type{
+	"name":             types.StringType,
+	"include_patterns": types.SetType{ElemType: types.StringType},
+	"exclude_patterns": types.SetType{ElemType: types.StringType},
 }
 
 var targetsResourceModelAttributeTypes types.ObjectType = types.ObjectType{
-	AttrTypes: map[string]attr.Type{
-		"include_patterns": types.SetType{ElemType: types.StringType},
-		"exclude_patterns": types.SetType{ElemType: types.StringType},
-	},
+	AttrTypes: targetResourceModelAttributeType,
 }
 
 var resourceResourceModelAttributeTypes map[string]attr.Type = map[string]attr.Type{
 	"actions": types.ObjectType{
 		AttrTypes: actionsResourceModelAttributeTypes,
 	},
-	"targets": types.MapType{
+	"targets": types.SetType{
 		ElemType: targetsResourceModelAttributeTypes,
 	},
+}
+
+func (r *permissionResourceModel) fromUsersGroupsAPIModel(ctx context.Context, usersGroups map[string][]string) (set types.Set, ds diag.Diagnostics) {
+	set = types.SetNull(usersGroupsResourceModelAttributeTypes)
+	if len(usersGroups) == 0 {
+		return
+	}
+
+	userGroupSet := lo.MapToSlice(
+		usersGroups,
+		func(name string, permissions []string) attr.Value {
+			ps := types.SetNull(types.StringType)
+			if len(permissions) > 0 {
+				p, d := types.SetValueFrom(ctx, types.StringType, permissions)
+				if d != nil {
+					ds = append(ds, d...)
+				}
+				ps = p
+			}
+
+			t, d := types.ObjectValue(
+				map[string]attr.Type{
+					"name":        types.StringType,
+					"permissions": types.SetType{ElemType: types.StringType},
+				},
+				map[string]attr.Value{
+					"name":        types.StringValue(name),
+					"permissions": ps,
+				},
+			)
+			if d != nil {
+				ds = append(ds, d...)
+			}
+
+			return t
+		},
+	)
+
+	ugs, d := types.SetValue(
+		usersGroupsResourceModelAttributeTypes,
+		userGroupSet,
+	)
+	if d != nil {
+		ds = append(ds, d...)
+	}
+	set = ugs
+
+	return
 }
 
 func (r *permissionResourceModel) fromResourceAPIModel(ctx context.Context, resourceAPIModel *permissionActionsTargetsAPIModel) (obj basetypes.ObjectValue, ds diag.Diagnostics) {
@@ -398,30 +493,14 @@ func (r *permissionResourceModel) fromResourceAPIModel(ctx context.Context, reso
 	if resourceAPIModel.Actions != nil &&
 		(len(resourceAPIModel.Actions.Users) > 0 || len(resourceAPIModel.Actions.Groups) > 0) {
 
-		users := types.MapNull(types.SetType{ElemType: types.StringType})
-		if len(resourceAPIModel.Actions.Users) > 0 {
-			us, d := types.MapValueFrom(
-				ctx,
-				types.SetType{ElemType: types.StringType},
-				resourceAPIModel.Actions.Users,
-			)
-			if d != nil {
-				ds = append(ds, d...)
-			}
-			users = us
+		users, d := r.fromUsersGroupsAPIModel(ctx, resourceAPIModel.Actions.Users)
+		if d != nil {
+			ds = append(ds, d...)
 		}
 
-		groups := types.MapNull(types.SetType{ElemType: types.StringType})
-		if len(resourceAPIModel.Actions.Groups) > 0 {
-			gs, d := types.MapValueFrom(
-				ctx,
-				types.SetType{ElemType: types.StringType},
-				resourceAPIModel.Actions.Groups,
-			)
-			if d != nil {
-				ds = append(ds, d...)
-			}
-			groups = gs
+		groups, d := r.fromUsersGroupsAPIModel(ctx, resourceAPIModel.Actions.Groups)
+		if d != nil {
+			ds = append(ds, d...)
 		}
 
 		as, d := types.ObjectValue(
@@ -437,12 +516,49 @@ func (r *permissionResourceModel) fromResourceAPIModel(ctx context.Context, reso
 		actions = as
 	}
 
-	targets := types.MapNull(targetsResourceModelAttributeTypes)
+	targets := types.SetNull(targetsResourceModelAttributeTypes)
+
 	if len(resourceAPIModel.Targets) > 0 {
-		ts, d := types.MapValueFrom(
-			ctx,
-			targetsResourceModelAttributeTypes,
+		targetSet := lo.MapToSlice(
 			resourceAPIModel.Targets,
+			func(name string, filter permissionTargetsAPIModel) attr.Value {
+				includePatterns := types.SetNull(types.StringType)
+				if len(filter.IncludePatterns) > 0 {
+					s, d := types.SetValueFrom(ctx, types.StringType, filter.IncludePatterns)
+					if d != nil {
+						ds = append(ds, d...)
+					}
+					includePatterns = s
+				}
+
+				excludePatterns := types.SetNull(types.StringType)
+				if len(filter.ExcludePatterns) > 0 {
+					s, d := types.SetValueFrom(ctx, types.StringType, filter.ExcludePatterns)
+					if d != nil {
+						ds = append(ds, d...)
+					}
+					excludePatterns = s
+
+				}
+				t, d := types.ObjectValue(
+					targetResourceModelAttributeType,
+					map[string]attr.Value{
+						"name":             types.StringValue(name),
+						"include_patterns": includePatterns,
+						"exclude_patterns": excludePatterns,
+					},
+				)
+				if d != nil {
+					ds = append(ds, d...)
+				}
+
+				return t
+			},
+		)
+
+		ts, d := types.SetValue(
+			targetsResourceModelAttributeTypes,
+			targetSet,
 		)
 		if d != nil {
 			ds = append(ds, d...)
@@ -464,7 +580,7 @@ func (r *permissionResourceModel) fromResourceAPIModel(ctx context.Context, reso
 	return
 }
 
-func (r *permissionResourceModel) fromAPIModel(ctx context.Context, apiModel *permissionAPIModel) (ds diag.Diagnostics) {
+func (r *permissionResourceModel) fromAPIModel(ctx context.Context, apiModel *PermissionAPIModel) (ds diag.Diagnostics) {
 	r.Name = types.StringValue(apiModel.Name)
 
 	artifact, d := r.fromResourceAPIModel(ctx, apiModel.Resources["artifact"])
@@ -500,7 +616,7 @@ func (r *permissionResourceModel) fromAPIModel(ctx context.Context, apiModel *pe
 	return
 }
 
-type permissionAPIModel struct {
+type PermissionAPIModel struct {
 	Name      string                                       `json:"name"`
 	Resources map[string]*permissionActionsTargetsAPIModel `json:"resources"`
 }
@@ -536,7 +652,7 @@ func (r *permissionResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	var permission permissionAPIModel
+	var permission PermissionAPIModel
 	resp.Diagnostics.Append(plan.toAPIModel(ctx, &permission)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -544,7 +660,7 @@ func (r *permissionResource) Create(ctx context.Context, req resource.CreateRequ
 
 	response, err := r.ProviderData.Client.R().
 		SetBody(&permission).
-		Post(permissionEndpoint)
+		Post(PermissionEndpoint)
 	if err != nil {
 		utilfw.UnableToCreateResourceError(resp, err.Error())
 		return
@@ -567,12 +683,12 @@ func (r *permissionResource) Read(ctx context.Context, req resource.ReadRequest,
 		return
 	}
 
-	var permission permissionAPIModel
+	var permission PermissionAPIModel
 
 	response, err := r.ProviderData.Client.R().
 		SetPathParam("name", state.Name.ValueString()).
 		SetResult(&permission).
-		Get(permissionEndpoint + "/{name}")
+		Get(PermissionEndpoint + "/{name}")
 
 	// Treat HTTP 404 Not Found status as a signal to recreate resource
 	// and return early
@@ -607,7 +723,7 @@ func (r *permissionResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	var permission permissionAPIModel
+	var permission PermissionAPIModel
 	resp.Diagnostics.Append(plan.toAPIModel(ctx, &permission)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -622,7 +738,7 @@ func (r *permissionResource) Update(ctx context.Context, req resource.UpdateRequ
 				"resourceType": resourceType,
 			}).
 			SetBody(resourceValue).
-			Put(permissionEndpoint + "/{name}/{resourceType}")
+			Put(PermissionEndpoint + "/{name}/{resourceType}")
 		if err != nil {
 			utilfw.UnableToUpdateResourceError(resp, err.Error())
 			return
@@ -643,7 +759,7 @@ func (r *permissionResource) Delete(ctx context.Context, req resource.DeleteRequ
 
 	response, err := r.ProviderData.Client.R().
 		SetPathParam("name", data.Name.ValueString()).
-		Delete(permissionEndpoint + "/{name}")
+		Delete(PermissionEndpoint + "/{name}")
 	if err != nil {
 		utilfw.UnableToDeleteResourceError(resp, err.Error())
 		return
