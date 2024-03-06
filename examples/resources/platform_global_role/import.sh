@@ -1,0 +1,1 @@
+terraform import platform_global_role.my-global-role my-global-role
