@@ -1,3 +1,9 @@
+## 1.4.0 (Mar 6, 2024)
+
+FEATURES:
+
+* **New Resource:** `platform_global_role`: PR: [#35](https://github.com/jfrog/terraform-provider-platform/pull/35)
+
 ## 1.3.0 (Feb 29, 2024)
 
 FEATURES:
