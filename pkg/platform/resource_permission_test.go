@@ -317,10 +317,11 @@ func testAccCheckPermissionDestroy(id string) func(*terraform.State) error {
 			Get(url)
 
 		if err != nil {
-			if resp != nil && resp.StatusCode() == http.StatusNotFound {
-				return nil
-			}
 			return err
+		}
+
+		if resp != nil && resp.StatusCode() == http.StatusNotFound {
+			return nil
 		}
 
 		return fmt.Errorf("error: Permission %s still exists", rs.Primary.Attributes["name"])
