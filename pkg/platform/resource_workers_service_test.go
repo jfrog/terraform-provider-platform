@@ -179,10 +179,11 @@ func testAccCheckWorkersServiceDestroy(id string) func(*terraform.State) error {
 			Get(url)
 
 		if err != nil {
-			if resp != nil && resp.StatusCode() == http.StatusNotFound {
-				return nil
-			}
 			return err
+		}
+
+		if resp.StatusCode() == http.StatusNotFound {
+			return nil
 		}
 
 		return fmt.Errorf("error: Workers Service %s still exists", rs.Primary.Attributes["key"])

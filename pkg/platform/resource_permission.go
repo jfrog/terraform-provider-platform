@@ -690,13 +690,19 @@ func (r *permissionResource) Read(ctx context.Context, req resource.ReadRequest,
 		SetResult(&permission).
 		Get(PermissionEndpoint + "/{name}")
 
+	if err != nil {
+		utilfw.UnableToRefreshResourceError(resp, err.Error())
+		return
+	}
+
 	// Treat HTTP 404 Not Found status as a signal to recreate resource
 	// and return early
-	if err != nil {
-		if response.StatusCode() == http.StatusNotFound {
-			resp.State.RemoveResource(ctx)
-			return
-		}
+	if response.StatusCode() == http.StatusNotFound {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	if response.IsError() {
 		utilfw.UnableToRefreshResourceError(resp, response.String())
 		return
 	}
@@ -732,7 +738,7 @@ func (r *permissionResource) Update(ctx context.Context, req resource.UpdateRequ
 	// permission can only be updated by resource type, not in its entirety!
 	// so loop through every field and update each value
 	for resourceType, resourceValue := range permission.Resources {
-		_, err := r.ProviderData.Client.R().
+		response, err := r.ProviderData.Client.R().
 			SetPathParams(map[string]string{
 				"name":         plan.Name.ValueString(),
 				"resourceType": resourceType,
@@ -741,6 +747,11 @@ func (r *permissionResource) Update(ctx context.Context, req resource.UpdateRequ
 			Put(PermissionEndpoint + "/{name}/{resourceType}")
 		if err != nil {
 			utilfw.UnableToUpdateResourceError(resp, err.Error())
+			return
+		}
+
+		if response.IsError() {
+			utilfw.UnableToUpdateResourceError(resp, response.String())
 			return
 		}
 	}
