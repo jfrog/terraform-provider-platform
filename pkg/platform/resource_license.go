@@ -77,7 +77,7 @@ type licenseResourceModel struct {
 	LicensedTo   types.String `tfsdk:"licensed_to"`
 }
 
-func (r *licenseResourceModel) fromAPIModel(ctx context.Context, apiModel *licenseAPIGetModel) (ds diag.Diagnostics) {
+func (r *licenseResourceModel) fromAPIModel(_ context.Context, apiModel *licenseAPIGetModel) (ds diag.Diagnostics) {
 	r.Type = types.StringValue(apiModel.Type)
 	r.ValidThrough = types.StringValue(apiModel.ValidThrough)
 	r.LicensedTo = types.StringValue(apiModel.LicensedTo)
@@ -128,12 +128,15 @@ func (r *licenseResource) Create(ctx context.Context, req resource.CreateRequest
 		Post(licensePostEndpoint)
 
 	if err != nil {
-		if !(response.StatusCode() == http.StatusBadRequest &&
-			errorResult.Messages[license.Key] == "License already exists.") {
-			messages := lo.Values[string, string](errorResult.Messages)
-			utilfw.UnableToCreateResourceError(resp, strings.Join(messages, ","))
-			return
-		}
+		utilfw.UnableToCreateResourceError(resp, err.Error())
+		return
+	}
+
+	if response.IsError() && !(response.StatusCode() == http.StatusBadRequest &&
+		errorResult.Messages[license.Key] == "License already exists.") {
+		messages := lo.Values[string, string](errorResult.Messages)
+		utilfw.UnableToCreateResourceError(resp, strings.Join(messages, ","))
+		return
 	}
 
 	var licenseGet licenseAPIGetModel
@@ -142,9 +145,12 @@ func (r *licenseResource) Create(ctx context.Context, req resource.CreateRequest
 		SetResult(&licenseGet).
 		Get(licenseGetEndpoint)
 
-	// Treat HTTP 404 Not Found status as a signal to recreate resource
-	// and return early
 	if err != nil {
+		utilfw.UnableToCreateResourceError(resp, err.Error())
+		return
+	}
+
+	if response.IsError() {
 		utilfw.UnableToCreateResourceError(resp, response.String())
 		return
 	}
@@ -173,9 +179,19 @@ func (r *licenseResource) Read(ctx context.Context, req resource.ReadRequest, re
 		SetResult(&license).
 		Get(licenseGetEndpoint)
 
+	if err != nil {
+		utilfw.UnableToRefreshResourceError(resp, err.Error())
+		return
+	}
+
 	// Treat HTTP 404 Not Found status as a signal to recreate resource
 	// and return early
-	if err != nil {
+	if response.StatusCode() == http.StatusNotFound {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	if response.IsError() {
 		utilfw.UnableToRefreshResourceError(resp, response.String())
 		return
 	}
@@ -210,12 +226,15 @@ func (r *licenseResource) Update(ctx context.Context, req resource.UpdateRequest
 		Post(licensePostEndpoint)
 
 	if err != nil {
-		if !(response.StatusCode() == http.StatusBadRequest &&
-			errorResult.Messages[license.Key] == "License already exists.") {
-			messages := lo.Values[string, string](errorResult.Messages)
-			utilfw.UnableToUpdateResourceError(resp, strings.Join(messages, ","))
-			return
-		}
+		utilfw.UnableToUpdateResourceError(resp, err.Error())
+		return
+	}
+
+	if response.IsError() && !(response.StatusCode() == http.StatusBadRequest &&
+		errorResult.Messages[license.Key] == "License already exists.") {
+		messages := lo.Values[string, string](errorResult.Messages)
+		utilfw.UnableToUpdateResourceError(resp, strings.Join(messages, ","))
+		return
 	}
 
 	var licenseGet licenseAPIGetModel
@@ -224,9 +243,12 @@ func (r *licenseResource) Update(ctx context.Context, req resource.UpdateRequest
 		SetResult(&licenseGet).
 		Get(licenseGetEndpoint)
 
-	// Treat HTTP 404 Not Found status as a signal to recreate resource
-	// and return early
 	if err != nil {
+		utilfw.UnableToUpdateResourceError(resp, err.Error())
+		return
+	}
+
+	if response.IsError() {
 		utilfw.UnableToUpdateResourceError(resp, response.String())
 		return
 	}

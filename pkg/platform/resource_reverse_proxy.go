@@ -153,7 +153,7 @@ type reverseProxyResourceModel struct {
 	SslCertificatePath       types.String `tfsdk:"ssl_certificate_path"`
 }
 
-func (r *reverseProxyResourceModel) toAPIModel(ctx context.Context, apiModel *reverseProxyAPIModel) (ds diag.Diagnostics) {
+func (r *reverseProxyResourceModel) toAPIModel(_ context.Context, apiModel *reverseProxyAPIModel) (ds diag.Diagnostics) {
 	*apiModel = reverseProxyAPIModel{
 		Key:                      strings.ToLower(r.ServerProvider.ValueString()),
 		WebServerType:            r.ServerProvider.ValueString(),
@@ -173,7 +173,7 @@ func (r *reverseProxyResourceModel) toAPIModel(ctx context.Context, apiModel *re
 	return nil
 }
 
-func (r *reverseProxyResourceModel) fromAPIModel(ctx context.Context, apiModel *reverseProxyAPIModel) (ds diag.Diagnostics) {
+func (r *reverseProxyResourceModel) fromAPIModel(_ context.Context, apiModel *reverseProxyAPIModel) (ds diag.Diagnostics) {
 	r.ServerProvider = types.StringValue(apiModel.WebServerType)
 	r.DockerReverseProxyMethod = types.StringValue(apiModel.DockerReverseProxyMethod)
 	r.PublicServerName = types.StringValue(apiModel.ServerName)
@@ -264,9 +264,19 @@ func (r *reverseProxyResource) Read(ctx context.Context, req resource.ReadReques
 		SetResult(&reverseProxy).
 		Get(reversProxyEndpoint)
 
+	if err != nil {
+		utilfw.UnableToRefreshResourceError(resp, err.Error())
+		return
+	}
+
 	// Treat HTTP 404 Not Found status as a signal to recreate resource
 	// and return early
-	if err != nil {
+	if response.StatusCode() == http.StatusNotFound {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	if response.IsError() {
 		utilfw.UnableToRefreshResourceError(resp, response.String())
 		return
 	}
