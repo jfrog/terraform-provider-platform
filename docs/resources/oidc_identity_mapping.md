@@ -19,15 +19,15 @@ resource "platform_oidc_identity_mapping" "my-github-oidc-identity-mapping" {
   provider_name = "my-github-oidc-configuration"
   priority      = 1
 
-  claims = {
-    sub          = "repo:humpty/access-oidc-poc:ref:refs/heads/main"
-    workflow_ref = "humpty/access-oidc-poc/.github/workflows/job.yaml@refs/heads/main"
-  }
+  claims_json = jsonencode({
+    "sub" = "repo:humpty/access-oidc-poc:ref:refs/heads/main",
+    "workflow_ref" = "humpty/access-oidc-poc/.github/workflows/job.yaml@refs/heads/main"
+  })
 
   token_spec = {
     username   = "my-user"
     scope      = "applied-permissions/user"
-    audience   = "*@*"
+    audience   = "jfrt@* jfac@* jfmc@* jfmd@* jfevt@* jfxfer@* jflnk@* jfint@* jfwks@*"
     expires_in = 7200
   }
 }
@@ -38,7 +38,7 @@ resource "platform_oidc_identity_mapping" "my-github-oidc-identity-mapping" {
 
 ### Required
 
-- `claims` (Attributes) Claims information from the OIDC provider. (see [below for nested schema](#nestedatt--claims))
+- `claims_json` (String) Claims JSON from the OIDC provider. Use [Terraform jsonencode function](https://developer.hashicorp.com/terraform/language/functions/jsonencode) to encode the JSON string.
 - `name` (String) Name of the OIDC identity mapping
 - `provider_name` (String) Name of the OIDC configuration
 - `token_spec` (Attributes) Specifications of the token. (see [below for nested schema](#nestedatt--token_spec))
@@ -47,15 +47,6 @@ resource "platform_oidc_identity_mapping" "my-github-oidc-identity-mapping" {
 
 - `description` (String) Description of the OIDC mapping
 - `priority` (Number) Priority of the identity mapping. The priority should be a number. The higher priority is set for the lower number. If you do not enter a value, the identity mapping is assigned the lowest priority. We recommend that you assign the highest priority (1) to the strongest permission gate. Set the lowest priority to the weakest permission for a logical and effective access control setup.
-
-<a id="nestedatt--claims"></a>
-### Nested Schema for `claims`
-
-Required:
-
-- `sub` (String)
-- `workflow_ref` (String)
-
 
 <a id="nestedatt--token_spec"></a>
 ### Nested Schema for `token_spec`

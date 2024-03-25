@@ -76,6 +76,9 @@ func (r *odicConfigurationResource) Schema(ctx context.Context, req resource.Sch
 				Validators: []validator.String{
 					stringvalidator.OneOf([]string{"generic", gitHubProviderType}...),
 				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 				MarkdownDescription: fmt.Sprintf("Type of OIDC provider. Can be `generic` or `%s`.", gitHubProviderType),
 			},
 			"audience": schema.StringAttribute{

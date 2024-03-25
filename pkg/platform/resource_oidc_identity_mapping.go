@@ -2,6 +2,7 @@ package platform
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
@@ -74,23 +75,9 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 				},
 				Description: "Priority of the identity mapping. The priority should be a number. The higher priority is set for the lower number. If you do not enter a value, the identity mapping is assigned the lowest priority. We recommend that you assign the highest priority (1) to the strongest permission gate. Set the lowest priority to the weakest permission for a logical and effective access control setup.",
 			},
-			"claims": schema.SingleNestedAttribute{
-				Required: true,
-				Attributes: map[string]schema.Attribute{
-					"sub": schema.StringAttribute{
-						Required: true,
-						Validators: []validator.String{
-							stringvalidator.LengthAtLeast(1),
-						},
-					},
-					"workflow_ref": schema.StringAttribute{
-						Required: true,
-						Validators: []validator.String{
-							stringvalidator.LengthAtLeast(1),
-						},
-					},
-				},
-				Description: "Claims information from the OIDC provider.",
+			"claims_json": schema.StringAttribute{
+				Required:            true,
+				MarkdownDescription: "Claims JSON from the OIDC provider. Use [Terraform jsonencode function](https://developer.hashicorp.com/terraform/language/functions/jsonencode) to encode the JSON string.",
 			},
 			"token_spec": schema.SingleNestedAttribute{
 				Required: true,
@@ -144,18 +131,8 @@ type odicIdentityMappingResourceModel struct {
 	Description  types.String `tfsdk:"description"`
 	ProviderName types.String `tfsdk:"provider_name"`
 	Priority     types.Int64  `tfsdk:"priority"`
-	Claims       types.Object `tfsdk:"claims"`
+	ClaimsJSON   types.String `tfsdk:"claims_json"`
 	TokenSpec    types.Object `tfsdk:"token_spec"`
-}
-
-type odicIdentityMappingClaimsResourceModel struct {
-	Sub         types.String `tfsdk:"sub"`
-	WorkflowRef types.String `tfsdk:"workflow_ref"`
-}
-
-var odicIdentityMappingClaimsResourceModelAttributeType map[string]attr.Type = map[string]attr.Type{
-	"sub":          types.StringType,
-	"workflow_ref": types.StringType,
 }
 
 type odicIdentityMappingTokenSpecResourceModel struct {
@@ -173,13 +150,15 @@ var odicIdentityMappingTokenSpecResourceModelAttributeType map[string]attr.Type 
 }
 
 func (r *odicIdentityMappingResourceModel) toAPIModel(ctx context.Context, apiModel *odicIdentityMappingAPIModel) (ds diag.Diagnostics) {
-
-	var claims odicIdentityMappingClaimsResourceModel
-	ds.Append(r.Claims.As(ctx, &claims, basetypes.ObjectAsOptions{})...)
-	if ds.HasError() {
+	var claims map[string]any
+	err := json.Unmarshal([]byte(r.ClaimsJSON.ValueString()), &claims)
+	if err != nil {
+		ds.AddError(
+			"fails to unmarshal claims",
+			err.Error(),
+		)
 		return
 	}
-
 	var tokenSpec odicIdentityMappingTokenSpecResourceModel
 	ds.Append(r.TokenSpec.As(ctx, &tokenSpec, basetypes.ObjectAsOptions{})...)
 	if ds.HasError() {
@@ -191,10 +170,7 @@ func (r *odicIdentityMappingResourceModel) toAPIModel(ctx context.Context, apiMo
 		Description:  r.Description.ValueString(),
 		ProviderName: r.ProviderName.ValueString(),
 		Priority:     r.Priority.ValueInt64(),
-		Claims: odicIdentityMappingClaimsAPIModel{
-			Sub:         claims.Sub.ValueString(),
-			WorkflowRef: claims.WorkflowRef.ValueString(),
-		},
+		Claims:       claims,
 		TokenSpec: odicIdentityMappingTokenSpecAPIModel{
 			Username:  tokenSpec.Username.ValueString(),
 			Scope:     tokenSpec.Scope.ValueString(),
@@ -209,24 +185,17 @@ func (r *odicIdentityMappingResourceModel) toAPIModel(ctx context.Context, apiMo
 func (r *odicIdentityMappingResourceModel) fromAPIModel(ctx context.Context, apiModel *odicIdentityMappingAPIModel) (ds diag.Diagnostics) {
 	r.Name = types.StringValue(apiModel.Name)
 	r.Description = types.StringValue(apiModel.Description)
-	// r.ProviderName = types.StringValue(apiModel.ProviderName)
 	r.Priority = types.Int64Value(apiModel.Priority)
 
-	claims, d := types.ObjectValueFrom(
-		ctx,
-		odicIdentityMappingClaimsResourceModelAttributeType,
-		odicIdentityMappingClaimsResourceModel{
-			Sub:         types.StringValue(apiModel.Claims.Sub),
-			WorkflowRef: types.StringValue(apiModel.Claims.WorkflowRef),
-		},
-	)
-	if d != nil {
-		ds = append(ds, d...)
-	}
-	if ds.HasError() {
+	claimsBytes, err := json.Marshal(apiModel.Claims)
+	if err != nil {
+		ds.AddError(
+			"fails to marshal claims JSON",
+			err.Error(),
+		)
 		return
 	}
-	r.Claims = claims
+	r.ClaimsJSON = types.StringValue(string(claimsBytes))
 
 	tokenSpec, d := types.ObjectValueFrom(
 		ctx,
@@ -254,13 +223,8 @@ type odicIdentityMappingAPIModel struct {
 	Description  string                               `json:"description"`
 	ProviderName string                               `json:"provider_name"`
 	Priority     int64                                `json:"priority"`
-	Claims       odicIdentityMappingClaimsAPIModel    `json:"claims"`
+	Claims       map[string]any                       `json:"claims"`
 	TokenSpec    odicIdentityMappingTokenSpecAPIModel `json:"token_spec"`
-}
-
-type odicIdentityMappingClaimsAPIModel struct {
-	Sub         string `json:"sub"`
-	WorkflowRef string `json:"workflow_ref"`
 }
 
 type odicIdentityMappingTokenSpecAPIModel struct {
