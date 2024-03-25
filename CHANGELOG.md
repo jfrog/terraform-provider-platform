@@ -1,3 +1,9 @@
+## 1.5.0 (Mar 26, 2024)
+
+FEATURES:
+
+* **New Resource:** `platform_oidc_configuration` and `platform_oidc_identity_mapping`: PR: [#47](https://github.com/jfrog/terraform-provider-platform/pull/47) Issue: [#26](https://github.com/jfrog/terraform-provider-platform/issues/26), [#29](https://github.com/jfrog/terraform-provider-platform/issues/29), [#31](https://github.com/jfrog/terraform-provider-platform/issues/31), [#38](https://github.com/jfrog/terraform-provider-platform/issues/38)
+
 ## 1.4.1 (Mar 18, 2024)
 
 BUG FIXES:

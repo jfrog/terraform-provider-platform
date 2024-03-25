@@ -27,7 +27,7 @@ resource "platform_oidc_configuration" "my-github-oidc-configuration" {
 
 ### Required
 
-- `issuer_url` (String) OIDC issuer URL. For GitHub actions, the URL is https://token.actions.githubusercontent.com/.
+- `issuer_url` (String) OIDC issuer URL. For GitHub actions, the URL must be https://token.actions.githubusercontent.com/.
 - `name` (String) Name of the OIDC provider
 - `provider_type` (String) Type of OIDC provider. Can be `generic` or `GitHub`.
 
