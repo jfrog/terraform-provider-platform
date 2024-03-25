@@ -3,12 +3,12 @@
 page_title: "platform_oidc_identity_mapping Resource - terraform-provider-platform"
 subcategory: ""
 description: |-
-  Resource of identity mapping for an OIDC configuration.  JFrog OIDC identity mappings documentation https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-identity-mappings.
+  Manage OIDC identity mapping for an OIDC configuration in JFrog platform. See the JFrog OIDC identity mappings documentation https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-identity-mappings for more information.
 ---
 
 # platform_oidc_identity_mapping (Resource)
 
-Resource of identity mapping for an OIDC configuration.  JFrog [OIDC identity mappings documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-identity-mappings).
+Manage OIDC identity mapping for an OIDC configuration in JFrog platform. See the JFrog [OIDC identity mappings documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-identity-mappings) for more information.
 
 ## Example Usage
 

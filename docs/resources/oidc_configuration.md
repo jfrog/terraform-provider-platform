@@ -3,12 +3,12 @@
 page_title: "platform_oidc_configuration Resource - terraform-provider-platform"
 subcategory: ""
 description: |-
-  Resourec for OIDC configuration. JFrog OIDC configuration documentation https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-an-oidc-integration.
+  Manage OIDC configuration in JFrog platform. See the JFrog OIDC configuration documentation https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-an-oidc-integration for more information.
 ---
 
 # platform_oidc_configuration (Resource)
 
-Resourec for OIDC configuration. JFrog [OIDC configuration documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-an-oidc-integration).
+Manage OIDC configuration in JFrog platform. See the JFrog [OIDC configuration documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-an-oidc-integration) for more information.
 
 ## Example Usage
 

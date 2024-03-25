@@ -86,7 +86,7 @@ func (r *odicConfigurationResource) Schema(ctx context.Context, req resource.Sch
 				Description: "Informational field that you can use to include details of the audience that uses the OIDC configuration.",
 			},
 		},
-		MarkdownDescription: "Resourec for OIDC configuration. JFrog [OIDC configuration documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-an-oidc-integration).",
+		MarkdownDescription: "Manage OIDC configuration in JFrog platform. See the JFrog [OIDC configuration documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-an-oidc-integration) for more information.",
 	}
 }
 
