@@ -2,7 +2,9 @@ package platform
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"regexp"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -14,10 +16,21 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jfrog/terraform-provider-shared/util"
 	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
-	validator_string "github.com/jfrog/terraform-provider-shared/validator/fw/string"
 )
 
-const odicConfigurationEndpoint = "/access/api/v1/oidc"
+const (
+	gitHubProviderType        = "GitHub"
+	gitHubProviderURL         = "https://token.actions.githubusercontent.com/"
+	odicConfigurationEndpoint = "/access/api/v1/oidc"
+)
+
+var OIDCConfigurationNameValidators = []validator.String{
+	stringvalidator.LengthBetween(1, 255),
+	stringvalidator.RegexMatches(
+		regexp.MustCompile(`^[a-z]{1}[a-z0-9\-]+$`),
+		"must start with a lowercase letter and only contain lowercase letters, digits and `-` character.",
+	),
+}
 
 var _ resource.Resource = (*odicConfigurationResource)(nil)
 
@@ -32,14 +45,13 @@ func NewOIDCConfigurationResource() resource.Resource {
 func (r *odicConfigurationResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_oidc_configuration"
 }
+
 func (r *odicConfigurationResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
-				Required: true,
-				Validators: []validator.String{
-					stringvalidator.LengthBetween(1, 255),
-				},
+				Required:   true,
+				Validators: OIDCConfigurationNameValidators,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -52,23 +64,46 @@ func (r *odicConfigurationResource) Schema(ctx context.Context, req resource.Sch
 			"issuer_url": schema.StringAttribute{
 				Required: true,
 				Validators: []validator.String{
-					validator_string.IsURLHttpOrHttps(),
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(`^https:\/\/`),
+						"must use https protocol.",
+					),
 				},
-				Description: "OIDC issuer URL. For GitHub actions, the URL is https://token.actions.githubusercontent.com/.",
+				Description: fmt.Sprintf("OIDC issuer URL. For GitHub actions, the URL must be %s.", gitHubProviderURL),
 			},
 			"provider_type": schema.StringAttribute{
 				Required: true,
 				Validators: []validator.String{
-					stringvalidator.OneOf([]string{"generic", "GitHub"}...),
+					stringvalidator.OneOf([]string{"generic", gitHubProviderType}...),
 				},
-				MarkdownDescription: "Type of OIDC provider. Can be `generic` or `GitHub`.",
+				MarkdownDescription: fmt.Sprintf("Type of OIDC provider. Can be `generic` or `%s`.", gitHubProviderType),
 			},
 			"audience": schema.StringAttribute{
-				Optional:    true,
+				Optional: true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
 				Description: "Informational field that you can use to include details of the audience that uses the OIDC configuration.",
 			},
 		},
 		MarkdownDescription: "Resourec for OIDC configuration. JFrog [OIDC configuration documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-an-oidc-integration).",
+	}
+}
+
+func (r odicConfigurationResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data odicConfigurationResourceModel
+
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if data.ProviderType.ValueString() == gitHubProviderType && data.IssuerURL.ValueString() != gitHubProviderURL {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("issuer_url"),
+			"Invalid Attribute Configuration",
+			fmt.Sprintf("issuer_url must be set to %s when provider_type is set to '%s'.", gitHubProviderURL, gitHubProviderType),
+		)
 	}
 }
 
@@ -86,6 +121,14 @@ type odicConfigurationAPIModel struct {
 	IssuerURL    string `json:"issuer_url"`
 	ProviderType string `json:"provider_type"`
 	Audience     string `json:"audience"`
+}
+
+func (r *odicConfigurationResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	// Prevent panic if the provider has not been configured.
+	if req.ProviderData == nil {
+		return
+	}
+	r.ProviderData = req.ProviderData.(util.ProvderMetadata)
 }
 
 func (r *odicConfigurationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -182,7 +225,7 @@ func (r *odicConfigurationResource) Update(ctx context.Context, req resource.Upd
 	response, err := r.ProviderData.Client.R().
 		SetPathParam("name", plan.Name.ValueString()).
 		SetBody(&odicConfig).
-		Put(odicConfigurationEndpoint + "{name}")
+		Put(odicConfigurationEndpoint + "/{name}")
 	if err != nil {
 		utilfw.UnableToUpdateResourceError(resp, err.Error())
 		return

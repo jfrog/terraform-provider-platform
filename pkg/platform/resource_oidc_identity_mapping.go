@@ -2,8 +2,13 @@ package platform
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"net/http"
+	"regexp"
+	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -43,6 +48,10 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 				Required: true,
 				Validators: []validator.String{
 					stringvalidator.LengthBetween(1, 255),
+					stringvalidator.RegexMatches(
+						regexp.MustCompile(`^[^ !@#$%^&*()+={}\[\]:;'"<>,\./?~\x60|\\]+$`),
+						"name cannot contain spaces or special characters",
+					),
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
@@ -55,10 +64,14 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 			},
 			"provider_name": schema.StringAttribute{
 				Required:    true,
+				Validators:  OIDCConfigurationNameValidators,
 				Description: "Name of the OIDC configuration",
 			},
 			"priority": schema.Int64Attribute{
-				Optional:    true,
+				Optional: true,
+				Validators: []validator.Int64{
+					int64validator.Between(1, math.MaxInt64),
+				},
 				Description: "Priority of the identity mapping. The priority should be a number. The higher priority is set for the lower number. If you do not enter a value, the identity mapping is assigned the lowest priority. We recommend that you assign the highest priority (1) to the strongest permission gate. Set the lowest priority to the weakest permission for a logical and effective access control setup.",
 			},
 			"claims": schema.SingleNestedAttribute{
@@ -66,9 +79,15 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 				Attributes: map[string]schema.Attribute{
 					"sub": schema.StringAttribute{
 						Required: true,
+						Validators: []validator.String{
+							stringvalidator.LengthAtLeast(1),
+						},
 					},
 					"workflow_ref": schema.StringAttribute{
 						Required: true,
+						Validators: []validator.String{
+							stringvalidator.LengthAtLeast(1),
+						},
 					},
 				},
 				Description: "Claims information from the OIDC provider.",
@@ -77,7 +96,10 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 				Required: true,
 				Attributes: map[string]schema.Attribute{
 					"username": schema.StringAttribute{
-						Required:    true,
+						Required: true,
+						Validators: []validator.String{
+							stringvalidator.LengthAtLeast(1),
+						},
 						Description: "User name of the OIDC user.",
 					},
 					"scope": schema.StringAttribute{
@@ -92,15 +114,21 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 						MarkdownDescription: "Scope of the token. You can use `applied-permissions/user`, `applied-permissions/admin`, or `applied-permissions/group`.",
 					},
 					"audience": schema.StringAttribute{
-						Optional:            true,
-						Computed:            true,
-						Default:             stringdefault.StaticString("*@*"),
+						Optional: true,
+						Computed: true,
+						Default:  stringdefault.StaticString("*@*"),
+						Validators: []validator.String{
+							stringvalidator.LengthAtLeast(1),
+						},
 						MarkdownDescription: "Sets of (space separated) the JFrog services to which the mapping applies. Default value is `*@*`, which applies to all services.",
 					},
 					"expires_in": schema.Int64Attribute{
-						Optional:            true,
-						Computed:            true,
-						Default:             int64default.StaticInt64(60),
+						Optional: true,
+						Computed: true,
+						Default:  int64default.StaticInt64(60),
+						Validators: []validator.Int64{
+							int64validator.Between(60, 86400),
+						},
 						MarkdownDescription: "Token expiry time in seconds. Default value is 60.",
 					},
 				},
@@ -153,7 +181,7 @@ func (r *odicIdentityMappingResourceModel) toAPIModel(ctx context.Context, apiMo
 	}
 
 	var tokenSpec odicIdentityMappingTokenSpecResourceModel
-	ds.Append(r.Claims.As(ctx, &tokenSpec, basetypes.ObjectAsOptions{})...)
+	ds.Append(r.TokenSpec.As(ctx, &tokenSpec, basetypes.ObjectAsOptions{})...)
 	if ds.HasError() {
 		return
 	}
@@ -181,13 +209,16 @@ func (r *odicIdentityMappingResourceModel) toAPIModel(ctx context.Context, apiMo
 func (r *odicIdentityMappingResourceModel) fromAPIModel(ctx context.Context, apiModel *odicIdentityMappingAPIModel) (ds diag.Diagnostics) {
 	r.Name = types.StringValue(apiModel.Name)
 	r.Description = types.StringValue(apiModel.Description)
-	r.ProviderName = types.StringValue(apiModel.ProviderName)
+	// r.ProviderName = types.StringValue(apiModel.ProviderName)
 	r.Priority = types.Int64Value(apiModel.Priority)
 
 	claims, d := types.ObjectValueFrom(
 		ctx,
 		odicIdentityMappingClaimsResourceModelAttributeType,
-		apiModel.Claims,
+		odicIdentityMappingClaimsResourceModel{
+			Sub:         types.StringValue(apiModel.Claims.Sub),
+			WorkflowRef: types.StringValue(apiModel.Claims.WorkflowRef),
+		},
 	)
 	if d != nil {
 		ds = append(ds, d...)
@@ -200,7 +231,12 @@ func (r *odicIdentityMappingResourceModel) fromAPIModel(ctx context.Context, api
 	tokenSpec, d := types.ObjectValueFrom(
 		ctx,
 		odicIdentityMappingTokenSpecResourceModelAttributeType,
-		apiModel.TokenSpec,
+		odicIdentityMappingTokenSpecResourceModel{
+			Username:  types.StringValue(apiModel.TokenSpec.Username),
+			Scope:     types.StringValue(apiModel.TokenSpec.Scope),
+			Audience:  types.StringValue(apiModel.TokenSpec.Audience),
+			ExpiresIn: types.Int64Value(apiModel.TokenSpec.ExpiresIn),
+		},
 	)
 	if d != nil {
 		ds = append(ds, d...)
@@ -232,6 +268,14 @@ type odicIdentityMappingTokenSpecAPIModel struct {
 	Scope     string `json:"scope"`
 	Audience  string `json:"audience"`
 	ExpiresIn int64  `json:"expires_in"`
+}
+
+func (r *odicIdentityMappingResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	// Prevent panic if the provider has not been configured.
+	if req.ProviderData == nil {
+		return
+	}
+	r.ProviderData = req.ProviderData.(util.ProvderMetadata)
 }
 
 func (r *odicIdentityMappingResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -330,7 +374,7 @@ func (r *odicIdentityMappingResource) Update(ctx context.Context, req resource.U
 			"name":          plan.Name.ValueString(),
 		}).
 		SetBody(&odicIdentityMapping).
-		Put(odicIdentityMappingEndpoint + "{name}")
+		Put(odicIdentityMappingEndpoint + "/{name}")
 	if err != nil {
 		utilfw.UnableToUpdateResourceError(resp, err.Error())
 		return
@@ -374,5 +418,16 @@ func (r *odicIdentityMappingResource) Delete(ctx context.Context, req resource.D
 }
 
 func (r *odicIdentityMappingResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("name"), req, resp)
+	idParts := strings.Split(req.ID, ":")
+
+	if len(idParts) != 2 || len(idParts[0]) == 0 || len(idParts[1]) == 0 {
+		resp.Diagnostics.AddError(
+			"Unexpected Import Identifier",
+			fmt.Sprintf("Expected import identifier with format: identity_mapping_name:provider_name. Got: %q", req.ID),
+		)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), idParts[0])...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("provider_name"), idParts[1])...)
 }
