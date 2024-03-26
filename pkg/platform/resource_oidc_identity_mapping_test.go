@@ -9,14 +9,48 @@ import (
 	"github.com/jfrog/terraform-provider-shared/testutil"
 )
 
-func TestAccOIDIdentityMapping_full(t *testing.T) {
+func TestAccOIDCIdentityMapping_full(t *testing.T) {
 	_, _, configName := testutil.MkNames("test-oidc-configuration", "platform_oidc_configuration")
 	_, fqrn, identityMappingName := testutil.MkNames("test-oidc-identity-mapping", "platform_oidc_identity_mapping")
 
 	temp := `
 	resource "platform_oidc_configuration" "{{ .configName }}" {
 		name          = "{{ .configName }}"
-		description   = "Test description"
+		issuer_url    = "{{ .issuerURL }}"
+		provider_type = "{{ .providerType }}"
+		audience      = "{{ .audience }}"
+	}
+
+	resource "platform_oidc_identity_mapping" "{{ .identityMappingName }}" {
+		name          = "{{ .identityMappingName }}"
+		provider_name = platform_oidc_configuration.{{ .configName }}.name
+		priority      = {{ .priority }}
+		claims_json   = jsonencode({
+			sub = "{{ .sub }}",
+			updated_at = 1490198843
+		})
+		token_spec = {
+			username   = "{{ .username }}"
+			scope      = "applied-permissions/user"
+		}
+	}`
+
+	testData := map[string]string{
+		"configName":          configName,
+		"identityMappingName": identityMappingName,
+		"issuerURL":           "https://tempurl.org",
+		"providerType":        "generic",
+		"audience":            "test-audience",
+		"priority":            fmt.Sprintf("%d", testutil.RandomInt()),
+		"sub":                 fmt.Sprintf("test-subscriber-%d", testutil.RandomInt()),
+		"username":            fmt.Sprintf("test-user-%d", testutil.RandomInt()),
+	}
+
+	config := testutil.ExecuteTemplate(identityMappingName, temp, testData)
+
+	updatedTemp := `
+	resource "platform_oidc_configuration" "{{ .configName }}" {
+		name          = "{{ .configName }}"
 		issuer_url    = "{{ .issuerURL }}"
 		provider_type = "{{ .providerType }}"
 		audience      = "{{ .audience }}"
@@ -34,23 +68,10 @@ func TestAccOIDIdentityMapping_full(t *testing.T) {
 		token_spec = {
 			username   = "{{ .username }}"
 			scope      = "applied-permissions/user"
-			audience   = "*@*"
+			audience   = "jfrt@* jfac@* jfmc@* jfmd@* jfevt@* jfxfer@* jflnk@* jfint@* jfwks@*"
 			expires_in = 120
 		}
 	}`
-
-	testData := map[string]string{
-		"configName":          configName,
-		"identityMappingName": identityMappingName,
-		"issuerURL":           "https://tempurl.org",
-		"providerType":        "generic",
-		"audience":            "test-audience",
-		"priority":            fmt.Sprintf("%d", testutil.RandomInt()),
-		"sub":                 fmt.Sprintf("test-subscriber-%d", testutil.RandomInt()),
-		"username":            fmt.Sprintf("test-user-%d", testutil.RandomInt()),
-	}
-
-	config := testutil.ExecuteTemplate(identityMappingName, temp, testData)
 
 	updatedTestData := map[string]string{
 		"configName":          configName,
@@ -63,7 +84,7 @@ func TestAccOIDIdentityMapping_full(t *testing.T) {
 		"username":            fmt.Sprintf("test-user-%d", testutil.RandomInt()),
 	}
 
-	updatedConfig := testutil.ExecuteTemplate(identityMappingName, temp, updatedTestData)
+	updatedConfig := testutil.ExecuteTemplate(identityMappingName, updatedTemp, updatedTestData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -78,18 +99,19 @@ func TestAccOIDIdentityMapping_full(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "token_spec.username", testData["username"]),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.scope", "applied-permissions/user"),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.audience", "*@*"),
-					resource.TestCheckResourceAttr(fqrn, "token_spec.expires_in", "120"),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.expires_in", "60"),
 				),
 			},
 			{
 				Config: updatedConfig,
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", updatedTestData["identityMappingName"]),
+					resource.TestCheckResourceAttr(fqrn, "description", "Test description"),
 					resource.TestCheckResourceAttr(fqrn, "priority", updatedTestData["priority"]),
 					resource.TestCheckResourceAttr(fqrn, "claims_json", fmt.Sprintf("{\"sub\":\"%s\",\"updated_at\":1490198843}", updatedTestData["sub"])),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.username", updatedTestData["username"]),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.scope", "applied-permissions/user"),
-					resource.TestCheckResourceAttr(fqrn, "token_spec.audience", "*@*"),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.audience", "jfrt@* jfac@* jfmc@* jfmd@* jfevt@* jfxfer@* jflnk@* jfint@* jfwks@*"),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.expires_in", "120"),
 				),
 			},
@@ -104,7 +126,7 @@ func TestAccOIDIdentityMapping_full(t *testing.T) {
 	})
 }
 
-func TestAccOIDIdentityMapping_groups_scope(t *testing.T) {
+func TestAccOIDCIdentityMapping_groups_scope(t *testing.T) {
 	_, _, configName := testutil.MkNames("test-oidc-configuration", "platform_oidc_configuration")
 	_, fqrn, identityMappingName := testutil.MkNames("test-oidc-identity-mapping", "platform_oidc_identity_mapping")
 
@@ -165,7 +187,7 @@ func TestAccOIDIdentityMapping_groups_scope(t *testing.T) {
 	})
 }
 
-func TestAccOIDIdentityMapping_invalid_name(t *testing.T) {
+func TestAccOIDCIdentityMapping_invalid_name(t *testing.T) {
 	for _, invalidName := range []string{"invalid name", "invalid!name"} {
 		t.Run(invalidName, func(t *testing.T) {
 			_, _, configName := testutil.MkNames("test-oidc-configuration", "platform_oidc_configuration")
@@ -224,7 +246,7 @@ func TestAccOIDIdentityMapping_invalid_name(t *testing.T) {
 	}
 }
 
-func TestAccOIDIdentityMapping_invalid_provider_name(t *testing.T) {
+func TestAccOIDCIdentityMapping_invalid_provider_name(t *testing.T) {
 	for _, invalidName := range []string{"Test", "test!@", "1test"} {
 		t.Run(invalidName, func(t *testing.T) {
 			_, _, identityMappingName := testutil.MkNames("test-oidc-identity-mapping", "platform_oidc_identity_mapping")
@@ -272,7 +294,7 @@ func TestAccOIDIdentityMapping_invalid_provider_name(t *testing.T) {
 	}
 }
 
-func TestAccOIDIdentityMapping_invalid_scope(t *testing.T) {
+func TestAccOIDCIdentityMapping_invalid_scope(t *testing.T) {
 	for _, invalidScope := range []string{"invalid-scope", "applied-permissions/group", "applied-permissions/groups"} {
 		t.Run(invalidScope, func(t *testing.T) {
 			_, _, configName := testutil.MkNames("test-oidc-configuration", "platform_oidc_configuration")

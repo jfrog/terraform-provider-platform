@@ -14,20 +14,26 @@ func TestAccOIDCConfiguration_full(t *testing.T) {
 	temp := `
 	resource "platform_oidc_configuration" "{{ .name }}" {
 		name          = "{{ .name }}"
-		description   = "Test description"
 		issuer_url    = "{{ .issuerURL }}"
 		provider_type = "{{ .providerType }}"
-		audience      = "{{ .audience }}"
 	}`
 
 	testData := map[string]string{
 		"name":         configName,
 		"issuerURL":    "https://tempurl.org",
 		"providerType": "generic",
-		"audience":     "test-audience-1",
 	}
 
 	config := testutil.ExecuteTemplate(configName, temp, testData)
+
+	updatedTemp := `
+	resource "platform_oidc_configuration" "{{ .name }}" {
+		name          = "{{ .name }}"
+		description   = "Test Description"
+		issuer_url    = "{{ .issuerURL }}"
+		provider_type = "{{ .providerType }}"
+		audience      = "{{ .audience }}"
+	}`
 
 	updatedTestData := map[string]string{
 		"name":         configName,
@@ -35,7 +41,7 @@ func TestAccOIDCConfiguration_full(t *testing.T) {
 		"providerType": "GitHub",
 		"audience":     "test-audience-2",
 	}
-	updatedConfig := testutil.ExecuteTemplate(configName, temp, updatedTestData)
+	updatedConfig := testutil.ExecuteTemplate(configName, updatedTemp, updatedTestData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -47,13 +53,13 @@ func TestAccOIDCConfiguration_full(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
 					resource.TestCheckResourceAttr(fqrn, "issuer_url", testData["issuerURL"]),
 					resource.TestCheckResourceAttr(fqrn, "provider_type", testData["providerType"]),
-					resource.TestCheckResourceAttr(fqrn, "audience", testData["audience"]),
 				),
 			},
 			{
 				Config: updatedConfig,
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", updatedTestData["name"]),
+					resource.TestCheckResourceAttr(fqrn, "description", "Test Description"),
 					resource.TestCheckResourceAttr(fqrn, "issuer_url", updatedTestData["issuerURL"]),
 					resource.TestCheckResourceAttr(fqrn, "provider_type", updatedTestData["providerType"]),
 					resource.TestCheckResourceAttr(fqrn, "audience", updatedTestData["audience"]),

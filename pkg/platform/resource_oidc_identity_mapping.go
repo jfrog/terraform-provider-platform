@@ -183,7 +183,11 @@ func (r *odicIdentityMappingResourceModel) toAPIModel(ctx context.Context, apiMo
 
 func (r *odicIdentityMappingResourceModel) fromAPIModel(ctx context.Context, apiModel *odicIdentityMappingAPIModel) (ds diag.Diagnostics) {
 	r.Name = types.StringValue(apiModel.Name)
-	r.Description = types.StringValue(apiModel.Description)
+
+	if len(apiModel.Description) > 0 {
+		r.Description = types.StringValue(apiModel.Description)
+	}
+
 	r.Priority = types.Int64Value(apiModel.Priority)
 
 	claimsBytes, err := json.Marshal(apiModel.Claims)
@@ -198,11 +202,13 @@ func (r *odicIdentityMappingResourceModel) fromAPIModel(ctx context.Context, api
 
 	tokenSpecResource := odicIdentityMappingTokenSpecResourceModel{
 		Scope:     types.StringValue(apiModel.TokenSpec.Scope),
-		Audience:  types.StringValue(apiModel.TokenSpec.Audience),
 		ExpiresIn: types.Int64Value(apiModel.TokenSpec.ExpiresIn),
 	}
 	if len(apiModel.TokenSpec.Username) > 0 {
 		tokenSpecResource.Username = types.StringValue(apiModel.TokenSpec.Username)
+	}
+	if len(apiModel.TokenSpec.Audience) > 0 {
+		tokenSpecResource.Audience = types.StringValue(apiModel.TokenSpec.Audience)
 	}
 
 	tokenSpec, d := types.ObjectValueFrom(

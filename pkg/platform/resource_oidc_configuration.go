@@ -117,10 +117,10 @@ type odicConfigurationResourceModel struct {
 
 type odicConfigurationAPIModel struct {
 	Name         string `json:"name"`
-	Description  string `json:"description"`
+	Description  string `json:"description,omitempty"`
 	IssuerURL    string `json:"issuer_url"`
 	ProviderType string `json:"provider_type"`
-	Audience     string `json:"audience"`
+	Audience     string `json:"audience,omitempty"`
 }
 
 func (r *odicConfigurationResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -198,10 +198,18 @@ func (r *odicConfigurationResource) Read(ctx context.Context, req resource.ReadR
 	// Convert from the API data model to the Terraform data model
 	// and refresh any attribute values.
 	state.Name = types.StringValue(odicConfig.Name)
+
+	if len(odicConfig.Description) > 0 {
+		state.Description = types.StringValue(odicConfig.Description)
+	}
+
 	state.IssuerURL = types.StringValue(odicConfig.IssuerURL)
-	state.Audience = types.StringValue(odicConfig.Audience)
+
+	if len(odicConfig.Audience) > 0 {
+		state.Audience = types.StringValue(odicConfig.Audience)
+	}
+
 	state.ProviderType = types.StringValue(odicConfig.ProviderType)
-	state.Description = types.StringValue(odicConfig.Description)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
