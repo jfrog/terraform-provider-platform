@@ -13,9 +13,9 @@ Manage OIDC identity mapping for an OIDC configuration in JFrog platform. See th
 ## Example Usage
 
 ```terraform
-resource "platform_oidc_identity_mapping" "my-github-oidc-identity-mapping" {
-  name          = "my-github-oidc-identity-mapping"
-  description   = "My GitHub OIDC identity mapping"
+resource "platform_oidc_identity_mapping" "my-github-oidc-user-identity-mapping" {
+  name          = "my-github-oidc-user-identity-mapping"
+  description   = "My GitHub OIDC user identity mapping"
   provider_name = "my-github-oidc-configuration"
   priority      = 1
 
@@ -27,6 +27,24 @@ resource "platform_oidc_identity_mapping" "my-github-oidc-identity-mapping" {
   token_spec = {
     username   = "my-user"
     scope      = "applied-permissions/user"
+    audience   = "*@*"
+    expires_in = 7200
+  }
+}
+
+resource "platform_oidc_identity_mapping" "my-github-oidc-group-identity-mapping" {
+  name          = "my-github-oidc-group-identity-mapping"
+  description   = "My GitHub OIDC group identity mapping"
+  provider_name = "my-github-oidc-configuration"
+  priority      = 1
+
+  claims_json = jsonencode({
+    "sub" = "repo:humpty/access-oidc-poc:ref:refs/heads/main",
+    "workflow_ref" = "humpty/access-oidc-poc/.github/workflows/job.yaml@refs/heads/main"
+  })
+
+  token_spec = {
+    scope      = "applied-permissions/groups:\"readers\",\"my-group\""
     audience   = "jfrt@* jfac@* jfmc@* jfmd@* jfevt@* jfxfer@* jflnk@* jfint@* jfwks@*"
     expires_in = 7200
   }
@@ -38,28 +56,28 @@ resource "platform_oidc_identity_mapping" "my-github-oidc-identity-mapping" {
 
 ### Required
 
-- `claims_json` (String) Claims JSON from the OIDC provider. Use [Terraform jsonencode function](https://developer.hashicorp.com/terraform/language/functions/jsonencode) to encode the JSON string.
+- `claims_json` (String) Claims JSON from the OIDC provider. Use [Terraform jsonencode function](https://developer.hashicorp.com/terraform/language/functions/jsonencode) to encode the JSON string. Claims constitute the payload part of a JSON web token and represent a set of information exchanged between two parties. The JWT standard distinguishes between reserved claims, public claims, and private claims. In API Gateway context, both public claims and private claims are considered custom claims. For example, an ID token (which is always a JWT) can contain a claim called that asserts that the name of the user authenticating is "John Doe". In a JWT, a claim appears as a name/value pair where the name is always a string and the value can be any JSON value.
 - `name` (String) Name of the OIDC identity mapping
+- `priority` (Number) Priority of the identity mapping. The priority should be a number. The higher priority is set for the lower number. If you do not enter a value, the identity mapping is assigned the lowest priority. We recommend that you assign the highest priority (1) to the strongest permission gate. Set the lowest priority to the weakest permission for a logical and effective access control setup.
 - `provider_name` (String) Name of the OIDC configuration
-- `token_spec` (Attributes) Specifications of the token. (see [below for nested schema](#nestedatt--token_spec))
+- `token_spec` (Attributes) Specifications of the token. In case of success, a token with the following details will be generated and passed to OIDC Provider. (see [below for nested schema](#nestedatt--token_spec))
 
 ### Optional
 
 - `description` (String) Description of the OIDC mapping
-- `priority` (Number) Priority of the identity mapping. The priority should be a number. The higher priority is set for the lower number. If you do not enter a value, the identity mapping is assigned the lowest priority. We recommend that you assign the highest priority (1) to the strongest permission gate. Set the lowest priority to the weakest permission for a logical and effective access control setup.
 
 <a id="nestedatt--token_spec"></a>
 ### Nested Schema for `token_spec`
 
 Required:
 
-- `scope` (String) Scope of the token. You can use `applied-permissions/user`, `applied-permissions/admin`, or `applied-permissions/group`.
-- `username` (String) User name of the OIDC user.
+- `scope` (String) Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\"readers\",\"my-group\",`
 
 Optional:
 
 - `audience` (String) Sets of (space separated) the JFrog services to which the mapping applies. Default value is `*@*`, which applies to all services.
 - `expires_in` (Number) Token expiry time in seconds. Default value is 60.
+- `username` (String) User name of the OIDC user. Not applicable when `scope` is set to `applied-permissions/groups`
 
 ## Import
 

@@ -69,7 +69,7 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 				Description: "Name of the OIDC configuration",
 			},
 			"priority": schema.Int64Attribute{
-				Optional: true,
+				Required: true,
 				Validators: []validator.Int64{
 					int64validator.Between(1, math.MaxInt64),
 				},
@@ -77,28 +77,27 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 			},
 			"claims_json": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "Claims JSON from the OIDC provider. Use [Terraform jsonencode function](https://developer.hashicorp.com/terraform/language/functions/jsonencode) to encode the JSON string.",
+				MarkdownDescription: "Claims JSON from the OIDC provider. Use [Terraform jsonencode function](https://developer.hashicorp.com/terraform/language/functions/jsonencode) to encode the JSON string. Claims constitute the payload part of a JSON web token and represent a set of information exchanged between two parties. The JWT standard distinguishes between reserved claims, public claims, and private claims. In API Gateway context, both public claims and private claims are considered custom claims. For example, an ID token (which is always a JWT) can contain a claim called that asserts that the name of the user authenticating is \"John Doe\". In a JWT, a claim appears as a name/value pair where the name is always a string and the value can be any JSON value.",
 			},
 			"token_spec": schema.SingleNestedAttribute{
 				Required: true,
 				Attributes: map[string]schema.Attribute{
 					"username": schema.StringAttribute{
-						Required: true,
+						Optional: true,
 						Validators: []validator.String{
 							stringvalidator.LengthAtLeast(1),
 						},
-						Description: "User name of the OIDC user.",
+						Description: "User name of the OIDC user. Not applicable when `scope` is set to `applied-permissions/groups`",
 					},
 					"scope": schema.StringAttribute{
 						Required: true,
 						Validators: []validator.String{
-							stringvalidator.OneOf([]string{
-								"applied-permissions/user",
-								"applied-permissions/admin",
-								"applied-permissions/group",
-							}...),
+							stringvalidator.RegexMatches(
+								regexp.MustCompile(`^(applied-permissions\/admin|applied-permissions\/user|applied-permissions\/groups:.+)$`),
+								"must start with either 'applied-permissions/admin', 'applied-permissions/user', or 'applied-permissions/groups:'",
+							),
 						},
-						MarkdownDescription: "Scope of the token. You can use `applied-permissions/user`, `applied-permissions/admin`, or `applied-permissions/group`.",
+						MarkdownDescription: "Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\\\"readers\\\",\\\"my-group\\\",`",
 					},
 					"audience": schema.StringAttribute{
 						Optional: true,
@@ -119,7 +118,7 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 						MarkdownDescription: "Token expiry time in seconds. Default value is 60.",
 					},
 				},
-				Description: "Specifications of the token.",
+				Description: "Specifications of the token. In case of success, a token with the following details will be generated and passed to OIDC Provider.",
 			},
 		},
 		MarkdownDescription: "Manage OIDC identity mapping for an OIDC configuration in JFrog platform. See the JFrog [OIDC identity mappings documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-identity-mappings) for more information.",
@@ -197,15 +196,19 @@ func (r *odicIdentityMappingResourceModel) fromAPIModel(ctx context.Context, api
 	}
 	r.ClaimsJSON = types.StringValue(string(claimsBytes))
 
+	tokenSpecResource := odicIdentityMappingTokenSpecResourceModel{
+		Scope:     types.StringValue(apiModel.TokenSpec.Scope),
+		Audience:  types.StringValue(apiModel.TokenSpec.Audience),
+		ExpiresIn: types.Int64Value(apiModel.TokenSpec.ExpiresIn),
+	}
+	if len(apiModel.TokenSpec.Username) > 0 {
+		tokenSpecResource.Username = types.StringValue(apiModel.TokenSpec.Username)
+	}
+
 	tokenSpec, d := types.ObjectValueFrom(
 		ctx,
 		odicIdentityMappingTokenSpecResourceModelAttributeType,
-		odicIdentityMappingTokenSpecResourceModel{
-			Username:  types.StringValue(apiModel.TokenSpec.Username),
-			Scope:     types.StringValue(apiModel.TokenSpec.Scope),
-			Audience:  types.StringValue(apiModel.TokenSpec.Audience),
-			ExpiresIn: types.Int64Value(apiModel.TokenSpec.ExpiresIn),
-		},
+		tokenSpecResource,
 	)
 	if d != nil {
 		ds = append(ds, d...)
@@ -220,7 +223,7 @@ func (r *odicIdentityMappingResourceModel) fromAPIModel(ctx context.Context, api
 
 type odicIdentityMappingAPIModel struct {
 	Name         string                               `json:"name"`
-	Description  string                               `json:"description"`
+	Description  string                               `json:"description,omitempty"`
 	ProviderName string                               `json:"provider_name"`
 	Priority     int64                                `json:"priority"`
 	Claims       map[string]any                       `json:"claims"`
@@ -228,7 +231,7 @@ type odicIdentityMappingAPIModel struct {
 }
 
 type odicIdentityMappingTokenSpecAPIModel struct {
-	Username  string `json:"username"`
+	Username  string `json:"username,omitempty"`
 	Scope     string `json:"scope"`
 	Audience  string `json:"audience"`
 	ExpiresIn int64  `json:"expires_in"`
