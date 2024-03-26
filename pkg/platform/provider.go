@@ -143,6 +143,8 @@ func (p *PlatformProvider) Resources(ctx context.Context) []func() resource.Reso
 	return []func() resource.Resource{
 		NewLicenseResource,
 		NewGlobalRoleResource,
+		NewOIDCConfigurationResource,
+		NewOIDCIdentityMappingResource,
 		NewPermissionResource,
 		NewReverseProxyResource,
 		NewWorkerServiceResource,
