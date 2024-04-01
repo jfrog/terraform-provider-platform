@@ -3,7 +3,10 @@ package platform
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"time"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -66,7 +69,10 @@ func (r *ipAllowListResource) Schema(ctx context.Context, req resource.SchemaReq
 				Description: "List of IPs for the JPD allowlist",
 			},
 		},
-		MarkdownDescription: "Provides a JFrog [allowlist](https://jfrog.com/help/r/jfrog-hosting-models-documentation/configure-the-ip/cidr-allowlist) resource to manage list of allow IP/CIDR addresses. To use this resource, you need an access token. Only a Primary Admin can generate MyJFrog tokens. For more information, see [Generate a Token in MyJFrog](https://jfrog.com/help/r/jfrog-hosting-models-documentation/generate-a-token-in-myjfrog).\n\n" +
+		MarkdownDescription: "Provides a JFrog [allowlist](https://jfrog.com/help/r/jfrog-hosting-models-documentation/configure-the-ip/cidr-allowlist) resource to manage list of allow IP/CIDR addresses. " +
+			"To use this resource, you need an access token. Only a Primary Admin can generate MyJFrog tokens. For more information, see [Generate a Token in MyJFrog](https://jfrog.com/help/r/jfrog-hosting-models-documentation/generate-a-token-in-myjfrog).\n\n" +
+			"->This resource is supported only on the Cloud (SaaS) platform.\n\n" +
+			"->The provider will automatically retry API requests that return 409 (Conflict) or 429 (Too Many Attempts) error. It will retry up to 5 times, wait initially for 2 minutes with increasing delay (max 12 minutes) after each attempt.\n\n" +
 			"~>See [Allowlist REST API](https://jfrog.com/help/r/jfrog-rest-apis/allowlist-rest-api) for limitations.",
 	}
 }
@@ -88,6 +94,16 @@ type ipAllowListAPIGetResponseModel struct {
 	IPs []ipAllowListIPAPIGetResponseModel `json:"ips"`
 }
 
+func (r *ipAllowListResource) myJFrogClient() *resty.Client {
+	return r.ProviderData.MyJFrogClient.
+		AddRetryCondition(func(r *resty.Response, err error) bool {
+			return r.StatusCode() == http.StatusConflict || r.StatusCode() == http.StatusTooManyRequests
+		}).
+		SetRetryCount(5).
+		SetRetryWaitTime(2 * time.Minute).
+		SetRetryMaxWaitTime(12 * time.Minute)
+}
+
 func (r *ipAllowListResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var plan ipAllowListResourceModel
 
@@ -106,7 +122,7 @@ func (r *ipAllowListResource) Create(ctx context.Context, req resource.CreateReq
 		IPs: planIPs,
 	}
 
-	response, err := r.ProviderData.MyJFrogClient.R().
+	response, err := r.myJFrogClient().R().
 		SetPathParam("serverName", plan.ServerName.ValueString()).
 		SetBody(&allowList).
 		Post(ipAllowlistEndpoint)
@@ -201,7 +217,7 @@ func (r *ipAllowListResource) Update(ctx context.Context, req resource.UpdateReq
 			IPs: ipsToAdd,
 		}
 
-		response, err := r.ProviderData.MyJFrogClient.R().
+		response, err := r.myJFrogClient().R().
 			SetPathParam("serverName", plan.ServerName.ValueString()).
 			SetBody(&allowList).
 			Post(ipAllowlistEndpoint)
@@ -221,7 +237,7 @@ func (r *ipAllowListResource) Update(ctx context.Context, req resource.UpdateReq
 			IPs: ipsToRemove,
 		}
 
-		response, err := r.ProviderData.MyJFrogClient.R().
+		response, err := r.myJFrogClient().R().
 			SetPathParam("serverName", plan.ServerName.ValueString()).
 			SetBody(&allowList).
 			Delete(ipAllowlistEndpoint)
@@ -258,7 +274,7 @@ func (r *ipAllowListResource) Delete(ctx context.Context, req resource.DeleteReq
 		IPs: ipsToRemove,
 	}
 
-	response, err := r.ProviderData.MyJFrogClient.R().
+	response, err := r.myJFrogClient().R().
 		SetPathParam("serverName", state.ServerName.ValueString()).
 		SetBody(&allowList).
 		Delete(ipAllowlistEndpoint)
