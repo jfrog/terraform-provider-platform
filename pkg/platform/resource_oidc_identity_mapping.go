@@ -23,7 +23,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
-	"github.com/jfrog/terraform-provider-shared/util"
 	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
 )
 
@@ -32,7 +31,7 @@ const odicIdentityMappingEndpoint = "/access/api/v1/oidc/{provider_name}/identit
 var _ resource.Resource = (*odicIdentityMappingResource)(nil)
 
 type odicIdentityMappingResource struct {
-	ProviderData util.ProvderMetadata
+	ProviderData PlatformProviderMetadata
 }
 
 func NewOIDCIdentityMappingResource() resource.Resource {
@@ -248,7 +247,7 @@ func (r *odicIdentityMappingResource) Configure(ctx context.Context, req resourc
 	if req.ProviderData == nil {
 		return
 	}
-	r.ProviderData = req.ProviderData.(util.ProvderMetadata)
+	r.ProviderData = req.ProviderData.(PlatformProviderMetadata)
 }
 
 func (r *odicIdentityMappingResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

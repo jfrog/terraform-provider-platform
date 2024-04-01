@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/jfrog/terraform-provider-shared/util"
 	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
 	"github.com/samber/lo"
 )
@@ -24,7 +23,7 @@ const (
 var _ resource.Resource = (*licenseResource)(nil)
 
 type licenseResource struct {
-	ProviderData util.ProvderMetadata
+	ProviderData PlatformProviderMetadata
 }
 
 func NewLicenseResource() resource.Resource {
@@ -105,7 +104,7 @@ func (r *licenseResource) Configure(ctx context.Context, req resource.ConfigureR
 	if req.ProviderData == nil {
 		return
 	}
-	r.ProviderData = req.ProviderData.(util.ProvderMetadata)
+	r.ProviderData = req.ProviderData.(PlatformProviderMetadata)
 }
 
 func (r *licenseResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
