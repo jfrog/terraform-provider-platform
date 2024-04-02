@@ -93,7 +93,7 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 
 	var myJFrogClient *resty.Client
 	if len(myJFrogAPIToken) > 0 {
-		c, err := client.Build(url, productId)
+		c, err := client.Build("https://my.jfrog.com", productId)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error creating Resty client for MyJFrog",
@@ -181,7 +181,7 @@ func (p *PlatformProvider) Resources(ctx context.Context) []func() resource.Reso
 		NewGlobalRoleResource,
 		NewOIDCConfigurationResource,
 		NewOIDCIdentityMappingResource,
-		NewIPAllowListResource,
+		NewMyJFrogIPAllowListResource,
 		NewPermissionResource,
 		NewReverseProxyResource,
 		NewWorkerServiceResource,

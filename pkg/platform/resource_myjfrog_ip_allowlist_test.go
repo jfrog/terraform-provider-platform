@@ -20,13 +20,17 @@ func TestAccIPAllowlist_full(t *testing.T) {
 		t.Fatalf("env var JFROG_MYJFROG_API_TOKEN is not set. Please create a API token in MyJFrog portal")
 	}
 
-	_, fqrn, allowlistName := testutil.MkNames("test-ip-allowlist", "platform_ip_allowlist")
+	_, fqrn, allowlistName := testutil.MkNames("test-myjfrog-ip-allowlist", "platform_myjfrog_ip_allowlist")
 
-	re := regexp.MustCompile(`^(\w+)\.jfrog\.io$`)
-	serverName := re.FindString(jfrogURL)
+	re := regexp.MustCompile(`^https://(\w+)\.jfrog\.io$`)
+	matches := re.FindStringSubmatch(jfrogURL)
+	if len(matches) < 2 {
+		t.Fatalf("can't find server name from JFROG_URL %s", jfrogURL)
+	}
+	serverName := matches[1]
 
 	temp := `
-	resource "platform_ip_allowlist" "{{ .name }}" {
+	resource "platform_myjfrog_ip_allowlist" "{{ .name }}" {
 		server_name = "{{ .serverName }}"
 		ips = {{ .ips }}
 	}`

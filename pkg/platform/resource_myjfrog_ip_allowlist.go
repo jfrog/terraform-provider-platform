@@ -19,7 +19,7 @@ import (
 	"github.com/samber/lo"
 )
 
-const ipAllowlistEndpoint = "/access/api/v1/allowlist/{serverName}"
+const ipAllowlistEndpoint = "/api/jmis/v1/allowlist/{serverName}"
 
 var _ resource.Resource = (*ipAllowListResource)(nil)
 
@@ -27,12 +27,12 @@ type ipAllowListResource struct {
 	ProviderData PlatformProviderMetadata
 }
 
-func NewIPAllowListResource() resource.Resource {
+func NewMyJFrogIPAllowListResource() resource.Resource {
 	return &ipAllowListResource{}
 }
 
 func (r *ipAllowListResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_ip_allowlist"
+	resp.TypeName = req.ProviderTypeName + "_myjfrog_ip_allowlist"
 }
 
 func (r *ipAllowListResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -69,7 +69,7 @@ func (r *ipAllowListResource) Schema(ctx context.Context, req resource.SchemaReq
 				Description: "List of IPs for the JPD allowlist",
 			},
 		},
-		MarkdownDescription: "Provides a JFrog [allowlist](https://jfrog.com/help/r/jfrog-hosting-models-documentation/configure-the-ip/cidr-allowlist) resource to manage list of allow IP/CIDR addresses. " +
+		MarkdownDescription: "Provides a MyJFrog [IP allowlist](https://jfrog.com/help/r/jfrog-hosting-models-documentation/configure-the-ip/cidr-allowlist) resource to manage list of allow IP/CIDR addresses. " +
 			"To use this resource, you need an access token. Only a Primary Admin can generate MyJFrog tokens. For more information, see [Generate a Token in MyJFrog](https://jfrog.com/help/r/jfrog-hosting-models-documentation/generate-a-token-in-myjfrog).\n\n" +
 			"->This resource is supported only on the Cloud (SaaS) platform.\n\n" +
 			"->The provider will automatically retry API requests that return 409 (Conflict) or 429 (Too Many Attempts) error. It will retry up to 5 times, wait initially for 2 minutes with increasing delay (max 12 minutes) after each attempt.\n\n" +
