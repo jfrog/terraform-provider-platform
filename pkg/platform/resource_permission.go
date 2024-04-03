@@ -157,7 +157,7 @@ func (r *permissionResource) Schema(ctx context.Context, req resource.SchemaRequ
 					),
 					"targets": targetAttributeSchema(
 						false,
-						"Specify repository key as name. Use `ANY_LOCAL`, `ANY_REMOTE`, or `ANY_DISTRIBUTION` for any repository type.",
+						"Specify repository key as name. Use `ANY LOCAL`, `ANY REMOTE`, or `ANY DISTRIBUTION` for any repository type.",
 						"Simple comma separated wildcard patterns for **existing and future** repository artifact paths (with no leading slash). Ant-style path expressions are supported (*, **, ?). For example: `org/apache/**`",
 						"Simple comma separated wildcard patterns for **existing and future** repository artifact paths (with no leading slash). Ant-style path expressions are supported (*, **, ?). For example: `org/apache/**`",
 					),
@@ -539,6 +539,7 @@ func (r *permissionResourceModel) fromResourceAPIModel(ctx context.Context, reso
 					excludePatterns = s
 
 				}
+
 				t, d := types.ObjectValue(
 					targetResourceModelAttributeType,
 					map[string]attr.Value{
