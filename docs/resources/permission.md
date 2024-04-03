@@ -150,7 +150,7 @@ Optional:
 
 Required:
 
-- `name` (String) Specify repository key as name. Use `ANY_LOCAL`, `ANY_REMOTE`, or `ANY_DISTRIBUTION` for any repository type.
+- `name` (String) Specify repository key as name. Use `ANY LOCAL`, `ANY REMOTE`, or `ANY DISTRIBUTION` for any repository type.
 
 Optional:
 

@@ -96,15 +96,15 @@ func TestAccPermission_full(t *testing.T) {
 					exclude_patterns = ["{{ .excludePattern }}"]
 				},
 				{
-					name = "ALL-LOCAL"
+					name = "ANY LOCAL"
 					include_patterns = ["**", "*.js"]
 				},
 				{
-					name = "ALL-REMOTE"
+					name = "ANY REMOTE"
 					include_patterns = ["**", "*.js"]
 				},
 				{
-					name = "ALL-DISTRIBUTION"
+					name = "ANY DISTRIBUTION"
 					include_patterns = ["**", "*.js"]
 				}
 			]
