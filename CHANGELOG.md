@@ -1,3 +1,10 @@
+## 1.5.1 (Apr 3, 2024)
+
+BUG FIXES:
+
+* resource/platform_permission: Update documentation for target `name` attribute for `ANY` repository types. Correct values should be `ANY LOCAL`, `ANY REMOTE`, or `ANY DISTRIBUTION`. Note the removal of underscore character. Issue: [#48](https://github.com/jfrog/terraform-provider-platform/issues/48) PR: [#49](https://github.com/jfrog/terraform-provider-platform/pull/49)
+
+
 ## 1.5.0 (Mar 26, 2024)
 
 FEATURES:
