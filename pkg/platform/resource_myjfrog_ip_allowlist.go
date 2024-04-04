@@ -394,7 +394,7 @@ func (r *ipAllowListResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 
 	var ipsToRemove []string
-	resp.Diagnostics.Append(state.IPs.ElementsAs(ctx, ipsToRemove, false)...)
+	resp.Diagnostics.Append(state.IPs.ElementsAs(ctx, &ipsToRemove, false)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
