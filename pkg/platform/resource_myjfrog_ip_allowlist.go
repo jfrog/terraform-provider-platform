@@ -152,7 +152,7 @@ type ipAllowListAPIGetResponseModel struct {
 func (r ipAllowListResource) waitForCompletion(ctx context.Context, serverName string) ([]string, error) {
 	tflog.Info(ctx, "waiting for ip allowlist process to complete")
 
-	var ips []string
+	ips := []string{}
 
 	backoff := retry.NewConstant(15 * time.Second)
 	backoff = retry.WithJitterPercent(10, backoff)
