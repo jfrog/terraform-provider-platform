@@ -89,7 +89,7 @@ func TestAccIPAllowlist_full(t *testing.T) {
 			{
 				ResourceName:                         fqrn,
 				ImportState:                          true,
-				ImportStateId:                        allowlistName,
+				ImportStateId:                        testData["serverName"],
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "server_name",
 			},

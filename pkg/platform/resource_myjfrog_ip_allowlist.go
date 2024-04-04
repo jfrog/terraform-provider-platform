@@ -25,10 +25,7 @@ import (
 	"github.com/sethvargo/go-retry"
 )
 
-const (
-	ipAllowlistEndpoint = "/api/jmis/v1/allowlist/{serverName}"
-	inProgressStatus    = "IN_PROGRESS"
-)
+const ipAllowlistEndpoint = "/api/jmis/v1/allowlist/{serverName}"
 
 type MyJFrogAllowlistError struct {
 	Message string   `json:"message"`
@@ -150,22 +147,25 @@ type ipAllowListAPIGetResponseModel struct {
 	IPs []ipAllowListIPAPIGetResponseModel `json:"ips"`
 }
 
+// waitForCompletion makes GET request to MyJFrog API to get the current IP allowlist status.
+// The response includes the current list of IPs so we return that as well when status changes to "COMPLETED".
 func (r ipAllowListResource) waitForCompletion(ctx context.Context, serverName string) ([]string, error) {
 	tflog.Info(ctx, "waiting for ip allowlist process to complete")
 
 	var ips []string
 
-	retryExponential := retry.NewExponential(15 * time.Second)
-	retryExponential = retry.WithCappedDuration(1*time.Minute, retryExponential)
-	retryExponential = retry.WithMaxDuration(15*time.Minute, retryExponential)
+	backoff := retry.NewConstant(15 * time.Second)
+	backoff = retry.WithJitterPercent(10, backoff)
+	backoff = retry.WithCappedDuration(1*time.Minute, backoff)
+	backoff = retry.WithMaxDuration(15*time.Minute, backoff)
 
-	if err := retry.Do(ctx, retryExponential, func(_ context.Context) error {
+	var retryFunc = func(_ context.Context) error {
 		tflog.Info(ctx, "checking ip allowlist process status")
 		i, status, err := r.getAllowList(serverName)
 		if err != nil {
 			return err
 		}
-		if status == inProgressStatus {
+		if status != "COMPLETED" {
 			tflog.Info(ctx, "ip allowlist process still in progress")
 			return retry.RetryableError(fmt.Errorf(status))
 		}
@@ -173,7 +173,9 @@ func (r ipAllowListResource) waitForCompletion(ctx context.Context, serverName s
 		ips = i
 		tflog.Info(ctx, "ip allowlist process completed")
 		return nil
-	}); err != nil {
+	}
+
+	if err := retry.Do(ctx, backoff, retryFunc); err != nil {
 		return nil, err
 	}
 
