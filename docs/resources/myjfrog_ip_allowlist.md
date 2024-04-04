@@ -5,8 +5,7 @@ subcategory: ""
 description: |-
   Provides a MyJFrog IP allowlist https://jfrog.com/help/r/jfrog-hosting-models-documentation/configure-the-ip/cidr-allowlist resource to manage list of allow IP/CIDR addresses. To use this resource, you need an access token. Only a Primary Admin can generate MyJFrog tokens. For more information, see Generate a Token in MyJFrog https://jfrog.com/help/r/jfrog-hosting-models-documentation/generate-a-token-in-myjfrog.
   ->This resource is supported only on the Cloud (SaaS) platform.
-  ->The provider will automatically retry API requests that return 409 (Conflict) or 429 (Too Many Attempts) error. It will retry up to 5 times, wait initially for 2 minutes with increasing delay (max 12 minutes) after each attempt.
-  ~>See Allowlist REST API https://jfrog.com/help/r/jfrog-rest-apis/allowlist-rest-api for limitations.
+  ~>The rate limit is 5 times per hour for actions that result in a successful outcome (for Create, Update, and Delete actions). See Allowlist REST API https://jfrog.com/help/r/jfrog-rest-apis/allowlist-rest-api for full list of limitations.
 ---
 
 # platform_myjfrog_ip_allowlist (Resource)
@@ -15,9 +14,7 @@ Provides a MyJFrog [IP allowlist](https://jfrog.com/help/r/jfrog-hosting-models-
 
 ->This resource is supported only on the Cloud (SaaS) platform.
 
-->The provider will automatically retry API requests that return 409 (Conflict) or 429 (Too Many Attempts) error. It will retry up to 5 times, wait initially for 2 minutes with increasing delay (max 12 minutes) after each attempt.
-
-~>See [Allowlist REST API](https://jfrog.com/help/r/jfrog-rest-apis/allowlist-rest-api) for limitations.
+~>The rate limit is **5 times per hour** for actions that result in a successful outcome (for Create, Update, and Delete actions). See [Allowlist REST API](https://jfrog.com/help/r/jfrog-rest-apis/allowlist-rest-api) for full list of limitations.
 
 ## Example Usage
 
