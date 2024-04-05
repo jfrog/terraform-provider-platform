@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -101,6 +103,11 @@ func (r *ipAllowListResource) Schema(ctx context.Context, req resource.SchemaReq
 				ElementType: types.StringType,
 				Required:    true,
 				Description: "List of IPs for the JPD allowlist",
+				Validators: []validator.Set{
+					setvalidator.ValueStringsAre(
+						IPCIDR(),
+					),
+				},
 			},
 		},
 		MarkdownDescription: "Provides a MyJFrog [IP allowlist](https://jfrog.com/help/r/jfrog-hosting-models-documentation/configure-the-ip/cidr-allowlist) resource to manage list of allow IP/CIDR addresses. " +
@@ -161,7 +168,7 @@ func (r ipAllowListResource) waitForCompletion(ctx context.Context, serverName s
 
 	var retryFunc = func(_ context.Context) error {
 		tflog.Info(ctx, "checking ip allowlist process status")
-		i, status, err := r.getAllowList(serverName)
+		i, status, err := r.getIPs(serverName)
 		if err != nil {
 			return err
 		}
@@ -182,69 +189,7 @@ func (r ipAllowListResource) waitForCompletion(ctx context.Context, serverName s
 	return ips, nil
 }
 
-func (r *ipAllowListResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var plan ipAllowListResourceModel
-
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	var planIPs []string
-	resp.Diagnostics.Append(plan.IPs.ElementsAs(ctx, &planIPs, false)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	allowList := ipAllowListAPIPostRequestModel{
-		IPs: planIPs,
-	}
-
-	serverName := plan.ServerName.ValueString()
-	var result ipAllowListAPIPostDeleteResponseModel
-	var apiErr MyJFrogAllowlistErrorResponse
-	response, err := r.ProviderData.MyJFrogClient.R().
-		SetPathParam("serverName", serverName).
-		SetBody(&allowList).
-		SetResult(&result).
-		SetError(&apiErr).
-		Post(ipAllowlistEndpoint)
-
-	if err != nil {
-		utilfw.UnableToCreateResourceError(resp, err.Error())
-		return
-	}
-
-	if response.IsError() {
-		if slices.Contains([]int{http.StatusConflict, http.StatusTooManyRequests}, response.StatusCode()) {
-			var conflictErr MyJFrogAllowlistConflictErrorResponse
-			err := json.Unmarshal(response.Body(), &conflictErr)
-			if err != nil {
-				utilfw.UnableToCreateResourceError(resp, err.Error())
-				return
-			}
-			utilfw.UnableToCreateResourceError(resp, conflictErr.Error())
-			return
-		}
-		utilfw.UnableToCreateResourceError(resp, apiErr.Error())
-		return
-	}
-
-	ips, err := r.waitForCompletion(ctx, serverName)
-	if err != nil {
-		utilfw.UnableToCreateResourceError(resp, err.Error())
-		return
-	}
-
-	resp.Diagnostics.Append(plan.fromIPs(ctx, ips)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
-}
-
-func (r *ipAllowListResource) getAllowList(serverName string) ([]string, string, error) {
+func (r *ipAllowListResource) getIPs(serverName string) ([]string, string, error) {
 	var result ipAllowListAPIGetResponseModel
 
 	response, err := r.ProviderData.MyJFrogClient.R().
@@ -264,6 +209,91 @@ func (r *ipAllowListResource) getAllowList(serverName string) ([]string, string,
 		return list.IP
 	})
 	return ips, result.Status, nil
+}
+
+func (r *ipAllowListResource) addIPs(ctx context.Context, serverName string, ips []string) ([]string, error) {
+	return r.mutateIPs(ctx, serverName, ips, func(req *resty.Request) (*resty.Response, error) {
+		return req.Post(ipAllowlistEndpoint)
+	})
+}
+
+func (r *ipAllowListResource) removeIPs(ctx context.Context, serverName string, ips []string) ([]string, error) {
+	return r.mutateIPs(ctx, serverName, ips, func(req *resty.Request) (*resty.Response, error) {
+		return req.Delete(ipAllowlistEndpoint)
+	})
+}
+
+func (r *ipAllowListResource) mutateIPs(ctx context.Context, serverName string, ips []string, requestCallback func(req *resty.Request) (*resty.Response, error)) ([]string, error) {
+	if requestCallback == nil {
+		return nil, fmt.Errorf("requestCallback cannot be nil")
+	}
+
+	allowList := ipAllowListAPIPostRequestModel{
+		IPs: ips,
+	}
+
+	var result ipAllowListAPIPostDeleteResponseModel
+	var apiErr MyJFrogAllowlistErrorResponse
+	req := r.ProviderData.MyJFrogClient.R().
+		SetPathParam("serverName", serverName).
+		SetBody(&allowList).
+		SetResult(&result).
+		SetError(&apiErr)
+
+	resp, err := requestCallback(req)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.IsError() {
+		if slices.Contains([]int{http.StatusConflict, http.StatusTooManyRequests}, resp.StatusCode()) {
+			var conflictErr MyJFrogAllowlistConflictErrorResponse
+			err := json.Unmarshal(resp.Body(), &conflictErr)
+			if err != nil {
+				return nil, err
+			}
+			return nil, conflictErr
+		}
+		return nil, apiErr
+	}
+
+	updatedIPS, err := r.waitForCompletion(ctx, serverName)
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedIPS, nil
+}
+
+func (r *ipAllowListResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var plan ipAllowListResourceModel
+
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var planIPs []string
+	resp.Diagnostics.Append(plan.IPs.ElementsAs(ctx, &planIPs, false)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if len(planIPs) > 0 {
+		ips, err := r.addIPs(ctx, plan.ServerName.ValueString(), planIPs)
+		if err != nil {
+			utilfw.UnableToCreateResourceError(resp, err.Error())
+			return
+		}
+
+		resp.Diagnostics.Append(plan.fromIPs(ctx, ips)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *ipAllowListResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -302,7 +332,7 @@ func (r *ipAllowListResource) Update(ctx context.Context, req resource.UpdateReq
 	serverName := plan.ServerName.ValueString()
 
 	// Get the current list of IPs
-	jpdIPs, _, err := r.getAllowList(serverName)
+	jpdIPs, _, err := r.getIPs(serverName)
 	if err != nil {
 		utilfw.UnableToUpdateResourceError(resp, err.Error())
 		return
@@ -320,56 +350,31 @@ func (r *ipAllowListResource) Update(ctx context.Context, req resource.UpdateReq
 	}
 
 	ipsToAdd, ipsToRemove := lo.Difference(planIPs, jpdIPs)
-	var result ipAllowListAPIPostDeleteResponseModel
-	var response *resty.Response
-	var apiErr MyJFrogAllowlistErrorResponse
-
-	myJFrogReq := r.ProviderData.MyJFrogClient.R().
-		SetPathParam("serverName", plan.ServerName.ValueString()).
-		SetResult(&result).
-		SetError(&apiErr)
 
 	if len(ipsToAdd) > 0 {
-		allowList := ipAllowListAPIPostRequestModel{
-			IPs: ipsToAdd,
+		_, e := r.addIPs(ctx, serverName, ipsToAdd)
+		if e != nil {
+			resp.Diagnostics.AddError(
+				"failed to add IPs",
+				e.Error(),
+			)
 		}
-
-		response, err = myJFrogReq.
-			SetBody(&allowList).
-			Post(ipAllowlistEndpoint)
 	}
-
 	if len(ipsToRemove) > 0 {
-		allowList := ipAllowListAPIPostRequestModel{
-			IPs: ipsToRemove,
+		_, e := r.removeIPs(ctx, serverName, ipsToRemove)
+		if e != nil {
+			resp.Diagnostics.AddError(
+				"failed to add IPs",
+				e.Error(),
+			)
 		}
-
-		response, err = myJFrogReq.
-			SetBody(&allowList).
-			Delete(ipAllowlistEndpoint)
 	}
 
-	if err != nil {
-		utilfw.UnableToUpdateResourceError(resp, err.Error())
+	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	if response.IsError() {
-		if slices.Contains([]int{http.StatusConflict, http.StatusTooManyRequests}, response.StatusCode()) {
-			var conflictErr MyJFrogAllowlistConflictErrorResponse
-			err := json.Unmarshal(response.Body(), &conflictErr)
-			if err != nil {
-				utilfw.UnableToUpdateResourceError(resp, err.Error())
-				return
-			}
-			utilfw.UnableToUpdateResourceError(resp, conflictErr.Error())
-			return
-		}
-
-		utilfw.UnableToUpdateResourceError(resp, apiErr.Error())
-		return
-	}
-
+	// waitForCompletion fetches list of ips from server so no need for extra GET request
 	ips, err := r.waitForCompletion(ctx, serverName)
 	if err != nil {
 		utilfw.UnableToUpdateResourceError(resp, err.Error())
@@ -399,44 +404,11 @@ func (r *ipAllowListResource) Delete(ctx context.Context, req resource.DeleteReq
 		return
 	}
 
-	allowList := ipAllowListAPIPostRequestModel{
-		IPs: ipsToRemove,
-	}
-
-	serverName := state.ServerName.ValueString()
-	var result ipAllowListAPIPostDeleteResponseModel
-	var apiErr MyJFrogAllowlistErrorResponse
-
-	response, err := r.ProviderData.MyJFrogClient.R().
-		SetPathParam("serverName", serverName).
-		SetBody(&allowList).
-		SetResult(&result).
-		SetError(&apiErr).
-		Delete(ipAllowlistEndpoint)
-	if err != nil {
-		utilfw.UnableToDeleteResourceError(resp, err.Error())
-		return
-	}
-
-	if response.IsError() {
-		if slices.Contains([]int{http.StatusConflict, http.StatusTooManyRequests}, response.StatusCode()) {
-			var conflictErr MyJFrogAllowlistConflictErrorResponse
-			err := json.Unmarshal(response.Body(), &conflictErr)
-			if err != nil {
-				utilfw.UnableToDeleteResourceError(resp, err.Error())
-				return
-			}
-			utilfw.UnableToDeleteResourceError(resp, conflictErr.Error())
-			return
+	if len(ipsToRemove) > 0 {
+		_, err := r.removeIPs(ctx, state.ServerName.ValueString(), ipsToRemove)
+		if err != nil {
+			utilfw.UnableToDeleteResourceError(resp, err.Error())
 		}
-
-		utilfw.UnableToDeleteResourceError(resp, apiErr.Error())
-		return
-	}
-
-	if _, err := r.waitForCompletion(ctx, serverName); err != nil {
-		utilfw.UnableToDeleteResourceError(resp, err.Error())
-		return
 	}
 
 	// If the logic reaches here, it implicitly succeeded and will remove
@@ -445,4 +417,51 @@ func (r *ipAllowListResource) Delete(ctx context.Context, req resource.DeleteReq
 
 func (r *ipAllowListResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("server_name"), req, resp)
+}
+
+type ipCIDRValidator struct{}
+
+// Description returns a plain text description of the validator's behavior, suitable for a practitioner to understand its impact.
+func (v ipCIDRValidator) Description(ctx context.Context) string {
+	return `IP/CIDR must be in format like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC 4632 and RFC 4291.`
+}
+
+// MarkdownDescription returns a markdown formatted description of the validator's behavior, suitable for a practitioner to understand its impact.
+func (v ipCIDRValidator) MarkdownDescription(ctx context.Context) string {
+	return `IP/CIDR must be in format like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC 4632 and RFC 4291.`
+}
+
+func (v ipCIDRValidator) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	// If the value is unknown or null, there is nothing to validate.
+	if req.ConfigValue.IsUnknown() || req.ConfigValue.IsNull() {
+		return
+	}
+
+	isValidIP := true
+	isValidCIDR := true
+	var err error
+
+	ip := net.ParseIP(req.ConfigValue.ValueString())
+	if ip == nil {
+		isValidIP = false
+		err = fmt.Errorf("invalid IP address: %s", req.ConfigValue.ValueString())
+	}
+
+	_, _, e := net.ParseCIDR(req.ConfigValue.ValueString())
+	if e != nil {
+		isValidCIDR = false
+		err = e
+	}
+
+	if !isValidIP && !isValidCIDR {
+		resp.Diagnostics.AddAttributeError(
+			req.Path,
+			"Invalid IP/CIDR format",
+			err.Error(),
+		)
+	}
+}
+
+func IPCIDR() ipCIDRValidator {
+	return ipCIDRValidator{}
 }
