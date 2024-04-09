@@ -1,9 +1,14 @@
+## 1.6.0 (Apr 5, 2024)
+
+FEATURES:
+
+* **New Resource:** `platform_myjfrog_ip_allowlist`: Resource to manage MyJFrog IP allowlist. PR: [#50](https://github.com/jfrog/terraform-provider-platform/pull/50) Issue: [#27](https://github.com/jfrog/terraform-provider-platform/issues/27)
+
 ## 1.5.1 (Apr 3, 2024)
 
 BUG FIXES:
 
 * resource/platform_permission: Update documentation for target `name` attribute for `ANY` repository types. Correct values should be `ANY LOCAL`, `ANY REMOTE`, or `ANY DISTRIBUTION`. Note the removal of underscore character. Issue: [#48](https://github.com/jfrog/terraform-provider-platform/issues/48) PR: [#49](https://github.com/jfrog/terraform-provider-platform/pull/49)
-
 
 ## 1.5.0 (Mar 26, 2024)
 

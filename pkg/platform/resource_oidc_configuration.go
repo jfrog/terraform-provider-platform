@@ -14,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/jfrog/terraform-provider-shared/util"
 	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
 )
 
@@ -35,7 +34,7 @@ var OIDCConfigurationNameValidators = []validator.String{
 var _ resource.Resource = (*odicConfigurationResource)(nil)
 
 type odicConfigurationResource struct {
-	ProviderData util.ProvderMetadata
+	ProviderData PlatformProviderMetadata
 }
 
 func NewOIDCConfigurationResource() resource.Resource {
@@ -128,7 +127,7 @@ func (r *odicConfigurationResource) Configure(ctx context.Context, req resource.
 	if req.ProviderData == nil {
 		return
 	}
-	r.ProviderData = req.ProviderData.(util.ProvderMetadata)
+	r.ProviderData = req.ProviderData.(PlatformProviderMetadata)
 }
 
 func (r *odicConfigurationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

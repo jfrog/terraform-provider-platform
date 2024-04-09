@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -13,7 +14,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jfrog/terraform-provider-shared/client"
 	"github.com/jfrog/terraform-provider-shared/util"
-	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
 	validator_string "github.com/jfrog/terraform-provider-shared/validator/fw/string"
 )
 
@@ -24,14 +24,20 @@ var productId = "terraform-provider-platform/" + Version
 
 var _ provider.Provider = (*PlatformProvider)(nil)
 
+type PlatformProviderMetadata struct {
+	util.ProvderMetadata
+	MyJFrogClient *resty.Client
+}
+
 type PlatformProvider struct {
-	Meta util.ProvderMetadata
+	Meta PlatformProviderMetadata
 }
 
 type platformProviderModel struct {
-	Url          types.String `tfsdk:"url"`
-	AccessToken  types.String `tfsdk:"access_token"`
-	CheckLicense types.Bool   `tfsdk:"check_license"`
+	Url             types.String `tfsdk:"url"`
+	AccessToken     types.String `tfsdk:"access_token"`
+	MyJFrogAPIToken types.String `tfsdk:"myjfrog_api_token"`
+	CheckLicense    types.Bool   `tfsdk:"check_license"`
 }
 
 func NewProvider() func() provider.Provider {
@@ -44,6 +50,7 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 	// Check environment variables, first available OS variable will be assigned to the var
 	url := util.CheckEnvVars([]string{"JFROG_URL"}, "")
 	accessToken := util.CheckEnvVars([]string{"JFROG_ACCESS_TOKEN"}, "")
+	myJFrogAPIToken := util.CheckEnvVars([]string{"JFROG_MYJFROG_API_TOKEN"}, "")
 
 	var config platformProviderModel
 
@@ -67,6 +74,10 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 		return
 	}
 
+	if config.MyJFrogAPIToken.ValueString() != "" {
+		myJFrogAPIToken = config.MyJFrogAPIToken.ValueString()
+	}
+
 	if config.Url.ValueString() != "" {
 		url = config.Url.ValueString()
 	}
@@ -79,7 +90,28 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 		return
 	}
 
-	restyBase, err := client.Build(url, productId)
+	var myJFrogClient *resty.Client
+	if len(myJFrogAPIToken) > 0 {
+		c, err := client.Build("https://my.jfrog.com", productId)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error creating Resty client for MyJFrog",
+				err.Error(),
+			)
+		}
+
+		c, err = client.AddAuth(c, "", myJFrogAPIToken)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error adding Auth to Resty client for MyJFrog",
+				err.Error(),
+			)
+		}
+
+		myJFrogClient = c
+	}
+
+	platformClient, err := client.Build(url, productId)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Resty client",
@@ -87,7 +119,7 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 		)
 	}
 
-	restyBase, err = client.AddAuth(restyBase, "", accessToken)
+	platformClient, err = client.AddAuth(platformClient, "", accessToken)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error adding Auth to Resty client",
@@ -96,16 +128,16 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 	}
 
 	if config.CheckLicense.IsNull() || config.CheckLicense.ValueBool() {
-		if licenseErr := utilfw.CheckArtifactoryLicense(restyBase, "Enterprise", "Commercial", "Edge"); licenseErr != nil {
+		if licenseErr := util.CheckArtifactoryLicense(platformClient, "Enterprise", "Commercial", "Edge"); licenseErr != nil {
 			resp.Diagnostics.AddError(
 				"Error getting Artifactory license",
-				fmt.Sprintf("%v", licenseErr),
+				licenseErr.Error(),
 			)
 			return
 		}
 	}
 
-	version, err := util.GetArtifactoryVersion(restyBase)
+	version, err := util.GetArtifactoryVersion(platformClient)
 	if err != nil {
 		resp.Diagnostics.AddWarning(
 			"Error getting Artifactory version",
@@ -115,11 +147,14 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 	}
 
 	featureUsage := fmt.Sprintf("Terraform/%s", req.TerraformVersion)
-	util.SendUsage(ctx, restyBase, productId, featureUsage)
+	util.SendUsage(ctx, platformClient, productId, featureUsage)
 
-	meta := util.ProvderMetadata{
-		Client:             restyBase,
-		ArtifactoryVersion: version,
+	meta := PlatformProviderMetadata{
+		ProvderMetadata: util.ProvderMetadata{
+			Client:             platformClient,
+			ArtifactoryVersion: version,
+		},
+		MyJFrogClient: myJFrogClient,
 	}
 
 	p.Meta = meta
@@ -145,6 +180,7 @@ func (p *PlatformProvider) Resources(ctx context.Context) []func() resource.Reso
 		NewGlobalRoleResource,
 		NewOIDCConfigurationResource,
 		NewOIDCIdentityMappingResource,
+		NewMyJFrogIPAllowListResource,
 		NewPermissionResource,
 		NewReverseProxyResource,
 		NewWorkerServiceResource,
@@ -155,23 +191,31 @@ func (p *PlatformProvider) Schema(ctx context.Context, req provider.SchemaReques
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"url": schema.StringAttribute{
-				Description: "JFrog Platform URL.",
-				Optional:    true,
+				Optional: true,
 				Validators: []validator.String{
 					validator_string.IsURLHttpOrHttps(),
 				},
+				MarkdownDescription: "JFrog Platform URL. This can also be sourced from the `JFROG_URL` environment variable.",
 			},
 			"access_token": schema.StringAttribute{
-				Description: "This is a access token that can be given to you by your admin under `Platform Configuration -> User Management -> Access Tokens`.",
-				Optional:    true,
-				Sensitive:   true,
+				Optional:  true,
+				Sensitive: true,
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
+				MarkdownDescription: "This is a access token that can be given to you by your admin under `Platform Configuration -> User Management -> Access Tokens`. This can also be sourced from the `JFROG_ACCESS_TOKEN` environment variable.",
+			},
+			"myjfrog_api_token": schema.StringAttribute{
+				Optional:  true,
+				Sensitive: true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+				MarkdownDescription: "MyJFrog API token that allows you to make changes to your JFrog account. See [Generate a Token in MyJFrog](https://jfrog.com/help/r/jfrog-hosting-models-documentation/generate-a-token-in-myjfrog) for more details.  This can also be sourced from the `JFROG_MYJFROG_API_TOKEN` environment variable.",
 			},
 			"check_license": schema.BoolAttribute{
-				Description: "Toggle for pre-flight checking of Artifactory Pro and Enterprise license. Default to `true`.",
-				Optional:    true,
+				Optional:            true,
+				MarkdownDescription: "Toggle for pre-flight checking of Artifactory Pro and Enterprise license. Default to `true`.",
 			},
 		},
 	}

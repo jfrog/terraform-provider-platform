@@ -107,6 +107,7 @@ provider "platform" {
 
 ### Optional
 
-- `access_token` (String, Sensitive) This is a access token that can be given to you by your admin under `Platform Configuration -> User Management -> Access Tokens`.
+- `access_token` (String, Sensitive) This is a access token that can be given to you by your admin under `Platform Configuration -> User Management -> Access Tokens`. This can also be sourced from the `JFROG_ACCESS_TOKEN` environment variable.
 - `check_license` (Boolean) Toggle for pre-flight checking of Artifactory Pro and Enterprise license. Default to `true`.
-- `url` (String) JFrog Platform URL.
+- `myjfrog_api_token` (String, Sensitive) MyJFrog API token that allows you to make changes to your JFrog account. See [Generate a Token in MyJFrog](https://jfrog.com/help/r/jfrog-hosting-models-documentation/generate-a-token-in-myjfrog) for more details.  This can also be sourced from the `JFROG_MYJFROG_API_TOKEN` environment variable.
+- `url` (String) JFrog Platform URL. This can also be sourced from the `JFROG_URL` environment variable.
