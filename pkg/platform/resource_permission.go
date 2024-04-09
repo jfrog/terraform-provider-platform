@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/jfrog/terraform-provider-shared/util"
 	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
 	"github.com/samber/lo"
 )
@@ -641,6 +642,18 @@ func (r *permissionResource) Configure(ctx context.Context, req resource.Configu
 		return
 	}
 	r.ProviderData = req.ProviderData.(PlatformProviderMetadata)
+
+	ok, err := util.CheckVersion(r.ProviderData.ArtifactoryVersion, "7.72.0")
+	if err != nil {
+		resp.Diagnostics.AddError("failed to check Artifactory version", err.Error())
+	}
+
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unsupported Artifactory version",
+			"Access Permission API is only support by Artifactory version 7.72.0 or later",
+		)
+	}
 }
 
 func (r *permissionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
