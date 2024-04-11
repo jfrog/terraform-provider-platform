@@ -1,3 +1,9 @@
+## 1.7.0 (Apr 12, 2024)
+
+FEATURES:
+
+* provider: Add support for Terraform Cloud Workload Identity Token. Issue: [#30](https://github.com/jfrog/terraform-provider-platform/issues/30) PR: [#54](https://github.com/jfrog/terraform-provider-platform/pull/54)
+
 ## 1.6.0 (Apr 5, 2024)
 
 FEATURES:
