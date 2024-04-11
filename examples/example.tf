@@ -1,12 +1,12 @@
 terraform {
   required_providers {
     artifactory = {
-      source  = "registry.terraform.io/jfrog/artifactory"
-      version = "9.9.0"
+      source  = "jfrog/artifactory"
+      version = "10.5.1"
     }
     platform = {
-      source  = "registry.terraform.io/jfrog/platform"
-      version = "1.0.0"
+      source  = "jfrog/platform"
+      version = "1.6.0"
     }
   }
 }
@@ -24,6 +24,14 @@ provider "artifactory" {
 provider "platform" {
   url = "${var.jfrog_url}"
   // supply JFROG_ACCESS_TOKEN as env var
+}
+
+resource "platform_global_role" "my-global-role" {
+  name         = "my-global-role"
+  description  = "Test description"
+  type         = "CUSTOM_GLOBAL"
+  environments = ["DEV"]
+  actions      = ["READ_REPOSITORY", "READ_BUILD"]
 }
 
 resource "artifactory_local_generic_repository" "my-generic-local" {
