@@ -34,10 +34,11 @@ type PlatformProvider struct {
 }
 
 type platformProviderModel struct {
-	Url             types.String `tfsdk:"url"`
-	AccessToken     types.String `tfsdk:"access_token"`
-	MyJFrogAPIToken types.String `tfsdk:"myjfrog_api_token"`
-	CheckLicense    types.Bool   `tfsdk:"check_license"`
+	Url              types.String `tfsdk:"url"`
+	AccessToken      types.String `tfsdk:"access_token"`
+	MyJFrogAPIToken  types.String `tfsdk:"myjfrog_api_token"`
+	OIDCProviderName types.String `tfsdk:"oidc_provider_name"`
+	CheckLicense     types.Bool   `tfsdk:"check_license"`
 }
 
 func NewProvider() func() provider.Provider {
@@ -60,8 +61,30 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 		return
 	}
 
-	// Check configuration data, which should take precedence over
+	platformClient, err := client.Build(url, productId)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error creating Resty client",
+			err.Error(),
+		)
+	}
+
+	oidcAccessToken, err := util.OIDCTokenExchange(ctx, platformClient, config.OIDCProviderName.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed OIDC ID token exchange",
+			err.Error(),
+		)
+	}
+
+	// use token from OIDC provider, which should take precedence over
 	// environment variable data, if found.
+	if oidcAccessToken != "" {
+		accessToken = oidcAccessToken
+	}
+
+	// use token from configuration, which should take precedence over
+	// environment variable data or OIDC provider, if found.
 	if config.AccessToken.ValueString() != "" {
 		accessToken = config.AccessToken.ValueString()
 	}
@@ -69,7 +92,7 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 	if accessToken == "" {
 		resp.Diagnostics.AddError(
 			"Missing JFrog Access Token",
-			"While configuring the provider, the Access Token was not found in the JFROG_ACCESS_TOKEN environment variable or provider configuration block access_token attribute.",
+			"While configuring the provider, the Access Token was not found in the JFROG_ACCESS_TOKEN environment variable, provider configuration block access_token attribute, or Terraform Cloud TFC_WORKLOAD_IDENTITY_TOKEN environment variable.",
 		)
 		return
 	}
@@ -109,14 +132,6 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 		}
 
 		myJFrogClient = c
-	}
-
-	platformClient, err := client.Build(url, productId)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating Resty client",
-			err.Error(),
-		)
 	}
 
 	platformClient, err = client.AddAuth(platformClient, "", accessToken)
@@ -211,7 +226,14 @@ func (p *PlatformProvider) Schema(ctx context.Context, req provider.SchemaReques
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
-				MarkdownDescription: "MyJFrog API token that allows you to make changes to your JFrog account. See [Generate a Token in MyJFrog](https://jfrog.com/help/r/jfrog-hosting-models-documentation/generate-a-token-in-myjfrog) for more details.  This can also be sourced from the `JFROG_MYJFROG_API_TOKEN` environment variable.",
+				MarkdownDescription: "MyJFrog API token that allows you to make changes to your JFrog account. See [Generate a Token in MyJFrog](https://jfrog.com/help/r/jfrog-hosting-models-documentation/generate-a-token-in-myjfrog) for more details. This can also be sourced from the `JFROG_MYJFROG_API_TOKEN` environment variable.",
+			},
+			"oidc_provider_name": schema.StringAttribute{
+				Optional: true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+				MarkdownDescription: "OIDC provider name. See [Configure an OIDC Integration](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-an-oidc-integration) for more details.",
 			},
 			"check_license": schema.BoolAttribute{
 				Optional:            true,
