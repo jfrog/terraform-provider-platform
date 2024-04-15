@@ -25,7 +25,7 @@ var productId = "terraform-provider-platform/" + Version
 var _ provider.Provider = (*PlatformProvider)(nil)
 
 type PlatformProviderMetadata struct {
-	util.ProvderMetadata
+	util.ProviderMetadata
 	MyJFrogClient *resty.Client
 }
 
@@ -170,7 +170,7 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 	util.SendUsage(ctx, platformClient, productId, featureUsage)
 
 	meta := PlatformProviderMetadata{
-		ProvderMetadata: util.ProvderMetadata{
+		ProviderMetadata: util.ProviderMetadata{
 			Client:             platformClient,
 			ArtifactoryVersion: version,
 		},
