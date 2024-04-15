@@ -22,6 +22,7 @@ func TestAccPermission_full(t *testing.T) {
 	resource "artifactory_managed_user" "{{ .userName }}" {
 		name = "{{ .userName }}"
 		email = "{{ .userName }}@tempurl.org"
+		password = "Password!123"
 	}
 
 	resource "artifactory_group" "{{ .groupName }}" {
@@ -66,6 +67,7 @@ func TestAccPermission_full(t *testing.T) {
 	resource "artifactory_managed_user" "{{ .userName }}" {
 		name = "{{ .userName }}"
 		email = "{{ .userName }}@tempurl.org"
+		password = "Password!123"
 	}
 
 	resource "artifactory_group" "{{ .groupName }}" {
