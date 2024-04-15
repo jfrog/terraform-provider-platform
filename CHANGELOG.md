@@ -1,3 +1,9 @@
+## 1.7.1 (Apr 15, 2024)
+
+BUG FIXES:
+
+* provider: Fix crashes when `url` attribute is used to set JFrog platform URL (vs env var). Issue: [#57](https://github.com/jfrog/terraform-provider-platform/issues/57) PR: [#58](https://github.com/jfrog/terraform-provider-platform/pull/58)
+
 ## 1.7.0 (Apr 12, 2024)
 
 FEATURES:
