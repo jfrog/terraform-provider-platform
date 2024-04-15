@@ -61,12 +61,25 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 		return
 	}
 
+	if config.Url.ValueString() != "" {
+		url = config.Url.ValueString()
+	}
+
+	if url == "" {
+		resp.Diagnostics.AddError(
+			"Missing URL Configuration",
+			"While configuring the provider, the url was not found in the JFROG_URL environment variable or provider configuration block url attribute.",
+		)
+		return
+	}
+
 	platformClient, err := client.Build(url, productId)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Resty client",
 			err.Error(),
 		)
+		return
 	}
 
 	oidcAccessToken, err := util.OIDCTokenExchange(ctx, platformClient, config.OIDCProviderName.ValueString())
@@ -75,6 +88,7 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 			"Failed OIDC ID token exchange",
 			err.Error(),
 		)
+		return
 	}
 
 	// use token from OIDC provider, which should take precedence over
@@ -101,18 +115,6 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 		myJFrogAPIToken = config.MyJFrogAPIToken.ValueString()
 	}
 
-	if config.Url.ValueString() != "" {
-		url = config.Url.ValueString()
-	}
-
-	if url == "" {
-		resp.Diagnostics.AddError(
-			"Missing URL Configuration",
-			"While configuring the provider, the url was not found in the JFROG_URL environment variable or provider configuration block url attribute.",
-		)
-		return
-	}
-
 	var myJFrogClient *resty.Client
 	if len(myJFrogAPIToken) > 0 {
 		c, err := client.Build("https://my.jfrog.com", productId)
@@ -121,6 +123,7 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 				"Error creating Resty client for MyJFrog",
 				err.Error(),
 			)
+			return
 		}
 
 		c, err = client.AddAuth(c, "", myJFrogAPIToken)
@@ -129,6 +132,7 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 				"Error adding Auth to Resty client for MyJFrog",
 				err.Error(),
 			)
+			return
 		}
 
 		myJFrogClient = c
@@ -140,6 +144,7 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 			"Error adding Auth to Resty client",
 			err.Error(),
 		)
+		return
 	}
 
 	if config.CheckLicense.IsNull() || config.CheckLicense.ValueBool() {
