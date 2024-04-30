@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/jfrog/terraform-provider-platform/pkg/platform"
 	"github.com/jfrog/terraform-provider-shared/testutil"
@@ -294,6 +295,154 @@ func TestAccPermission_full(t *testing.T) {
 				ImportStateId:                        permissionName,
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
+			},
+		},
+	})
+}
+
+func TestAccPermission_name_change(t *testing.T) {
+	_, fqrn, permissionName := testutil.MkNames("test-permission", "platform_permission")
+	_, _, userName := testutil.MkNames("test-user", "artifactory_managed_user")
+	_, _, groupName := testutil.MkNames("test-group", "artifactory_group")
+	_, _, repoName := testutil.MkNames("test-local-repo", "artifactory_local_generic_repository")
+
+	temp := `
+	resource "artifactory_managed_user" "{{ .userName }}" {
+		name = "{{ .userName }}"
+		email = "{{ .userName }}@tempurl.org"
+		password = "Password!123"
+	}
+
+	resource "artifactory_group" "{{ .groupName }}" {
+		name = "{{ .groupName }}"
+	}
+
+	resource "artifactory_local_generic_repository" "{{ .repoName }}" {
+		key = "{{ .repoName }}"
+	}
+
+	resource "platform_permission" "{{ .name }}" {
+		name = "{{ .name }}"
+
+		artifact = {
+			actions = {
+				users = [
+					{
+						name = artifactory_managed_user.{{ .userName }}.name
+						permissions = ["READ"]
+					}
+				]
+
+				groups = [
+					{
+						name = artifactory_group.{{ .groupName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = [ 
+				{
+					name = artifactory_local_generic_repository.{{ .repoName }}.key
+					include_patterns = ["**"]
+					exclude_patterns = ["{{ .excludePattern }}"]
+				}
+			]
+		}
+	}`
+
+	updatedTemp := `
+	resource "artifactory_managed_user" "{{ .userName }}" {
+		name = "{{ .userName }}"
+		email = "{{ .userName }}@tempurl.org"
+		password = "Password!123"
+	}
+
+	resource "artifactory_group" "{{ .groupName }}" {
+		name = "{{ .groupName }}"
+	}
+
+	resource "artifactory_local_generic_repository" "{{ .repoName }}" {
+		key = "{{ .repoName }}"
+	}
+
+	resource "platform_permission" "{{ .name }}" {
+		name = "foobar"
+
+		artifact = {
+			actions = {
+				users = [
+					{
+						name = artifactory_managed_user.{{ .userName }}.name
+						permissions = ["READ"]
+					}
+				]
+
+				groups = [
+					{
+						name = artifactory_group.{{ .groupName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = [ 
+				{
+					name = artifactory_local_generic_repository.{{ .repoName }}.key
+					include_patterns = ["**"]
+					exclude_patterns = ["{{ .excludePattern }}"]
+				}
+			]
+		}
+	}`
+
+	testData := map[string]string{
+		"name":           permissionName,
+		"userName":       userName,
+		"groupName":      groupName,
+		"repoName":       repoName,
+		"excludePattern": "foo",
+	}
+
+	config := testutil.ExecuteTemplate(permissionName, temp, testData)
+
+	updatedConfig := testutil.ExecuteTemplate(permissionName, updatedTemp, testData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"artifactory": {
+				Source: "jfrog/artifactory",
+			},
+		},
+		CheckDestroy: testAccCheckPermissionDestroy(fqrn),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
+					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.0.name", testData["userName"]),
+					resource.TestCheckTypeSetElemAttr(fqrn, "artifact.actions.users.0.permissions.*", "READ"),
+					resource.TestCheckResourceAttr(fqrn, "artifact.actions.groups.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "artifact.actions.groups.0.name", testData["groupName"]),
+					resource.TestCheckTypeSetElemAttr(fqrn, "artifact.actions.groups.0.permissions.*", "READ"),
+					resource.TestCheckResourceAttr(fqrn, "artifact.targets.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "artifact.targets.0.name", testData["repoName"]),
+					resource.TestCheckResourceAttr(fqrn, "artifact.targets.0.include_patterns.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "artifact.targets.0.include_patterns.0", "**"),
+					resource.TestCheckResourceAttr(fqrn, "artifact.targets.0.exclude_patterns.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "artifact.targets.0.exclude_patterns.0", testData["excludePattern"]),
+				),
+			},
+			{
+				Config: updatedConfig,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(fqrn, plancheck.ResourceActionDestroyBeforeCreate),
+					},
+				},
 			},
 		},
 	})
