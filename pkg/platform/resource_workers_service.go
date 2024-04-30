@@ -54,6 +54,7 @@ func (r *workersServiceResource) Schema(ctx context.Context, req resource.Schema
 				Description: "The unique ID of the worker.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"description": schema.StringAttribute{
