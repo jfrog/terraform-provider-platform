@@ -1,3 +1,9 @@
+## 1.7.2 (May 1, 2024)
+
+BUG FIXES:
+
+* resource/platform_permission: Make `name` attribute trigger resource replacement if changed. Issue: [#64](https://github.com/jfrog/terraform-provider-platform/issues/64) PR: [#66](https://github.com/jfrog/terraform-provider-platform/pull/66)
+
 ## 1.7.1 (Apr 15, 2024)
 
 BUG FIXES:
