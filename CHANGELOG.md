@@ -1,8 +1,9 @@
-## 1.7.3 (May 6, 2024)
+## 1.7.3 (May 7, 2024)
 
 BUG FIXES:
 
 * resource/platform_oidc_configuration: Remove trailing slash from GitHub provider URL validation. Issue: [#71](https://github.com/jfrog/terraform-provider-platform/issues/71) PR: [#72](https://github.com/jfrog/terraform-provider-platform/pull/72)
+* resource/platform_permission: Fix state drift when `*.actions.users` or `*.actions.groups` are set to empty set (`[]`). These 2 attributes now must either be `null`/not set, or a set of at least 1 item. Existing Terraform state with `[]` should be migrated to `null` automatically by provider. Issue: [#70](https://github.com/jfrog/terraform-provider-platform/issues/70) PR: [#73](https://github.com/jfrog/terraform-provider-platform/pull/73)
 
 ## 1.7.2 (May 1, 2024)
 
