@@ -37,7 +37,7 @@ func TestAccOIDCConfiguration_full(t *testing.T) {
 
 	updatedTestData := map[string]string{
 		"name":         configName,
-		"issuerURL":    "https://token.actions.githubusercontent.com/",
+		"issuerURL":    "https://token.actions.githubusercontent.com",
 		"providerType": "GitHub",
 		"audience":     "test-audience-2",
 	}
