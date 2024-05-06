@@ -174,7 +174,7 @@ func TestAccOIDCConfiguration_invalid_provider_type_issuer_url(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config:      config,
-				ExpectError: regexp.MustCompile(`must be set to https:\/\/token\.actions\.githubusercontent\.com\/`),
+				ExpectError: regexp.MustCompile(`must be set to https:\/\/token\.actions\.githubusercontent\.com[^\/]`),
 			},
 		},
 	})
