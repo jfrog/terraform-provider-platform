@@ -1,3 +1,9 @@
+## 1.7.3 (May 6, 2024)
+
+BUG FIXES:
+
+* resource/platform_oidc_configuration: Remove trailing slash from GitHub provider URL validation. Issue: [#71](https://github.com/jfrog/terraform-provider-platform/issues/71) PR: [#72](https://github.com/jfrog/terraform-provider-platform/pull/72)
+
 ## 1.7.2 (May 1, 2024)
 
 BUG FIXES:

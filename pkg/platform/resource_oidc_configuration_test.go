@@ -37,7 +37,7 @@ func TestAccOIDCConfiguration_full(t *testing.T) {
 
 	updatedTestData := map[string]string{
 		"name":         configName,
-		"issuerURL":    "https://token.actions.githubusercontent.com/",
+		"issuerURL":    "https://token.actions.githubusercontent.com",
 		"providerType": "GitHub",
 		"audience":     "test-audience-2",
 	}
@@ -174,7 +174,7 @@ func TestAccOIDCConfiguration_invalid_provider_type_issuer_url(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config:      config,
-				ExpectError: regexp.MustCompile(`must be set to https:\/\/token\.actions\.githubusercontent\.com\/`),
+				ExpectError: regexp.MustCompile(`must be set to https:\/\/token\.actions\.githubusercontent\.com[^\/]`),
 			},
 		},
 	})

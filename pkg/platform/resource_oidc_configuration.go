@@ -19,7 +19,7 @@ import (
 
 const (
 	gitHubProviderType        = "GitHub"
-	gitHubProviderURL         = "https://token.actions.githubusercontent.com/"
+	gitHubProviderURL         = "https://token.actions.githubusercontent.com"
 	odicConfigurationEndpoint = "/access/api/v1/oidc"
 )
 
