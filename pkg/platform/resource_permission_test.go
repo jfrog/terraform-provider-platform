@@ -300,6 +300,452 @@ func TestAccPermission_full(t *testing.T) {
 	})
 }
 
+func TestAccPermission_empty_users_state_migration(t *testing.T) {
+	_, fqrn, permissionName := testutil.MkNames("test-permission", "platform_permission")
+	_, _, groupName := testutil.MkNames("test-group", "artifactory_group")
+
+	temp := `
+	resource "artifactory_group" "{{ .groupName }}" {
+		name = "{{ .groupName }}"
+	}
+
+	resource "platform_permission" "{{ .name }}" {
+		name = "{{ .name }}"
+
+		artifact = {
+			actions = {
+				users = []
+				groups = [
+					{
+						name = artifactory_group.{{ .groupName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = []
+		}
+
+		build = {
+			actions = {
+				users = []
+				groups = [
+					{
+						name = artifactory_group.{{ .groupName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = []
+		}
+
+		release_bundle = {
+			actions = {
+				users = []
+				groups = [
+					{
+						name = artifactory_group.{{ .groupName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = []
+		}
+
+		destination = {
+			actions = {
+				users = []
+				groups = [
+					{
+						name = artifactory_group.{{ .groupName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = []
+		}
+
+		pipeline_source = {
+			actions = {
+				users = []
+				groups = [
+					{
+						name = artifactory_group.{{ .groupName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = []
+		}
+	}`
+
+	testData := map[string]string{
+		"name":      permissionName,
+		"groupName": groupName,
+	}
+
+	config := testutil.ExecuteTemplate(permissionName, temp, testData)
+
+	migratedTemp := `
+	resource "artifactory_group" "{{ .groupName }}" {
+		name = "{{ .groupName }}"
+	}
+
+	resource "platform_permission" "{{ .name }}" {
+		name = "{{ .name }}"
+
+		artifact = {
+			actions = {
+				groups = [
+					{
+						name = artifactory_group.{{ .groupName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = []
+		}
+
+		build = {
+			actions = {
+				groups = [
+					{
+						name = artifactory_group.{{ .groupName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = []
+		}
+
+		release_bundle = {
+			actions = {
+				groups = [
+					{
+						name = artifactory_group.{{ .groupName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = []
+		}
+
+		destination = {
+			actions = {
+				groups = [
+					{
+						name = artifactory_group.{{ .groupName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = []
+		}
+
+		pipeline_source = {
+			actions = {
+				groups = [
+					{
+						name = artifactory_group.{{ .groupName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = []
+		}
+	}`
+	migratedConfig := testutil.ExecuteTemplate(permissionName, migratedTemp, testData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		CheckDestroy: testAccCheckPermissionDestroy(fqrn),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				ExternalProviders: map[string]resource.ExternalProvider{
+					"artifactory": {
+						Source: "jfrog/artifactory",
+					},
+					"platform": {
+						Source:            "jfrog/platform",
+						VersionConstraint: "1.7.2",
+					},
+				},
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
+					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.#", "0"),
+					resource.TestCheckResourceAttr(fqrn, "artifact.actions.groups.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "build.actions.users.#", "0"),
+					resource.TestCheckResourceAttr(fqrn, "build.actions.groups.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "release_bundle.actions.users.#", "0"),
+					resource.TestCheckResourceAttr(fqrn, "release_bundle.actions.groups.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "destination.actions.users.#", "0"),
+					resource.TestCheckResourceAttr(fqrn, "destination.actions.groups.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "pipeline_source.actions.users.#", "0"),
+					resource.TestCheckResourceAttr(fqrn, "pipeline_source.actions.groups.#", "1"),
+				),
+				ExpectNonEmptyPlan: true,
+			},
+			{
+				Config:                   migratedConfig,
+				ProtoV6ProviderFactories: testAccProviders(),
+				ExternalProviders: map[string]resource.ExternalProvider{
+					"artifactory": {
+						Source: "jfrog/artifactory",
+					},
+				},
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
+					resource.TestCheckNoResourceAttr(fqrn, "artifact.actions.users"),
+					resource.TestCheckResourceAttr(fqrn, "artifact.actions.groups.#", "1"),
+					resource.TestCheckNoResourceAttr(fqrn, "build.actions.users"),
+					resource.TestCheckResourceAttr(fqrn, "build.actions.groups.#", "1"),
+					resource.TestCheckNoResourceAttr(fqrn, "release_bundle.actions.users"),
+					resource.TestCheckResourceAttr(fqrn, "release_bundle.actions.groups.#", "1"),
+					resource.TestCheckNoResourceAttr(fqrn, "destination.actions.users"),
+					resource.TestCheckResourceAttr(fqrn, "destination.actions.groups.#", "1"),
+					resource.TestCheckNoResourceAttr(fqrn, "pipeline_source.actions.users"),
+					resource.TestCheckResourceAttr(fqrn, "pipeline_source.actions.groups.#", "1"),
+				),
+			},
+		},
+	})
+}
+
+func TestAccPermission_empty_groups_state_migration(t *testing.T) {
+	_, fqrn, permissionName := testutil.MkNames("test-permission", "platform_permission")
+	_, _, userName := testutil.MkNames("test-user", "artifactory_managed_user")
+
+	temp := `
+	resource "artifactory_managed_user" "{{ .userName }}" {
+		name = "{{ .userName }}"
+		email = "{{ .userName }}@tempurl.org"
+		password = "Password!123"
+	}
+
+	resource "platform_permission" "{{ .name }}" {
+		name = "{{ .name }}"
+
+		artifact = {
+			actions = {
+				users = [
+					{
+						name = artifactory_managed_user.{{ .userName }}.name
+						permissions = ["READ"]
+					}
+				]
+				groups = []
+			}
+
+			targets = []
+		}
+
+		build = {
+			actions = {
+				users = [
+					{
+						name = artifactory_managed_user.{{ .userName }}.name
+						permissions = ["READ"]
+					}
+				]
+				groups = []
+			}
+
+			targets = []
+		}
+
+		release_bundle = {
+			actions = {
+				users = [
+					{
+						name = artifactory_managed_user.{{ .userName }}.name
+						permissions = ["READ"]
+					}
+				]
+				groups = []
+			}
+
+			targets = []
+		}
+
+		destination = {
+			actions = {
+				users = [
+					{
+						name = artifactory_managed_user.{{ .userName }}.name
+						permissions = ["READ"]
+					}
+				]
+				groups = []
+			}
+
+			targets = []
+		}
+
+		pipeline_source = {
+			actions = {
+				users = [
+					{
+						name = artifactory_managed_user.{{ .userName }}.name
+						permissions = ["READ"]
+					}
+				]
+				groups = []
+			}
+
+			targets = []
+		}
+	}`
+
+	testData := map[string]string{
+		"name":     permissionName,
+		"userName": userName,
+	}
+
+	config := testutil.ExecuteTemplate(permissionName, temp, testData)
+
+	migratedTemp := `
+	resource "artifactory_managed_user" "{{ .userName }}" {
+		name = "{{ .userName }}"
+		email = "{{ .userName }}@tempurl.org"
+		password = "Password!123"
+	}
+
+	resource "platform_permission" "{{ .name }}" {
+		name = "{{ .name }}"
+
+		artifact = {
+			actions = {
+				users = [
+					{
+						name = artifactory_managed_user.{{ .userName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = []
+		}
+
+		build = {
+			actions = {
+				users = [
+					{
+						name = artifactory_managed_user.{{ .userName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = []
+		}
+
+		release_bundle = {
+			actions = {
+				users = [
+					{
+						name = artifactory_managed_user.{{ .userName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = []
+		}
+
+		destination = {
+			actions = {
+				users = [
+					{
+						name = artifactory_managed_user.{{ .userName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = []
+		}
+
+		pipeline_source = {
+			actions = {
+				users = [
+					{
+						name = artifactory_managed_user.{{ .userName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = []
+		}
+	}`
+	migratedConfig := testutil.ExecuteTemplate(permissionName, migratedTemp, testData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:     func() { testAccPreCheck(t) },
+		CheckDestroy: testAccCheckPermissionDestroy(fqrn),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				ExternalProviders: map[string]resource.ExternalProvider{
+					"artifactory": {
+						Source: "jfrog/artifactory",
+					},
+					"platform": {
+						Source:            "jfrog/platform",
+						VersionConstraint: "1.7.2",
+					},
+				},
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
+					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "artifact.actions.groups.#", "0"),
+					resource.TestCheckResourceAttr(fqrn, "build.actions.users.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "build.actions.groups.#", "0"),
+					resource.TestCheckResourceAttr(fqrn, "release_bundle.actions.users.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "release_bundle.actions.groups.#", "0"),
+					resource.TestCheckResourceAttr(fqrn, "destination.actions.users.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "destination.actions.groups.#", "0"),
+					resource.TestCheckResourceAttr(fqrn, "pipeline_source.actions.users.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "pipeline_source.actions.groups.#", "0"),
+				),
+				ExpectNonEmptyPlan: true,
+			},
+			{
+				Config:                   migratedConfig,
+				ProtoV6ProviderFactories: testAccProviders(),
+				ExternalProviders: map[string]resource.ExternalProvider{
+					"artifactory": {
+						Source: "jfrog/artifactory",
+					},
+				},
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
+					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.#", "1"),
+					resource.TestCheckNoResourceAttr(fqrn, "artifact.actions.groups"),
+					resource.TestCheckResourceAttr(fqrn, "build.actions.users.#", "1"),
+					resource.TestCheckNoResourceAttr(fqrn, "build.actions.groups"),
+					resource.TestCheckResourceAttr(fqrn, "release_bundle.actions.users.#", "1"),
+					resource.TestCheckNoResourceAttr(fqrn, "release_bundle.actions.groups"),
+					resource.TestCheckResourceAttr(fqrn, "destination.actions.users.#", "1"),
+					resource.TestCheckNoResourceAttr(fqrn, "destination.actions.groups"),
+					resource.TestCheckResourceAttr(fqrn, "pipeline_source.actions.users.#", "1"),
+					resource.TestCheckNoResourceAttr(fqrn, "pipeline_source.actions.groups"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccPermission_name_change(t *testing.T) {
 	_, fqrn, permissionName := testutil.MkNames("test-permission", "platform_permission")
 	_, _, userName := testutil.MkNames("test-user", "artifactory_managed_user")

@@ -143,7 +143,7 @@ Required:
 
 Optional:
 
-- `actions` (Attributes) (see [below for nested schema](#nestedatt--artifact--actions))
+- `actions` (Attributes) Either one of `users` or `groups` attribute must be set. (see [below for nested schema](#nestedatt--artifact--actions))
 
 <a id="nestedatt--artifact--targets"></a>
 ### Nested Schema for `artifact.targets`
@@ -163,8 +163,8 @@ Optional:
 
 Optional:
 
-- `groups` (Attributes Set) (see [below for nested schema](#nestedatt--artifact--actions--groups))
-- `users` (Attributes Set) (see [below for nested schema](#nestedatt--artifact--actions--users))
+- `groups` (Attributes Set) Must contain at least one item. (see [below for nested schema](#nestedatt--artifact--actions--groups))
+- `users` (Attributes Set) Must contain at least one item. (see [below for nested schema](#nestedatt--artifact--actions--users))
 
 <a id="nestedatt--artifact--actions--groups"></a>
 ### Nested Schema for `artifact.actions.groups`
@@ -205,7 +205,7 @@ Required:
 
 Optional:
 
-- `actions` (Attributes) (see [below for nested schema](#nestedatt--build--actions))
+- `actions` (Attributes) Either one of `users` or `groups` attribute must be set. (see [below for nested schema](#nestedatt--build--actions))
 
 <a id="nestedatt--build--targets"></a>
 ### Nested Schema for `build.targets`
@@ -225,8 +225,8 @@ Optional:
 
 Optional:
 
-- `groups` (Attributes Set) (see [below for nested schema](#nestedatt--build--actions--groups))
-- `users` (Attributes Set) (see [below for nested schema](#nestedatt--build--actions--users))
+- `groups` (Attributes Set) Must contain at least one item. (see [below for nested schema](#nestedatt--build--actions--groups))
+- `users` (Attributes Set) Must contain at least one item. (see [below for nested schema](#nestedatt--build--actions--users))
 
 <a id="nestedatt--build--actions--groups"></a>
 ### Nested Schema for `build.actions.groups`
@@ -267,7 +267,7 @@ Required:
 
 Optional:
 
-- `actions` (Attributes) (see [below for nested schema](#nestedatt--destination--actions))
+- `actions` (Attributes) Either one of `users` or `groups` attribute must be set. (see [below for nested schema](#nestedatt--destination--actions))
 
 <a id="nestedatt--destination--targets"></a>
 ### Nested Schema for `destination.targets`
@@ -287,8 +287,8 @@ Optional:
 
 Optional:
 
-- `groups` (Attributes Set) (see [below for nested schema](#nestedatt--destination--actions--groups))
-- `users` (Attributes Set) (see [below for nested schema](#nestedatt--destination--actions--users))
+- `groups` (Attributes Set) Must contain at least one item. (see [below for nested schema](#nestedatt--destination--actions--groups))
+- `users` (Attributes Set) Must contain at least one item. (see [below for nested schema](#nestedatt--destination--actions--users))
 
 <a id="nestedatt--destination--actions--groups"></a>
 ### Nested Schema for `destination.actions.groups`
@@ -323,7 +323,7 @@ Required:
 
 Optional:
 
-- `actions` (Attributes) (see [below for nested schema](#nestedatt--pipeline_source--actions))
+- `actions` (Attributes) Either one of `users` or `groups` attribute must be set. (see [below for nested schema](#nestedatt--pipeline_source--actions))
 
 <a id="nestedatt--pipeline_source--targets"></a>
 ### Nested Schema for `pipeline_source.targets`
@@ -343,8 +343,8 @@ Optional:
 
 Optional:
 
-- `groups` (Attributes Set) (see [below for nested schema](#nestedatt--pipeline_source--actions--groups))
-- `users` (Attributes Set) (see [below for nested schema](#nestedatt--pipeline_source--actions--users))
+- `groups` (Attributes Set) Must contain at least one item. (see [below for nested schema](#nestedatt--pipeline_source--actions--groups))
+- `users` (Attributes Set) Must contain at least one item. (see [below for nested schema](#nestedatt--pipeline_source--actions--users))
 
 <a id="nestedatt--pipeline_source--actions--groups"></a>
 ### Nested Schema for `pipeline_source.actions.groups`
@@ -379,7 +379,7 @@ Required:
 
 Optional:
 
-- `actions` (Attributes) (see [below for nested schema](#nestedatt--release_bundle--actions))
+- `actions` (Attributes) Either one of `users` or `groups` attribute must be set. (see [below for nested schema](#nestedatt--release_bundle--actions))
 
 <a id="nestedatt--release_bundle--targets"></a>
 ### Nested Schema for `release_bundle.targets`
@@ -399,8 +399,8 @@ Optional:
 
 Optional:
 
-- `groups` (Attributes Set) (see [below for nested schema](#nestedatt--release_bundle--actions--groups))
-- `users` (Attributes Set) (see [below for nested schema](#nestedatt--release_bundle--actions--users))
+- `groups` (Attributes Set) Must contain at least one item. (see [below for nested schema](#nestedatt--release_bundle--actions--groups))
+- `users` (Attributes Set) Must contain at least one item. (see [below for nested schema](#nestedatt--release_bundle--actions--users))
 
 <a id="nestedatt--release_bundle--actions--groups"></a>
 ### Nested Schema for `release_bundle.actions.groups`

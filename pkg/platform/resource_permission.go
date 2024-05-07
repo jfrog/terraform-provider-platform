@@ -2,6 +2,7 @@ package platform
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
@@ -62,9 +63,14 @@ var usersGroupsAttributeSchema = func(description string) schema.SetNestedAttrib
 			},
 		},
 		Optional: true,
+		Validators: []validator.Set{
+			setvalidator.AtLeastOneOf(path.MatchRelative().AtParent().AtName("users"), path.MatchRelative().AtParent().AtName("groups")),
+			setvalidator.SizeAtLeast(1),
+		},
 		PlanModifiers: []planmodifier.Set{
 			setplanmodifier.UseStateForUnknown(),
 		},
+		MarkdownDescription: "Must contain at least one item.",
 	}
 }
 
@@ -78,6 +84,7 @@ var actionsAttributeSchema = func(description string) schema.SingleNestedAttribu
 		PlanModifiers: []planmodifier.Object{
 			objectplanmodifier.UseStateForUnknown(),
 		},
+		MarkdownDescription: "Either one of `users` or `groups` attribute must be set.",
 	}
 }
 
@@ -135,116 +142,190 @@ var targetAttributeSchema = func(isBuild bool, nameDescription, includeDescripti
 	return attr
 }
 
+var schemaAttributes = map[string]schema.Attribute{
+	"name": schema.StringAttribute{
+		Required: true,
+		Validators: []validator.String{
+			stringvalidator.LengthBetween(1, 255),
+		},
+		PlanModifiers: []planmodifier.String{
+			stringplanmodifier.RequiresReplace(),
+		},
+		Description: "Permission name",
+	},
+	"artifact": schema.SingleNestedAttribute{
+		Optional: true,
+		Attributes: map[string]schema.Attribute{
+			"actions": actionsAttributeSchema(
+				"**READ**: Downloads artifacts and reads the metadata.\n" +
+					"**ANNOTATE**: Annotates artifacts and folders with metadata and properties.\n" +
+					"**WRITE**: Deploys artifacts & deploys to remote repository caches.\n" +
+					"**DELETE**: Deletes or overwrites artifacts.\n" +
+					"**SCAN**: Triggers Xray scans on artifacts in repositories. Creates and deletes custom issues and license.\n" +
+					"**MANAGE**: Allows changing the permission settings for other users in this permission target. It does not permit adding/removing resources to the permission target.",
+			),
+			"targets": targetAttributeSchema(
+				false,
+				"Specify repository key as name. Use `ANY LOCAL`, `ANY REMOTE`, or `ANY DISTRIBUTION` for any repository type.",
+				"Simple comma separated wildcard patterns for **existing and future** repository artifact paths (with no leading slash). Ant-style path expressions are supported (*, **, ?). For example: `org/apache/**`",
+				"Simple comma separated wildcard patterns for **existing and future** repository artifact paths (with no leading slash). Ant-style path expressions are supported (*, **, ?). For example: `org/apache/**`",
+			),
+		},
+		PlanModifiers: []planmodifier.Object{
+			objectplanmodifier.UseStateForUnknown(),
+		},
+		Description: "Defines the repositories to be used or excluded.",
+	},
+	"build": schema.SingleNestedAttribute{
+		Optional: true,
+		Attributes: map[string]schema.Attribute{
+			"actions": actionsAttributeSchema(
+				"**READ**: View and downloads build info artifacts from the artifactory-build-info default repository and reads the corresponding build in the Builds page.\n" +
+					"**ANNOTATE**: Annotates build info artifacts and folders with metadata and properties.\n" +
+					"**WRITE**: Allows uploading and promoting build info artifacts.\n" +
+					"**DELETE**: Deletes build info artifacts.\n" +
+					"**SCAN**: Triggers Xray scans on builds. Creates and deletes custom issues and license.\n" +
+					"**MANAGE**: Allows changing build info permission settings for other users in this permission target. It does not permit adding/removing resources to the permission target.",
+			),
+			"targets": targetAttributeSchema(
+				true,
+				"Only `artifactory-build-info` is allowed for name. Specify build name as part of the `include_patterns` or `exclude_patterns`.",
+				"Use Ant-style wildcard patterns to specify **existing and future** build names (i.e. artifact paths) in the build info repository (without a leading slash) that will be included in this permission target. Ant-style path expressions are supported (*, **, ?). For example, an `apache/**` pattern will include the \"apache\" build info in the permission.",
+				"Use Ant-style wildcard patterns to specify **existing and future** build names (i.e. artifact paths) in the build info repository (without a leading slash) that will be excluded from this permission target. Ant-style path expressions are supported (*, **, ?). For example, an `apache/**` pattern will exclude the \"apache\" build info from the permission.",
+			),
+		},
+		PlanModifiers: []planmodifier.Object{
+			objectplanmodifier.UseStateForUnknown(),
+		},
+		Description: "Defines the builds to be used or excluded.",
+	},
+	"release_bundle": schema.SingleNestedAttribute{
+		Optional: true,
+		Attributes: map[string]schema.Attribute{
+			"actions": actionsAttributeSchema(
+				"**READ**: Views and downloads Release Bundle artifacts from the relevant Release Bundle repository and reads the corresponding Release Bundles in the Distribution page.\n" +
+					"**ANNOTATE**: Annotates Release Bundle artifacts and folder with metadata and properties.\n" +
+					"**WRITE**: Creates Release Bundles.\n" +
+					"**EXECUTE**: Allows users to promote Release Bundles v2 to a selected target environment and is a prerequisite for distributing Release Bundles (v1 & v2) to Distribution Edge nodes.\n" +
+					"**DELETE**: Deletes Release Bundles.\n" +
+					"**SCAN** Xray Metadata: Triggers Xray scans on Release Bundles. Creates and deletes custom issues and license.\n" +
+					"**MANAGE**: Allows changing Release Bundle permission settings for other users in this permission target. It does not permit adding/removing resources to the permission target.",
+			),
+			"targets": targetAttributeSchema(
+				false,
+				"Specify release bundle repository key as name.",
+				"Simple wildcard patterns for **existing and future** Release Bundle names. Ant-style path expressions are supported (*, **, ?). For example: `product_*/**`",
+				"Simple wildcard patterns for **existing and future** Release Bundle names. Ant-style path expressions are supported (*, **, ?). For example: `product_*/**`",
+			),
+		},
+		PlanModifiers: []planmodifier.Object{
+			objectplanmodifier.UseStateForUnknown(),
+		},
+		Description: "Defines the release bundles to be used or excluded.",
+	},
+	"destination": schema.SingleNestedAttribute{
+		Optional: true,
+		Attributes: map[string]schema.Attribute{
+			"actions": actionsAttributeSchema(
+				"**EXECUTE**: Distributes Release Bundles according to their destination permissions.\n" +
+					"**DELETE**: Deletes Release Bundles from the selected destinations.\n" +
+					"**MANAGE**: Adds and deletes users who can distribute Release Bundles on assigned destinations.",
+			),
+			"targets": targetAttributeSchema(
+				false,
+				"Specify destination name as name. Use `*` to include all destinations.",
+				"Simple wildcard patterns for existing and future JPD or city names. Ant-style path expressions are supported (*, **, ?). For example: `site_*` or `New*`",
+				"Simple wildcard patterns for existing and future JPD or city names. Ant-style path expressions are supported (*, **, ?). For example: `site_*` or `New*`",
+			),
+		},
+		PlanModifiers: []planmodifier.Object{
+			objectplanmodifier.UseStateForUnknown(),
+		},
+		Description: "Defines the destinations to be used or excluded.",
+	},
+	"pipeline_source": schema.SingleNestedAttribute{
+		Optional: true,
+		Attributes: map[string]schema.Attribute{
+			"actions": actionsAttributeSchema(
+				"**READ**: View the available pipeline sources.\n" +
+					"**EXECUTE**: Manually trigger execution of steps.\n" +
+					"**MANAGE**: Create and edit pipeline sources.",
+			),
+			"targets": targetAttributeSchema(
+				false,
+				"Specify pipeline source name as name. Use `*` to include all pipeline sources.",
+				"Use Ant-style wildcard patterns to specify the full repository name of the **existing and future** pipeline sources that will be included in this permission. The pattern should have the following format: `{FULL_REPOSITORY_NAME_PATTERN}/**`. Ant-style path expressions are supported (*, **, ?). For example, the pattern `*/*test*/**` will include all repositories that contain the word \"test\" regardless of the repository owner.",
+				"Use Ant-style wildcard patterns to specify the full repository name of the **existing and future** pipeline sources that will be excluded from this permission. The pattern should have the following format: `{FULL_REPOSITORY_NAME_PATTERN}/**`. Ant-style path expressions are supported (*, **, ?). For example, the pattern `*/*test*/**` will exclude all repositories that contain the word \"test\" regardless of the repository owner.",
+			),
+		},
+		PlanModifiers: []planmodifier.Object{
+			objectplanmodifier.UseStateForUnknown(),
+		},
+		Description: "Defines the pipeline sources to be used or excluded.",
+	},
+}
+
 func (r *permissionResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Attributes: map[string]schema.Attribute{
-			"name": schema.StringAttribute{
-				Required: true,
-				Validators: []validator.String{
-					stringvalidator.LengthBetween(1, 255),
-				},
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-				Description: "Permission name",
+		Version:             1,
+		Attributes:          schemaAttributes,
+		MarkdownDescription: "Provides a JFrog [permission](https://jfrog.com/help/r/jfrog-platform-administration-documentation/permissions) resource to manage how users and groups access JFrog resources. This resource is applicable for the next-generation permissions model and fully backwards compatible with the legacy `artifactory_permission_target` resource in Artifactory provider.",
+	}
+}
+
+func setUsersGroupsAttributeToNull(ctx context.Context, resource types.Object, resourceName string, resp *resource.UpgradeStateResponse) {
+	attrs := resource.Attributes()
+	actionsAttrs := attrs["actions"].(types.Object).Attributes()
+	usersSet := actionsAttrs["users"].(types.Set)
+
+	// actions.users and actions.groups no longer allows to be empty set.
+	// they can either be null (not set) or set with items
+	// When prior state has empty set then migrates the value to null
+
+	if !usersSet.IsNull() && len(usersSet.Elements()) == 0 {
+		resp.State.SetAttribute(ctx, path.Root(fmt.Sprintf("%s.actions.users", resourceName)), types.SetNull(usersGroupsResourceModelAttributeTypes))
+	}
+
+	groupsSet := actionsAttrs["groups"].(types.Set)
+	if !groupsSet.IsNull() && len(groupsSet.Elements()) == 0 {
+		resp.State.SetAttribute(ctx, path.Root(fmt.Sprintf("%s.actions.groups", resourceName)), types.SetNull(usersGroupsResourceModelAttributeTypes))
+	}
+}
+
+func (r *permissionResource) UpgradeState(ctx context.Context) map[int64]resource.StateUpgrader {
+	return map[int64]resource.StateUpgrader{
+		// State upgrade implementation from 0 (prior state version) to 1 (Schema.Version)
+		0: {
+			PriorSchema: &schema.Schema{
+				Attributes: schemaAttributes,
 			},
-			"artifact": schema.SingleNestedAttribute{
-				Optional: true,
-				Attributes: map[string]schema.Attribute{
-					"actions": actionsAttributeSchema(
-						"**READ**: Downloads artifacts and reads the metadata.\n" +
-							"**ANNOTATE**: Annotates artifacts and folders with metadata and properties.\n" +
-							"**WRITE**: Deploys artifacts & deploys to remote repository caches.\n" +
-							"**DELETE**: Deletes or overwrites artifacts.\n" +
-							"**SCAN**: Triggers Xray scans on artifacts in repositories. Creates and deletes custom issues and license.\n" +
-							"**MANAGE**: Allows changing the permission settings for other users in this permission target. It does not permit adding/removing resources to the permission target.",
-					),
-					"targets": targetAttributeSchema(
-						false,
-						"Specify repository key as name. Use `ANY LOCAL`, `ANY REMOTE`, or `ANY DISTRIBUTION` for any repository type.",
-						"Simple comma separated wildcard patterns for **existing and future** repository artifact paths (with no leading slash). Ant-style path expressions are supported (*, **, ?). For example: `org/apache/**`",
-						"Simple comma separated wildcard patterns for **existing and future** repository artifact paths (with no leading slash). Ant-style path expressions are supported (*, **, ?). For example: `org/apache/**`",
-					),
-				},
-				Description: "Defines the repositories to be used or excluded.",
-			},
-			"build": schema.SingleNestedAttribute{
-				Optional: true,
-				Attributes: map[string]schema.Attribute{
-					"actions": actionsAttributeSchema(
-						"**READ**: View and downloads build info artifacts from the artifactory-build-info default repository and reads the corresponding build in the Builds page.\n" +
-							"**ANNOTATE**: Annotates build info artifacts and folders with metadata and properties.\n" +
-							"**WRITE**: Allows uploading and promoting build info artifacts.\n" +
-							"**DELETE**: Deletes build info artifacts.\n" +
-							"**SCAN**: Triggers Xray scans on builds. Creates and deletes custom issues and license.\n" +
-							"**MANAGE**: Allows changing build info permission settings for other users in this permission target. It does not permit adding/removing resources to the permission target.",
-					),
-					"targets": targetAttributeSchema(
-						true,
-						"Only `artifactory-build-info` is allowed for name. Specify build name as part of the `include_patterns` or `exclude_patterns`.",
-						"Use Ant-style wildcard patterns to specify **existing and future** build names (i.e. artifact paths) in the build info repository (without a leading slash) that will be included in this permission target. Ant-style path expressions are supported (*, **, ?). For example, an `apache/**` pattern will include the \"apache\" build info in the permission.",
-						"Use Ant-style wildcard patterns to specify **existing and future** build names (i.e. artifact paths) in the build info repository (without a leading slash) that will be excluded from this permission target. Ant-style path expressions are supported (*, **, ?). For example, an `apache/**` pattern will exclude the \"apache\" build info from the permission.",
-					),
-				},
-				Description: "Defines the builds to be used or excluded.",
-			},
-			"release_bundle": schema.SingleNestedAttribute{
-				Optional: true,
-				Attributes: map[string]schema.Attribute{
-					"actions": actionsAttributeSchema(
-						"**READ**: Views and downloads Release Bundle artifacts from the relevant Release Bundle repository and reads the corresponding Release Bundles in the Distribution page.\n" +
-							"**ANNOTATE**: Annotates Release Bundle artifacts and folder with metadata and properties.\n" +
-							"**WRITE**: Creates Release Bundles.\n" +
-							"**EXECUTE**: Allows users to promote Release Bundles v2 to a selected target environment and is a prerequisite for distributing Release Bundles (v1 & v2) to Distribution Edge nodes.\n" +
-							"**DELETE**: Deletes Release Bundles.\n" +
-							"**SCAN** Xray Metadata: Triggers Xray scans on Release Bundles. Creates and deletes custom issues and license.\n" +
-							"**MANAGE**: Allows changing Release Bundle permission settings for other users in this permission target. It does not permit adding/removing resources to the permission target.",
-					),
-					"targets": targetAttributeSchema(
-						false,
-						"Specify release bundle repository key as name.",
-						"Simple wildcard patterns for **existing and future** Release Bundle names. Ant-style path expressions are supported (*, **, ?). For example: `product_*/**`",
-						"Simple wildcard patterns for **existing and future** Release Bundle names. Ant-style path expressions are supported (*, **, ?). For example: `product_*/**`",
-					),
-				},
-				Description: "Defines the release bundles to be used or excluded.",
-			},
-			"destination": schema.SingleNestedAttribute{
-				Optional: true,
-				Attributes: map[string]schema.Attribute{
-					"actions": actionsAttributeSchema(
-						"**EXECUTE**: Distributes Release Bundles according to their destination permissions.\n" +
-							"**DELETE**: Deletes Release Bundles from the selected destinations.\n" +
-							"**MANAGE**: Adds and deletes users who can distribute Release Bundles on assigned destinations.",
-					),
-					"targets": targetAttributeSchema(
-						false,
-						"Specify destination name as name. Use `*` to include all destinations.",
-						"Simple wildcard patterns for existing and future JPD or city names. Ant-style path expressions are supported (*, **, ?). For example: `site_*` or `New*`",
-						"Simple wildcard patterns for existing and future JPD or city names. Ant-style path expressions are supported (*, **, ?). For example: `site_*` or `New*`",
-					),
-				},
-				Description: "Defines the destinations to be used or excluded.",
-			},
-			"pipeline_source": schema.SingleNestedAttribute{
-				Optional: true,
-				Attributes: map[string]schema.Attribute{
-					"actions": actionsAttributeSchema(
-						"**READ**: View the available pipeline sources.\n" +
-							"**EXECUTE**: Manually trigger execution of steps.\n" +
-							"**MANAGE**: Create and edit pipeline sources.",
-					),
-					"targets": targetAttributeSchema(
-						false,
-						"Specify pipeline source name as name. Use `*` to include all pipeline sources.",
-						"Use Ant-style wildcard patterns to specify the full repository name of the **existing and future** pipeline sources that will be included in this permission. The pattern should have the following format: `{FULL_REPOSITORY_NAME_PATTERN}/**`. Ant-style path expressions are supported (*, **, ?). For example, the pattern `*/*test*/**` will include all repositories that contain the word \"test\" regardless of the repository owner.",
-						"Use Ant-style wildcard patterns to specify the full repository name of the **existing and future** pipeline sources that will be excluded from this permission. The pattern should have the following format: `{FULL_REPOSITORY_NAME_PATTERN}/**`. Ant-style path expressions are supported (*, **, ?). For example, the pattern `*/*test*/**` will exclude all repositories that contain the word \"test\" regardless of the repository owner.",
-					),
-				},
-				Description: "Defines the pipeline sources to be used or excluded.",
+			// Optionally, the PriorSchema field can be defined.
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				var priorStateData permissionResourceModel
+
+				resp.Diagnostics.Append(req.State.Get(ctx, &priorStateData)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+
+				upgradedStateData := permissionResourceModel{
+					Name:           priorStateData.Name,
+					Artifact:       priorStateData.Artifact,
+					Build:          priorStateData.Build,
+					ReleaseBundle:  priorStateData.ReleaseBundle,
+					Destination:    priorStateData.Destination,
+					PipelineSource: priorStateData.PipelineSource,
+				}
+
+				resp.Diagnostics.Append(resp.State.Set(ctx, upgradedStateData)...)
+
+				setUsersGroupsAttributeToNull(ctx, upgradedStateData.Artifact, "artifact", resp)
+				setUsersGroupsAttributeToNull(ctx, upgradedStateData.Build, "build", resp)
+				setUsersGroupsAttributeToNull(ctx, upgradedStateData.ReleaseBundle, "release_bundle", resp)
+				setUsersGroupsAttributeToNull(ctx, upgradedStateData.Destination, "destination", resp)
+				setUsersGroupsAttributeToNull(ctx, upgradedStateData.PipelineSource, "pipeline_source", resp)
 			},
 		},
-		MarkdownDescription: "Provides a JFrog [permission](https://jfrog.com/help/r/jfrog-platform-administration-documentation/permissions) resource to manage how users and groups access JFrog resources. This resource is applicable for the next-generation permissions model and fully backwards compatible with the legacy `artifactory_permission_target` resource in Artifactory provider.",
 	}
 }
 
@@ -439,8 +520,8 @@ var resourceResourceModelAttributeTypes map[string]attr.Type = map[string]attr.T
 }
 
 func (r *permissionResourceModel) fromUsersGroupsAPIModel(ctx context.Context, usersGroups map[string][]string) (set types.Set, ds diag.Diagnostics) {
-	set = types.SetNull(usersGroupsResourceModelAttributeTypes)
 	if len(usersGroups) == 0 {
+		set = types.SetNull(usersGroupsResourceModelAttributeTypes)
 		return
 	}
 
@@ -495,13 +576,12 @@ func (r *permissionResourceModel) fromResourceAPIModel(ctx context.Context, reso
 	actions := types.ObjectNull(actionsResourceModelAttributeTypes)
 	if resourceAPIModel.Actions != nil &&
 		(len(resourceAPIModel.Actions.Users) > 0 || len(resourceAPIModel.Actions.Groups) > 0) {
-
-		users, d := r.fromUsersGroupsAPIModel(ctx, resourceAPIModel.Actions.Users)
+		usersSet, d := r.fromUsersGroupsAPIModel(ctx, resourceAPIModel.Actions.Users)
 		if d != nil {
 			ds = append(ds, d...)
 		}
 
-		groups, d := r.fromUsersGroupsAPIModel(ctx, resourceAPIModel.Actions.Groups)
+		groupsSet, d := r.fromUsersGroupsAPIModel(ctx, resourceAPIModel.Actions.Groups)
 		if d != nil {
 			ds = append(ds, d...)
 		}
@@ -509,8 +589,8 @@ func (r *permissionResourceModel) fromResourceAPIModel(ctx context.Context, reso
 		as, d := types.ObjectValue(
 			actionsResourceModelAttributeTypes,
 			map[string]attr.Value{
-				"users":  users,
-				"groups": groups,
+				"users":  usersSet,
+				"groups": groupsSet,
 			},
 		)
 		if d != nil {
@@ -520,9 +600,8 @@ func (r *permissionResourceModel) fromResourceAPIModel(ctx context.Context, reso
 	}
 
 	targets := types.SetNull(targetsResourceModelAttributeTypes)
-
-	if len(resourceAPIModel.Targets) > 0 {
-		targetSet := lo.MapToSlice(
+	if resourceAPIModel.Targets != nil {
+		targetsSlice := lo.MapToSlice(
 			resourceAPIModel.Targets,
 			func(name string, filter permissionTargetsAPIModel) attr.Value {
 				includePatterns := types.SetNull(types.StringType)
@@ -560,14 +639,14 @@ func (r *permissionResourceModel) fromResourceAPIModel(ctx context.Context, reso
 			},
 		)
 
-		ts, d := types.SetValue(
+		targetsSet, d := types.SetValue(
 			targetsResourceModelAttributeTypes,
-			targetSet,
+			targetsSlice,
 		)
 		if d != nil {
 			ds = append(ds, d...)
 		}
-		targets = ts
+		targets = targetsSet
 	}
 
 	obj, d := types.ObjectValue(
