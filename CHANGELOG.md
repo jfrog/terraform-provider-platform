@@ -1,3 +1,9 @@
+## 1.7.4 (May 8, 2024)
+
+BUG FIXES:
+
+* resource/platform_permission: Fix state upgrader crash when upgrading from 1.7.2 to 1.7.3 with no `groups` or `users` attribute set. Issue: [#75](https://github.com/jfrog/terraform-provider-platform/issues/75) PR: [#76](https://github.com/jfrog/terraform-provider-platform/pull/76)
+
 ## 1.7.3 (May 7, 2024)
 
 BUG FIXES:

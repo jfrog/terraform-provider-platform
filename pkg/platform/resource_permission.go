@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/jfrog/terraform-provider-shared/util"
 	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
 	"github.com/samber/lo"
@@ -273,23 +274,68 @@ func (r *permissionResource) Schema(ctx context.Context, req resource.SchemaRequ
 	}
 }
 
-func setUsersGroupsAttributeToNull(ctx context.Context, resource types.Object, resourceName string, resp *resource.UpgradeStateResponse) {
+func setUsersGroupsAttributeToNull(ctx context.Context, resource types.Object, resourceName string, resp *resource.UpgradeStateResponse) diag.Diagnostics {
+	if resource.IsNull() {
+		return nil
+	}
+
 	attrs := resource.Attributes()
-	actionsAttrs := attrs["actions"].(types.Object).Attributes()
-	usersSet := actionsAttrs["users"].(types.Set)
+	a, ok := attrs["actions"]
+	if !ok {
+		return nil
+	}
+	actionsAttrs := a.(types.Object).Attributes()
 
 	// actions.users and actions.groups no longer allows to be empty set.
 	// they can either be null (not set) or set with items
 	// When prior state has empty set then migrates the value to null
+	ds := diag.Diagnostics{}
 
-	if !usersSet.IsNull() && len(usersSet.Elements()) == 0 {
-		resp.State.SetAttribute(ctx, path.Root(fmt.Sprintf("%s.actions.users", resourceName)), types.SetNull(usersGroupsResourceModelAttributeTypes))
+	u, ok := actionsAttrs["users"]
+	if !ok {
+		return nil
+	}
+	ds.Append(setAttributeToNull(ctx, u.(types.Set), resourceName, "users", resp)...)
+	if ds.HasError() {
+		return ds
 	}
 
-	groupsSet := actionsAttrs["groups"].(types.Set)
-	if !groupsSet.IsNull() && len(groupsSet.Elements()) == 0 {
-		resp.State.SetAttribute(ctx, path.Root(fmt.Sprintf("%s.actions.groups", resourceName)), types.SetNull(usersGroupsResourceModelAttributeTypes))
+	g, ok := actionsAttrs["groups"]
+	if !ok {
+		return nil
 	}
+	ds.Append(setAttributeToNull(ctx, g.(types.Set), resourceName, "groups", resp)...)
+	if ds.HasError() {
+		return ds
+	}
+
+	return ds
+}
+
+func setAttributeToNull(ctx context.Context, stateSet types.Set, resourceName, attrName string, resp *resource.UpgradeStateResponse) diag.Diagnostics {
+	ds := diag.Diagnostics{}
+	if !stateSet.IsNull() && len(stateSet.Elements()) == 0 {
+		// find the attribute using Paths
+		paths, d := resp.State.PathMatches(ctx, path.MatchRoot(resourceName).AtName("actions").AtName(attrName))
+		if d.HasError() {
+			ds.Append(d...)
+			return ds
+		}
+		if len(paths) == 0 {
+			tflog.Info(ctx, "no paths found", map[string]interface{}{
+				"path": fmt.Sprintf("%s.actions.%s", resourceName, attrName),
+			})
+			return ds
+		}
+
+		// set attribute to null using the found Path
+		ds.Append(resp.State.SetAttribute(ctx, paths[0], types.SetNull(usersGroupsResourceModelAttributeTypes))...)
+		if ds.HasError() {
+			return ds
+		}
+	}
+
+	return ds
 }
 
 func (r *permissionResource) UpgradeState(ctx context.Context) map[int64]resource.StateUpgrader {
@@ -318,12 +364,34 @@ func (r *permissionResource) UpgradeState(ctx context.Context) map[int64]resourc
 				}
 
 				resp.Diagnostics.Append(resp.State.Set(ctx, upgradedStateData)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
 
-				setUsersGroupsAttributeToNull(ctx, upgradedStateData.Artifact, "artifact", resp)
-				setUsersGroupsAttributeToNull(ctx, upgradedStateData.Build, "build", resp)
-				setUsersGroupsAttributeToNull(ctx, upgradedStateData.ReleaseBundle, "release_bundle", resp)
-				setUsersGroupsAttributeToNull(ctx, upgradedStateData.Destination, "destination", resp)
-				setUsersGroupsAttributeToNull(ctx, upgradedStateData.PipelineSource, "pipeline_source", resp)
+				resp.Diagnostics.Append(setUsersGroupsAttributeToNull(ctx, upgradedStateData.Artifact, "artifact", resp)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+
+				resp.Diagnostics.Append(setUsersGroupsAttributeToNull(ctx, upgradedStateData.Build, "build", resp)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+
+				resp.Diagnostics.Append(setUsersGroupsAttributeToNull(ctx, upgradedStateData.ReleaseBundle, "release_bundle", resp)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+
+				resp.Diagnostics.Append(setUsersGroupsAttributeToNull(ctx, upgradedStateData.Destination, "destination", resp)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+
+				resp.Diagnostics.Append(setUsersGroupsAttributeToNull(ctx, upgradedStateData.PipelineSource, "pipeline_source", resp)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
 			},
 		},
 	}
