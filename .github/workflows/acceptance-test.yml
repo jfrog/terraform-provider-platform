@@ -38,12 +38,11 @@ jobs:
       - name: Create Artifactory data directories
         run: |
           mkdir -p ${{ github.workspace }}/scripts/artifactory/extra_conf
-          mkdir -p ${{ github.workspace }}/scripts/artifactory/var/etc/access
+          mkdir -p ${{ github.workspace }}/scripts/artifactory/var/etc
           sudo chown -R 1030:1030 ./scripts/artifactory/var
       - name: Copy Artifactory configuration files
         run: |
           cp ${{ github.workspace }}/scripts/system.yaml ./scripts/artifactory/var/etc/system.yaml
-          cp ${{ github.workspace }}/scripts/access.config.patch.yaml ./scripts/artifactory/var/etc/access/access.config.patch.yaml
       - name: Run Artifactory container and execute acceptance tests
         run: |
           echo "Get latest Artifactory image tag"
