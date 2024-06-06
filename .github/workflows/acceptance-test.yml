@@ -10,11 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Unshallow
         run: git fetch --prune --unshallow
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: 1.21
       - name: Install Helm
@@ -36,14 +36,14 @@ jobs:
       - name: Create Artifactory data directories
         run: |
           mkdir -p ./scripts/artifactory/extra_conf
-          mkdir -p ./scripts/artifactory/var/etc
+          mkdir -p ./scripts/artifactory/var/etc/access
+          chown -R 1030:1030 ./scripts/artifactory/var
       - name: Copy Artifactory configuration files
         run: |
           cp ./scripts/system.yaml ./scripts/artifactory/var/etc/system.yaml
           cp ./scripts/access.config.patch.yaml ./scripts/artifactory/var/etc/access/access.config.patch.yaml
       - name: Run Artifactory container and execute acceptance tests
         run: |
-          export JFROG_URL="http://localhost:8082"
           echo "Get latest Artifactory image tag"
           helm repo add artifactory https://charts.jfrog.io
           helm repo update
@@ -54,6 +54,9 @@ jobs:
             -v ./scripts/artifactory/var:/var/opt/jfrog/artifactory \
             -p 8081:8081 -p 8082:8082 \
             releases-docker.jfrog.io/jfrog/artifactory-pro:${ARTIFACTORY_VERSION}
+          echo "Set localhost to a container IP address, since we run docker inside of docker"
+          export LOCALHOST=$(docker inspect -f '{{`{{range.NetworkSettings.Networks}}{{.Gateway}}{{end}}`}}' artifactory
+          export JFROG_URL="http://${LOCALHOST}:8082"
           echo "Waiting for Artifactory services to start"
           until $(curl -sf -m 5 ${JFROG_URL}/artifactory/api/system/ping/); do
             printf '.'
@@ -78,4 +81,7 @@ jobs:
           echo "Execute acceptance tests"
           TF_ACC=true make acceptance
           echo "Install provider"
+          export PROVIDER_VERSION=$(git describe --tags --abbrev=0 | sed  -n 's/v\([0-9]*\).\([0-9]*\).\([0-9]*\)/\1.\2.\3/p')
+          cat sample.tf | sed -e "s/version =.*/version = \"${PROVIDER_VERSION}\"/g" > sample.tf.tmp
+          cp sample.tf.tmp sample.tf && rm sample.tf.tmp
           make install
