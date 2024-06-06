@@ -39,7 +39,7 @@ jobs:
         run: |
           mkdir -p ./scripts/artifactory/extra_conf
           mkdir -p ./scripts/artifactory/var/etc/access
-          chown -R 1030:1030 ./scripts/artifactory/var
+          sudo chown -R 1030:1030 ./scripts/artifactory/var
       - name: Copy Artifactory configuration files
         run: |
           cp ./scripts/system.yaml ./scripts/artifactory/var/etc/system.yaml
