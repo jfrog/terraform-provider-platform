@@ -41,6 +41,12 @@ jobs:
           mkdir -p ${{ github.workspace }}/scripts/artifactory/var/etc
           cp ${{ github.workspace }}/scripts/system.yaml ${{ github.workspace }}/scripts/artifactory/var/etc/system.yaml
           sudo chown -R 1030:1030 ${{ github.workspace }}/scripts/artifactory/var
+      - name: Dump redis logs
+        uses: jwalton/gh-docker-logs@v2
+        with:
+          images: 'artifactory'
+          # Only show last 100 lines of each
+          tail: '100'
       - name: Run Artifactory container and execute acceptance tests
         run: |
           echo "Get latest Artifactory image tag"
