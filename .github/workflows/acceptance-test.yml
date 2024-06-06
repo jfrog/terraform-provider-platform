@@ -37,13 +37,13 @@ jobs:
           sudo apt-get install -y goreleaser
       - name: Create Artifactory data directories
         run: |
-          mkdir -p ./scripts/artifactory/extra_conf
-          mkdir -p ./scripts/artifactory/var/etc/access
+          mkdir -p ${{ github.workspace }}/scripts/artifactory/extra_conf
+          mkdir -p ${{ github.workspace }}/scripts/artifactory/var/etc/access
           sudo chown -R 1030:1030 ./scripts/artifactory/var
       - name: Copy Artifactory configuration files
         run: |
-          cp ./scripts/system.yaml ./scripts/artifactory/var/etc/system.yaml
-          cp ./scripts/access.config.patch.yaml ./scripts/artifactory/var/etc/access/access.config.patch.yaml
+          cp ${{ github.workspace }}/scripts/system.yaml ./scripts/artifactory/var/etc/system.yaml
+          cp ${{ github.workspace }}/scripts/access.config.patch.yaml ./scripts/artifactory/var/etc/access/access.config.patch.yaml
       - name: Run Artifactory container and execute acceptance tests
         run: |
           echo "Get latest Artifactory image tag"
@@ -52,8 +52,8 @@ jobs:
           ARTIFACTORY_VERSION=$(helm search repo | grep "artifactory " | awk '{$1=$1};1' |  cut -f3 -d " ")
           echo "Start up Artifactory container"
           docker run -i --name artifactory -d --rm \
-            -v ./scripts/artifactory/extra_conf:/artifactory_extra_conf \
-            -v ./scripts/artifactory/var:/var/opt/jfrog/artifactory \
+            -v ${{ github.workspace }}/scripts/artifactory/extra_conf:/artifactory_extra_conf \
+            -v ${{ github.workspace }}/scripts/artifactory/var:/var/opt/jfrog/artifactory \
             -p 8081:8081 -p 8082:8082 \
             releases-docker.jfrog.io/jfrog/artifactory-pro:${ARTIFACTORY_VERSION}
           echo "Set localhost to a container IP address, since we run docker inside of docker"
