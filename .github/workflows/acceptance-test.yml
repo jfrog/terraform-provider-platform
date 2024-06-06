@@ -35,14 +35,12 @@ jobs:
           echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
           sudo apt-get update
           sudo apt-get install -y goreleaser
-      - name: Create Artifactory data directories
+      - name: Create Artifactory data directories and copy data
         run: |
           mkdir -p ${{ github.workspace }}/scripts/artifactory/extra_conf
           mkdir -p ${{ github.workspace }}/scripts/artifactory/var/etc
+          cp ${{ github.workspace }}/scripts/system.yaml ${{ github.workspace }}/scripts/artifactory/var/etc/system.yaml
           sudo chown -R 1030:1030 ./scripts/artifactory/var
-      - name: Copy Artifactory configuration files
-        run: |
-          cp ${{ github.workspace }}/scripts/system.yaml ./scripts/artifactory/var/etc/system.yaml
       - name: Run Artifactory container and execute acceptance tests
         run: |
           echo "Get latest Artifactory image tag"
