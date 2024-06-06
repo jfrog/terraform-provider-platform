@@ -59,12 +59,12 @@ jobs:
           export JFROG_URL="http://${LOCALHOST}:8082"
           echo "Waiting for Artifactory services to start"
           until $(curl -sf -m 5 ${JFROG_URL}/artifactory/api/system/ping/); do
-            printf '.'
+            printf '.' >> $GITHUB_ENV
             sleep 5
           done
           echo "Waiting for Artifactory UI to start"
           until $(curl -sf -m 5 ${JFROG_URL}/ui/login/); do
-            printf '.'
+            printf '.' >> $GITHUB_ENV
             sleep 5
           done
           export COOKIES=$(curl -c - "${JFROG_URL}/ui/api/v1/ui/auth/login?_spring_security_remember_me=false" \
