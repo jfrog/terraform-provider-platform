@@ -40,7 +40,7 @@ jobs:
           mkdir -p ${{ github.workspace }}/scripts/artifactory/extra_conf
           mkdir -p ${{ github.workspace }}/scripts/artifactory/var/etc
           cp ${{ github.workspace }}/scripts/system.yaml ${{ github.workspace }}/scripts/artifactory/var/etc/system.yaml
-          sudo chown -R 1030:1030 ./scripts/artifactory/var
+          sudo chown -R 1030:1030 ${{ github.workspace }}/scripts/artifactory/var
       - name: Run Artifactory container and execute acceptance tests
         run: |
           echo "Get latest Artifactory image tag"
