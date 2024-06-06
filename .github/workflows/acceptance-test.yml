@@ -87,6 +87,7 @@ jobs:
           make install
       - name: Dump Artifactory logs
         uses: jwalton/gh-docker-logs@v2
+        if: always()
         with:
           images: 'artifactory'
           tail: '10000'
