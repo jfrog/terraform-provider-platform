@@ -62,7 +62,7 @@ scan:
 
 fmt:
 	@echo "==> Fixing source code with gofmt..."
-	@go fmt ./...
+	@go fmt ./pkg/...
 
 doc:
 	rm -rfv docs/*
