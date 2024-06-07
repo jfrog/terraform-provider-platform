@@ -1,10 +1,12 @@
-on: workflow_dispatch
-# on:
-#   pull_request_target:
-#     branches:
-#       - main
-#     types: [opened]
+on:
+  pull_request_target:
+    branches:
+      - main
+    types: [opened]
+  workflow_dispatch:
+
 name: Acceptance Tests
+
 jobs:
   acceptanceTests:
     runs-on: ubuntu-latest
@@ -97,3 +99,22 @@ jobs:
         if: failure()
         with:
           tail: '10000'
+      - name: Send workflow status to Slack
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "GitHub Action result: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "GitHub Action result: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_PR_WEBHOOK }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
