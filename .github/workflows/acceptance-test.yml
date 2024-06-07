@@ -39,7 +39,8 @@ jobs:
         run: |
           mkdir -p ${{ github.workspace }}/scripts/artifactory/extra_conf
           mkdir -p ${{ github.workspace }}/scripts/artifactory/var/etc
-          echo ${{ secrets.ARTIFACTORY_LICENSE }} > ${{ github.workspace }}/scripts/artifactory/extra_conf/artifactory.lic
+          export ARTIFACTORY_LICENSE=${{ secrets.ARTIFACTORY_LICENSE }}
+          echo $ARTIFACTORY_LICENSE > ${{ github.workspace }}/scripts/artifactory/extra_conf/artifactory.lic
           cp ${{ github.workspace }}/scripts/system.yaml ${{ github.workspace }}/scripts/artifactory/var/etc/system.yaml
           sudo chown -R 1030:1030 ${{ github.workspace }}/scripts/artifactory/var
       - name: Run Artifactory container and execute acceptance tests
