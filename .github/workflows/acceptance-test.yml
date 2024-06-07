@@ -57,7 +57,7 @@ jobs:
             -p 8081:8081 -p 8082:8082 \
             releases-docker.jfrog.io/jfrog/artifactory-pro:${ARTIFACTORY_VERSION}
           echo "Set localhost to a container IP address, since we run docker inside of docker"
-          export LOCALHOST=$(docker inspect -f '{{`{{range.NetworkSettings.Networks}}{{.Gateway}}{{end}}`}}' artifactory)
+          export LOCALHOST=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.Gateway}}{{end}}' artifactory)
           export JFROG_URL="http://${LOCALHOST}:8082"
           echo "Waiting for Artifactory services to start at ${JFROG_URL}"
           until $(curl -sf -m 5 ${JFROG_URL}/artifactory/api/system/ping/); do
