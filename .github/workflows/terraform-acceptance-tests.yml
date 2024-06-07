@@ -5,10 +5,10 @@ on:
     types: [opened]
   workflow_dispatch:
 
-name: Acceptance Tests
+name: Terraform Acceptance Tests
 
 jobs:
-  acceptanceTests:
+  tf-acceptance-tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -92,13 +92,13 @@ jobs:
           cat sample.tf | sed -e "s/version =.*/version = \"${PROVIDER_VERSION}\"/g" > sample.tf.tmp
           cp sample.tf.tmp sample.tf && rm sample.tf.tmp
           make install
-      - name: Clean up Docker container
-        run: docker stop artifactory
       - name: Dump Artifactory logs
         uses: jwalton/gh-docker-logs@v2
         if: failure()
         with:
           tail: '10000'
+      - name: Clean up Docker container
+        run: docker stop artifactory
       - name: Send workflow status to Slack
         uses: slackapi/slack-github-action@v1.26.0
         with:
