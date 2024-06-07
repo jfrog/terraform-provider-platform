@@ -94,5 +94,4 @@ jobs:
         uses: jwalton/gh-docker-logs@v2
         if: always()
         with:
-          images: 'artifactory'
           tail: '10000'
