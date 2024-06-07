@@ -59,12 +59,12 @@ jobs:
           export JFROG_URL="http://${LOCALHOST}:8082"
           echo "Waiting for Artifactory services to start"
           until $(curl -sf -m 5 ${JFROG_URL}/artifactory/api/system/ping/); do
-            printf '.' >> $GITHUB_ENV
+            printf '.'
             sleep 5
           done
           echo "Waiting for Artifactory UI to start"
           until $(curl -sf -m 5 ${JFROG_URL}/ui/login/); do
-            printf '.' >> $GITHUB_ENV
+            printf '.'
             sleep 5
           done
           export COOKIES=$(curl -c - "${JFROG_URL}/ui/api/v1/ui/auth/login?_spring_security_remember_me=false" \
@@ -78,15 +78,19 @@ jobs:
             --header "accept: application/json, text/plain, */*" \
             --header "x-requested-with: XMLHttpRequest" \
             --header "cookie: ACCESSTOKEN=${ACCESSTOKEN}; REFRESHTOKEN=${REFRESHTOKEN}")
-          echo "Execute acceptance tests"
-          TF_ACC=true make acceptance
-          echo "Install provider"
+      - name: Execute acceptance tests
+        run: TF_ACC=true make acceptance >> $GITHUB_ENV
+      - name: Install provider
+        run: |
           export PROVIDER_VERSION=$(git describe --tags --abbrev=0 | sed  -n 's/v\([0-9]*\).\([0-9]*\).\([0-9]*\)/\1.\2.\3/p')
           cat sample.tf | sed -e "s/version =.*/version = \"${PROVIDER_VERSION}\"/g" > sample.tf.tmp
           cp sample.tf.tmp sample.tf && rm sample.tf.tmp
           make install
+      - name: Clean up Docker container
+        run: docker stop artifactory
       - name: Dump Artifactory logs
         uses: jwalton/gh-docker-logs@v2
         if: always()
         with:
+          images: 'artifactory'
           tail: '10000'
