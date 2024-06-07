@@ -135,13 +135,13 @@ jobs:
         with:
           payload: |
             {
-              "text": "${{ github.workflow }} GitHub Action result: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.job }}> ${{ job.status 'success' && ':white_check_mark:' || ':x:' }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}",
+              "text": "${{ github.workflow }} GitHub Action result: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.job }}> ${{ job.status == 'success' && ':white_check_mark:' || ':x:' }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}",
               "blocks": [
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "${{ github.workflow }} GitHub Action result: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.job }}> ${{ job.status 'success' && ':white_check_mark:' || ':x:' }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
+                    "text": "${{ github.workflow }} GitHub Action result: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.job }}> ${{ job.status == 'success' && ':white_check_mark:' || ':x:' }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
                   }
                 }
               ]
