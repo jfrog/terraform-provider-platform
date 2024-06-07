@@ -5,7 +5,7 @@ on:
     types: [opened]
   workflow_dispatch:
 
-name: Acceptance Tests
+name: Terraform & OpenTofu Acceptance Tests
 
 jobs:
   tf-acceptance-tests:
@@ -83,6 +83,7 @@ jobs:
             --header "accept: application/json, text/plain, */*" \
             --header "x-requested-with: XMLHttpRequest" \
             --header "cookie: ACCESSTOKEN=${ACCESSTOKEN}; REFRESHTOKEN=${REFRESHTOKEN}")
+          echo "::add-mask::$JFROG_ACCESS_TOKEN"
           echo "JFROG_ACCESS_TOKEN=$JFROG_ACCESS_TOKEN" >> "$GITHUB_ENV"
       - name: Execute acceptance tests
         run: make acceptance
@@ -104,13 +105,13 @@ jobs:
         with:
           payload: |
             {
-              "text": "GitHub Action result: ${{ job.name }} ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}",
+              "text": "GitHub Action result: ${{ github.workflow }} ${{ github.job }} ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}",
               "blocks": [
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "GitHub Action result: ${{ job.name }} ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
+                    "text": "GitHub Action result: ${{ github.workflow }} ${{ github.job }} ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
                   }
                 }
               ]
@@ -230,13 +231,13 @@ jobs:
         with:
           payload: |
             {
-              "text": "GitHub Action result: ${{ job.name }} ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}",
+              "text": "GitHub Action result: ${{ github.workflow }} ${{ github.job }} ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}",
               "blocks": [
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "GitHub Action result: ${{ job.name }}  ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
+                    "text": "GitHub Action result: ${{ github.workflow }} ${{ github.job }} ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
                   }
                 }
               ]
