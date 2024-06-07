@@ -1,3 +1,5 @@
+![Terraform & OpenTofu Acceptance Tests](https://github.com/jfrog/terraform-provider-platform/actions/workflows/acceptance-tests.yml/badge.svg)
+
 # Terraform Provider for JFrog Platform
 
 ## Quick Start
