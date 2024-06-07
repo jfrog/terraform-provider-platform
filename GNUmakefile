@@ -7,12 +7,23 @@ GORELEASER_ARCH=${TARGET_ARCH}
 ifeq ($(GO_ARCH), amd64)
 GORELEASER_ARCH=${TARGET_ARCH}_$(shell go env GOAMD64)
 endif
+
 PKG_NAME=pkg/${PRODUCT}
 # if this path ever changes, you need to also update the 'ldflags' value in .goreleaser.yml
 PKG_VERSION_PATH=github.com/jfrog/terraform-provider-${PRODUCT}/${PKG_NAME}
 VERSION := $(shell git tag --sort=-creatordate | head -1 | sed  -n 's/v\([0-9]*\).\([0-9]*\).\([0-9]*\)/\1.\2.\3/p')
 NEXT_VERSION?=$(shell echo ${VERSION}| awk -F '.' '{print $$1 "." $$2 "." $$3 +1 }')
-BUILD_PATH=terraform.d/plugins/registry.terraform.io/jfrog/${PRODUCT}/${NEXT_VERSION}/${TARGET_ARCH}
+
+TERRAFORM_CLI?=terraform
+
+REGISTRY_HOST=registry.terraform.io
+
+ifeq ($(TERRAFORM_CLI), tofu)
+REGISTRY_HOST=registry.opentofu.org
+endif
+
+BUILD_PATH=terraform.d/plugins/${REGISTRY_HOST}/jfrog/${PRODUCT}/${NEXT_VERSION}/${TARGET_ARCH}
+
 SONAR_SCANNER_VERSION?=4.7.0.2747
 SONAR_SCANNER_HOME?=${HOME}/.sonar/sonar-scanner-${SONAR_SCANNER_VERSION}-macosx
 
@@ -24,7 +35,7 @@ install: clean build
 		mv -v dist/terraform-provider-${PRODUCT}_${GORELEASER_ARCH}/terraform-provider-${PRODUCT}_v${NEXT_VERSION}* ${BUILD_PATH} && \
 		rm -f .terraform.lock.hcl && \
 		sed -i.bak '0,/version = ".*"/s//version = "${NEXT_VERSION}"/' sample.tf && rm sample.tf.bak && \
-		terraform init
+		${TERRAFORM_CLI} init
 
 clean:
 	rm -fR dist terraform.d/ .terraform terraform.tfstate* .terraform.lock.hcl
