@@ -168,7 +168,7 @@ jobs:
         run: git fetch --prune --unshallow
       - name: Update CHANGELOG and push commit
         run: |
-          sed -i -E "0,/(##\s.+\..+\..+\s\(.+\)).*/ s/(##\s.+\..+\..+\s\(.+\)).*/\1. Tested on Artifactory ${ARTIFACTORY_VERSION} with ${TERRAFORM_VERSION} and ${OPENTOFU_VERSION}/" CHANGELOG.md
+          sed -i -E "0,/(##\s.+\..+\..+\s\(.+\)).*/ s/(##\s.+\..+\..+\s\(.+\)).*/\1. Tested on Artifactory $ARTIFACTORY_VERSION with $TERRAFORM_VERSION and $OPENTOFU_VERSION/" CHANGELOG.md
           head -10 CHANGELOG.md
           git add CHANGELOG.md
           export REGEX="Changes to be committed*"
@@ -180,7 +180,7 @@ jobs:
             git config --get user.name
             git config --get user.email
             git commit --author="JFrog CI <jfrog-solutions-ci+1@jfrog.com>" -m "JFrog Pipelines - Add Artifactory version to CHANGELOG.md"
-            git push orign ${{ github.event.pull_request.base.ref }}
+            git push origin ${{ github.event.pull_request.base.ref }}
           else
             echo "There is nothing to commit: Artifactory version hadn't changed."
           fi
