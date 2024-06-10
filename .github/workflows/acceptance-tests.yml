@@ -12,6 +12,7 @@ jobs:
     name: ${{ matrix.cli }}
     runs-on: ubuntu-latest
     continue-on-error: true
+    environment: development
     strategy:
       fail-fast: true
       matrix:
