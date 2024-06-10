@@ -32,8 +32,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 1.21
-      - name: Install jq
-        run: sudo apt-get install -y jq
       - name: Install Helm
         run: |
           curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
@@ -52,11 +50,9 @@ jobs:
       - name: Debug TF version
         id: debug_tf_version
         run: |
-          echo $(terraform -v)
-          echo $(terraform -v -json | jq -r .terraform_version)
           TF_VERSION=$(terraform -v -json | jq -r .terraform_version)
           echo $TF_VERSION
-          echo "version=$TF_VERSION >> "$GITHUB_OUTPUT"
+          echo "version=$TF_VERSION" >> "$GITHUB_OUTPUT"
       - name: Install OpenTofu CLI
         id: install_opentofu_cli
         if: ${{ matrix.cli == 'tofu' }}
@@ -80,7 +76,7 @@ jobs:
           echo "TF_ACC_TERRAFORM_PATH=$(which tofu)" >> "$GITHUB_ENV"
           echo "TF_ACC_PROVIDER_NAMESPACE=hashicorp" >> "$GITHUB_ENV"
           echo "TF_ACC_PROVIDER_HOST=registry.opentofu.org" >> "$GITHUB_ENV"
-          TOFU_VERSION=$(echo $(tofu -v) | grep -o '^OpenTofu v\d.\d.\d')
+          TOFU_VERSION=$(tofu -v -json | jq -r .terraform_version)
           echo $TOFU_VERSION
           echo "version=$TOFU_VERSION" >> "$GITHUB_OUTPUT"
       - name: Install GoReleaser
@@ -189,7 +185,7 @@ jobs:
           TERRAFORM_VERSION: ${{ needs.acceptance-tests-matrix.outputs.tf_version }}
           OPENTOFU_VERSION: ${{ needs.acceptance-tests-matrix.outputs.tofu_version }}
         run: |
-          sed -i -E "0,/(##\s.+\..+\..+\s\(.+\)).*/ s/(##\s.+\..+\..+\s\(.+\)).*/\1. Tested on Artifactory $ARTIFACTORY_VERSION with $TERRAFORM_VERSION and $OPENTOFU_VERSION/" CHANGELOG.md
+          sed -i -E "0,/(##\s.+\..+\..+\s\(.+\)).*/ s/(##\s.+\..+\..+\s\(.+\)).*/\1. Tested on Artifactory $ARTIFACTORY_VERSION with Terraform $TERRAFORM_VERSION and OpenTofu $OPENTOFU_VERSION/" CHANGELOG.md
           head -10 CHANGELOG.md
           git add CHANGELOG.md
           export REGEX="Changes to be committed*"
