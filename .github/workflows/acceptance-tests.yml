@@ -49,6 +49,7 @@ jobs:
           sudo apt-get install -y terraform
       - name: Debug TF version
         id: debug_tf_version
+        run: |
           echo $(terraform -v)
           echo $(terraform -v) | grep -o '^Terraform v\d.\d.\d'
           TF_VERSION=$(echo $(terraform -v) | grep -o '^Terraform v\d.\d.\d')
