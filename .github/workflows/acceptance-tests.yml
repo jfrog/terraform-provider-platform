@@ -19,6 +19,10 @@ jobs:
       fail-fast: true
       matrix:
         cli: [terraform, tofu]
+    outputs:
+      tf_version: ${{ steps.install_terraform_cli.outputs.version }}
+      tofu_version: ${{ steps.install_opentofu_cli.outputs.version }}
+      artifactory_version: ${{ steps.run_artifactory_container.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,6 +39,7 @@ jobs:
           ./get_helm.sh
           rm get_helm.sh
       - name: Install Terraform CLI
+        id: install_terraform_cli
         if: ${{ matrix.cli == 'terraform' }}
         run: |
           wget -q -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
@@ -42,8 +47,9 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
           sudo apt-get update
           sudo apt-get install -y terraform
-          echo "TERRAFORM_VERSION=$(echo $(terraform -v) | grep -o '^Terraform v\d.\d.\d')" >> "$GITHUB_ENV"
+          echo "version=$(echo $(terraform -v) | grep -o '^Terraform v\d.\d.\d')" >> "$GITHUB_OUTPUT"
       - name: Install OpenTofu CLI
+        id: install_opentofu_cli
         if: ${{ matrix.cli == 'tofu' }}
         run: |
           echo "Installing tooling"
@@ -66,7 +72,7 @@ jobs:
           echo "TF_ACC_TERRAFORM_PATH=$(which tofu)" >> "$GITHUB_ENV"
           echo "TF_ACC_PROVIDER_NAMESPACE=hashicorp" >> "$GITHUB_ENV"
           echo "TF_ACC_PROVIDER_HOST=registry.opentofu.org" >> "$GITHUB_ENV"
-          echo "OPENTOFU_VERSION=$(echo $(tofu -v) | grep -o '^OpenTofu v\d.\d.\d')" >> "$GITHUB_ENV"
+          echo "version=$(echo $(tofu -v) | grep -o '^OpenTofu v\d.\d.\d')" >> "$GITHUB_OUTPUT"
       - name: Install GoReleaser
         run: |
           echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
@@ -82,12 +88,13 @@ jobs:
           cp ${{ github.workspace }}/scripts/system.yaml ${{ runner.temp }}/artifactory/var/etc/system.yaml
           sudo chown -R 1030:1030 ${{ runner.temp }}/artifactory/var
       - name: Run Artifactory container
+        id: run_artifactory_container
         run: |
           echo "Get latest Artifactory image tag"
           helm repo add artifactory https://charts.jfrog.io
           helm repo update
           ARTIFACTORY_VERSION=$(helm search repo | grep "artifactory " | awk '{$1=$1};1' |  cut -f3 -d " ")
-          echo "ARTIFACTORY_VERSION=$ARTIFACTORY_VERSION" >> "$GITHUB_ENV"
+          echo "version=$ARTIFACTORY_VERSION" >> "$GITHUB_OUTPUT"
           echo "Start up Artifactory container"
           docker run -i --name artifactory -d --rm \
             -v ${{ runner.temp }}/artifactory/extra_conf:/artifactory_extra_conf \
@@ -167,6 +174,10 @@ jobs:
       - name: Unshallow
         run: git fetch --prune --unshallow
       - name: Update CHANGELOG and push commit
+        env:
+          ARTIFACTORY_VERSION: ${{ needs.acceptance-tests-matrix.outputs.artifactory_version }}
+          TERRAFORM_VERSION: ${{ needs.acceptance-tests-matrix.outputs.tf_version }}
+          OPENTOFU_VERSION: ${{ needs.acceptance-tests-matrix.outputs.tofu_version }}
         run: |
           sed -i -E "0,/(##\s.+\..+\..+\s\(.+\)).*/ s/(##\s.+\..+\..+\s\(.+\)).*/\1. Tested on Artifactory $ARTIFACTORY_VERSION with $TERRAFORM_VERSION and $OPENTOFU_VERSION/" CHANGELOG.md
           head -10 CHANGELOG.md
