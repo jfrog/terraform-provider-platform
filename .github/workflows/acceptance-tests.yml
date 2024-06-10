@@ -150,7 +150,6 @@ jobs:
       - name: Clean up Docker container
         run: docker stop artifactory
       - name: Send workflow status to Slack
-        id: slack
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
@@ -177,8 +176,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
       - name: Update CHANGELOG and push commit
         env:
           ARTIFACTORY_VERSION: ${{ needs.acceptance-tests-matrix.outputs.artifactory_version }}
@@ -201,8 +202,8 @@ jobs:
             echo "There is nothing to commit: Artifactory version hadn't changed."
           fi
       - name: Send workflow status to Slack
-        id: slack
         uses: slackapi/slack-github-action@v1.26.0
+        if: success()
         with:
           payload: |
             {
