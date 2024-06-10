@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/jfrog/terraform-provider-platform/pkg/platform"
 	"github.com/jfrog/terraform-provider-shared/testutil"
+	"github.com/jfrog/terraform-provider-shared/util"
 )
 
 func TestAccPermission_full(t *testing.T) {
@@ -196,7 +197,7 @@ func TestAccPermission_full(t *testing.T) {
 		"excludePattern": "foo",
 	}
 
-	config := testutil.ExecuteTemplate(permissionName, temp, testData)
+	config := util.ExecuteTemplate(permissionName, temp, testData)
 
 	updatedTestData := map[string]string{
 		"name":           permissionName,
@@ -205,7 +206,7 @@ func TestAccPermission_full(t *testing.T) {
 		"repoName":       repoName,
 		"excludePattern": "bar",
 	}
-	updatedConfig := testutil.ExecuteTemplate(permissionName, updatedTemp, updatedTestData)
+	updatedConfig := util.ExecuteTemplate(permissionName, updatedTemp, updatedTestData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -388,7 +389,7 @@ func TestAccPermission_empty_users_state_migration(t *testing.T) {
 		"groupName": groupName,
 	}
 
-	config := testutil.ExecuteTemplate(permissionName, temp, testData)
+	config := util.ExecuteTemplate(permissionName, temp, testData)
 
 	migratedTemp := `
 	resource "artifactory_group" "{{ .groupName }}" {
@@ -463,7 +464,7 @@ func TestAccPermission_empty_users_state_migration(t *testing.T) {
 			targets = []
 		}
 	}`
-	migratedConfig := testutil.ExecuteTemplate(permissionName, migratedTemp, testData)
+	migratedConfig := util.ExecuteTemplate(permissionName, migratedTemp, testData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -552,7 +553,7 @@ func TestAccPermission_no_users_state_migration(t *testing.T) {
 		"groupName": groupName,
 	}
 
-	config := testutil.ExecuteTemplate(permissionName, temp, testData)
+	config := util.ExecuteTemplate(permissionName, temp, testData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -684,7 +685,7 @@ func TestAccPermission_empty_groups_state_migration(t *testing.T) {
 		"userName": userName,
 	}
 
-	config := testutil.ExecuteTemplate(permissionName, temp, testData)
+	config := util.ExecuteTemplate(permissionName, temp, testData)
 
 	migratedTemp := `
 	resource "artifactory_managed_user" "{{ .userName }}" {
@@ -761,7 +762,7 @@ func TestAccPermission_empty_groups_state_migration(t *testing.T) {
 			targets = []
 		}
 	}`
-	migratedConfig := testutil.ExecuteTemplate(permissionName, migratedTemp, testData)
+	migratedConfig := util.ExecuteTemplate(permissionName, migratedTemp, testData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -852,7 +853,7 @@ func TestAccPermission_no_groups_state_migration(t *testing.T) {
 		"userName": userName,
 	}
 
-	config := testutil.ExecuteTemplate(permissionName, temp, testData)
+	config := util.ExecuteTemplate(permissionName, temp, testData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -998,9 +999,9 @@ func TestAccPermission_name_change(t *testing.T) {
 		"excludePattern": "foo",
 	}
 
-	config := testutil.ExecuteTemplate(permissionName, temp, testData)
+	config := util.ExecuteTemplate(permissionName, temp, testData)
 
-	updatedConfig := testutil.ExecuteTemplate(permissionName, updatedTemp, testData)
+	updatedConfig := util.ExecuteTemplate(permissionName, updatedTemp, testData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },

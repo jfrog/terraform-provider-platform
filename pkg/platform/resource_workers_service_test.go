@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/jfrog/terraform-provider-platform/pkg/platform"
 	"github.com/jfrog/terraform-provider-shared/testutil"
+	"github.com/jfrog/terraform-provider-shared/util"
 )
 
 const testSourceCode = "export default async (context: PlatformContext, data: BeforeDownloadRequest): Promise<BeforeDownloadResponse> => { console.log(await context.clients.platformHttp.get('/artifactory/api/system/ping')); console.log(await axios.get('https://my.external.resource')); return { status: 'DOWNLOAD_PROCEED', message: 'proceed', } }"
@@ -68,7 +69,7 @@ func TestAccWorkersService_full(t *testing.T) {
 		"secretValue2": "test-secret-value-2",
 	}
 
-	config := testutil.ExecuteTemplate(workersServiceName, temp, testData)
+	config := util.ExecuteTemplate(workersServiceName, temp, testData)
 
 	updatedTemp := `
 	resource "artifactory_local_generic_repository" "{{ .repoKey }}" {
@@ -105,7 +106,7 @@ func TestAccWorkersService_full(t *testing.T) {
 		"secretKey":   "test-secret-key",
 		"secretValue": "test-secret-value",
 	}
-	updatedConfig := testutil.ExecuteTemplate(workersServiceName, updatedTemp, updatedTestData)
+	updatedConfig := util.ExecuteTemplate(workersServiceName, updatedTemp, updatedTestData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -211,7 +212,7 @@ func TestAccWorkersService_name_change(t *testing.T) {
 		"secretValue2": "test-secret-value-2",
 	}
 
-	config := testutil.ExecuteTemplate(workersServiceName, temp, testData)
+	config := util.ExecuteTemplate(workersServiceName, temp, testData)
 
 	nameChangeTemp := `
 	resource "artifactory_local_generic_repository" "{{ .repoKey }}" {
@@ -242,7 +243,7 @@ func TestAccWorkersService_name_change(t *testing.T) {
 			}
 		]
 	}`
-	updatedConfig := testutil.ExecuteTemplate(workersServiceName, nameChangeTemp, testData)
+	updatedConfig := util.ExecuteTemplate(workersServiceName, nameChangeTemp, testData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },

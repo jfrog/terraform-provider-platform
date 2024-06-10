@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/jfrog/terraform-provider-shared/testutil"
+	"github.com/jfrog/terraform-provider-shared/util"
 )
 
 func TestAccIPAllowlist_full(t *testing.T) {
@@ -41,14 +42,14 @@ func TestAccIPAllowlist_full(t *testing.T) {
 		"ips":        `["1.1.1.7", "2.2.2.7/1"]`,
 	}
 
-	config := testutil.ExecuteTemplate(allowlistName, temp, testData)
+	config := util.ExecuteTemplate(allowlistName, temp, testData)
 
 	updatedTestData := map[string]string{
 		"name":       allowlistName,
 		"serverName": serverName,
 		"ips":        `["2.2.2.7/1", "3.3.3.7/1"]`,
 	}
-	updatedConfig := testutil.ExecuteTemplate(allowlistName, temp, updatedTestData)
+	updatedConfig := util.ExecuteTemplate(allowlistName, temp, updatedTestData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -113,7 +114,7 @@ func TestAccIPAllowlist_empty_ips(t *testing.T) {
 		"serverName": serverName,
 	}
 
-	config := testutil.ExecuteTemplate(allowlistName, temp, testData)
+	config := util.ExecuteTemplate(allowlistName, temp, testData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -146,7 +147,7 @@ func TestAccIPAllowlist_invalid_ips(t *testing.T) {
 				"invalidIPs": invalidIP,
 			}
 
-			config := testutil.ExecuteTemplate(allowlistName, temp, testData)
+			config := util.ExecuteTemplate(allowlistName, temp, testData)
 
 			resource.Test(t, resource.TestCase{
 				PreCheck:                 func() { testAccPreCheck(t) },

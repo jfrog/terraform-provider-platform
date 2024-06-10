@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/jfrog/terraform-provider-shared/testutil"
+	"github.com/jfrog/terraform-provider-shared/util"
 )
 
 func TestAccGlobalRole_full(t *testing.T) {
@@ -27,7 +28,7 @@ func TestAccGlobalRole_full(t *testing.T) {
 		"action":      "READ_REPOSITORY",
 	}
 
-	config := testutil.ExecuteTemplate(roleName, temp, testData)
+	config := util.ExecuteTemplate(roleName, temp, testData)
 
 	updatedTemp := `
 	resource "platform_global_role" "{{ .name }}" {
@@ -46,7 +47,7 @@ func TestAccGlobalRole_full(t *testing.T) {
 		"action":       "READ_REPOSITORY",
 		"action2":      "READ_BUILD",
 	}
-	updatedConfig := testutil.ExecuteTemplate(roleName, updatedTemp, updatedTestData)
+	updatedConfig := util.ExecuteTemplate(roleName, updatedTemp, updatedTestData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -106,7 +107,7 @@ func TestAccGlobalRole_name_change(t *testing.T) {
 		"action":      "READ_REPOSITORY",
 	}
 
-	config := testutil.ExecuteTemplate(roleName, temp, testData)
+	config := util.ExecuteTemplate(roleName, temp, testData)
 
 	nameChangeTemp := `
 	resource "platform_global_role" "{{ .name }}" {
@@ -117,7 +118,7 @@ func TestAccGlobalRole_name_change(t *testing.T) {
 		actions      = ["{{ .action }}"]
 	}`
 
-	updatedConfig := testutil.ExecuteTemplate(roleName, nameChangeTemp, testData)
+	updatedConfig := util.ExecuteTemplate(roleName, nameChangeTemp, testData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },

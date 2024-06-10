@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/jfrog/terraform-provider-shared/testutil"
+	"github.com/jfrog/terraform-provider-shared/util"
 )
 
 func TestAccOIDCIdentityMapping_full(t *testing.T) {
@@ -46,7 +47,7 @@ func TestAccOIDCIdentityMapping_full(t *testing.T) {
 		"username":            fmt.Sprintf("test-user-%d", testutil.RandomInt()),
 	}
 
-	config := testutil.ExecuteTemplate(identityMappingName, temp, testData)
+	config := util.ExecuteTemplate(identityMappingName, temp, testData)
 
 	updatedTemp := `
 	resource "platform_oidc_configuration" "{{ .configName }}" {
@@ -84,7 +85,7 @@ func TestAccOIDCIdentityMapping_full(t *testing.T) {
 		"username":            fmt.Sprintf("test-user-%d", testutil.RandomInt()),
 	}
 
-	updatedConfig := testutil.ExecuteTemplate(identityMappingName, updatedTemp, updatedTestData)
+	updatedConfig := util.ExecuteTemplate(identityMappingName, updatedTemp, updatedTestData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -166,7 +167,7 @@ func TestAccOIDCIdentityMapping_groups_scope(t *testing.T) {
 		"scope":               "applied-permissions/groups:\"readers\",\"test\"",
 	}
 
-	config := testutil.ExecuteTemplate(identityMappingName, temp, testData)
+	config := util.ExecuteTemplate(identityMappingName, temp, testData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -230,7 +231,7 @@ func TestAccOIDCIdentityMapping_invalid_name(t *testing.T) {
 				"username":            fmt.Sprintf("test-user-%d", testutil.RandomInt()),
 			}
 
-			config := testutil.ExecuteTemplate(identityMappingName, temp, testData)
+			config := util.ExecuteTemplate(identityMappingName, temp, testData)
 
 			resource.Test(t, resource.TestCase{
 				PreCheck:                 func() { testAccPreCheck(t) },
@@ -278,7 +279,7 @@ func TestAccOIDCIdentityMapping_invalid_provider_name(t *testing.T) {
 				"username":            fmt.Sprintf("test-user-%d", testutil.RandomInt()),
 			}
 
-			config := testutil.ExecuteTemplate(identityMappingName, temp, testData)
+			config := util.ExecuteTemplate(identityMappingName, temp, testData)
 
 			resource.Test(t, resource.TestCase{
 				PreCheck:                 func() { testAccPreCheck(t) },
@@ -328,7 +329,7 @@ func TestAccOIDCIdentityMapping_invalid_scope(t *testing.T) {
 				"invalidScope":        invalidScope,
 			}
 
-			config := testutil.ExecuteTemplate(identityMappingName, temp, testData)
+			config := util.ExecuteTemplate(identityMappingName, temp, testData)
 
 			resource.Test(t, resource.TestCase{
 				PreCheck:                 func() { testAccPreCheck(t) },

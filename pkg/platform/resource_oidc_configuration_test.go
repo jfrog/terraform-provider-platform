@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/jfrog/terraform-provider-shared/testutil"
+	"github.com/jfrog/terraform-provider-shared/util"
 )
 
 func TestAccOIDCConfiguration_full(t *testing.T) {
@@ -24,7 +25,7 @@ func TestAccOIDCConfiguration_full(t *testing.T) {
 		"providerType": "generic",
 	}
 
-	config := testutil.ExecuteTemplate(configName, temp, testData)
+	config := util.ExecuteTemplate(configName, temp, testData)
 
 	updatedTemp := `
 	resource "platform_oidc_configuration" "{{ .name }}" {
@@ -41,7 +42,7 @@ func TestAccOIDCConfiguration_full(t *testing.T) {
 		"providerType": "GitHub",
 		"audience":     "test-audience-2",
 	}
-	updatedConfig := testutil.ExecuteTemplate(configName, updatedTemp, updatedTestData)
+	updatedConfig := util.ExecuteTemplate(configName, updatedTemp, updatedTestData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -98,7 +99,7 @@ func TestAccOIDCConfiguration_invalid_name(t *testing.T) {
 				"audience":     "test-audience",
 			}
 
-			config := testutil.ExecuteTemplate(configName, temp, testData)
+			config := util.ExecuteTemplate(configName, temp, testData)
 
 			resource.Test(t, resource.TestCase{
 				PreCheck:                 func() { testAccPreCheck(t) },
@@ -133,7 +134,7 @@ func TestAccOIDCConfiguration_invalid_issuer_url(t *testing.T) {
 		"audience":     "test-audience",
 	}
 
-	config := testutil.ExecuteTemplate(configName, temp, testData)
+	config := util.ExecuteTemplate(configName, temp, testData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -166,7 +167,7 @@ func TestAccOIDCConfiguration_invalid_provider_type_issuer_url(t *testing.T) {
 		"audience":     "test-audience",
 	}
 
-	config := testutil.ExecuteTemplate(configName, temp, testData)
+	config := util.ExecuteTemplate(configName, temp, testData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },

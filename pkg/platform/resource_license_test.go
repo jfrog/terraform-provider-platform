@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/jfrog/terraform-provider-shared/testutil"
+	"github.com/jfrog/terraform-provider-shared/util"
 )
 
 func readLicense(path string) (string, error) {
@@ -44,7 +45,7 @@ EOT
 		"key":  licenseKey,
 	}
 
-	config := testutil.ExecuteTemplate(licenseName, temp, testData)
+	config := util.ExecuteTemplate(licenseName, temp, testData)
 
 	licenseKey, err = readLicense(licenseFilePath2)
 	if err != nil {
@@ -54,7 +55,7 @@ EOT
 		"name": licenseName,
 		"key":  licenseKey,
 	}
-	updatedConfig := testutil.ExecuteTemplate(licenseName, temp, updatedTestData)
+	updatedConfig := util.ExecuteTemplate(licenseName, temp, updatedTestData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
