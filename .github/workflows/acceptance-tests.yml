@@ -177,8 +177,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Update CHANGELOG and push commit
+      - name: Checkout
         uses: actions/checkout@v4
+      - name: Update CHANGELOG and push commit
         env:
           ARTIFACTORY_VERSION: ${{ needs.acceptance-tests-matrix.outputs.artifactory_version }}
           TERRAFORM_VERSION: ${{ needs.acceptance-tests-matrix.outputs.tf_version }}
