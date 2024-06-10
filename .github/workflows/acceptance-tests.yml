@@ -2,7 +2,7 @@ on:
   pull_request:
     branches:
       - main
-    types: [opened]
+    types: [opened,synchronize]
     paths:
       - '**.go'
   workflow_dispatch:
@@ -19,6 +19,10 @@ jobs:
       fail-fast: true
       matrix:
         cli: [terraform, tofu]
+    outputs:
+      tf_version: ${{ steps.debug_tf_version.outputs.version }}
+      tofu_version: ${{ steps.install_opentofu_cli.outputs.version }}
+      artifactory_version: ${{ steps.run_artifactory_container.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,6 +39,7 @@ jobs:
           ./get_helm.sh
           rm get_helm.sh
       - name: Install Terraform CLI
+        id: install_terraform_cli
         if: ${{ matrix.cli == 'terraform' }}
         run: |
           wget -q -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
@@ -42,11 +47,16 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
           sudo apt-get update
           sudo apt-get install -y terraform
-          echo "TERRAFORM_VERSION=$(echo $(terraform -v) | grep -o '^Terraform v\d.\d.\d')" >> "$GITHUB_ENV"
+      - name: Debug TF version
+        id: debug_tf_version
+        run: |
+          TF_VERSION=$(terraform -v -json | jq -r .terraform_version)
+          echo $TF_VERSION
+          echo "version=$TF_VERSION" >> "$GITHUB_OUTPUT"
       - name: Install OpenTofu CLI
+        id: install_opentofu_cli
         if: ${{ matrix.cli == 'tofu' }}
         run: |
-          echo "Installing tooling"
           sudo apt-get update
           sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
           echo "Set up the OpenTofu repository"
@@ -66,7 +76,9 @@ jobs:
           echo "TF_ACC_TERRAFORM_PATH=$(which tofu)" >> "$GITHUB_ENV"
           echo "TF_ACC_PROVIDER_NAMESPACE=hashicorp" >> "$GITHUB_ENV"
           echo "TF_ACC_PROVIDER_HOST=registry.opentofu.org" >> "$GITHUB_ENV"
-          echo "OPENTOFU_VERSION=$(echo $(tofu -v) | grep -o '^OpenTofu v\d.\d.\d')" >> "$GITHUB_ENV"
+          TOFU_VERSION=$(tofu -v -json | jq -r .terraform_version)
+          echo $TOFU_VERSION
+          echo "version=$TOFU_VERSION" >> "$GITHUB_OUTPUT"
       - name: Install GoReleaser
         run: |
           echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
@@ -82,12 +94,13 @@ jobs:
           cp ${{ github.workspace }}/scripts/system.yaml ${{ runner.temp }}/artifactory/var/etc/system.yaml
           sudo chown -R 1030:1030 ${{ runner.temp }}/artifactory/var
       - name: Run Artifactory container
+        id: run_artifactory_container
         run: |
           echo "Get latest Artifactory image tag"
           helm repo add artifactory https://charts.jfrog.io
           helm repo update
           ARTIFACTORY_VERSION=$(helm search repo | grep "artifactory " | awk '{$1=$1};1' |  cut -f3 -d " ")
-          echo "ARTIFACTORY_VERSION=$ARTIFACTORY_VERSION" >> "$GITHUB_ENV"
+          echo "version=$ARTIFACTORY_VERSION" >> "$GITHUB_OUTPUT"
           echo "Start up Artifactory container"
           docker run -i --name artifactory -d --rm \
             -v ${{ runner.temp }}/artifactory/extra_conf:/artifactory_extra_conf \
@@ -137,18 +150,17 @@ jobs:
       - name: Clean up Docker container
         run: docker stop artifactory
       - name: Send workflow status to Slack
-        id: slack
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
             {
-              "text": "${{ github.workflow }} GitHub Action result: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.job }}> ${{ job.status == 'success' && ':white_check_mark:' || ':x:' }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}",
+              "text": "${{ github.workflow }} https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/job/${{ github.job }} ${{ matrix.cli }} GitHub Action result: ${{ job.status == 'success' && ':white_check_mark:' || ':x:' }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}",
               "blocks": [
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "${{ github.workflow }} GitHub Action result: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.job }}> ${{ job.status == 'success' && ':white_check_mark:' || ':x:' }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
+                    "text": "${{ github.workflow }} <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/job/${{ github.job }}|${{ matrix.cli }} GitHub Action result>: ${{ job.status == 'success' && ':white_check_mark:' || ':x:' }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
                   }
                 }
               ]
@@ -161,32 +173,39 @@ jobs:
     runs-on: ubuntu-latest
     needs: acceptance-tests-matrix
     if: ${{ github.event_name == 'pull_request' }}
+    permissions:
+      contents: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Unshallow
-        run: git fetch --prune --unshallow
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
       - name: Update CHANGELOG and push commit
+        env:
+          ARTIFACTORY_VERSION: ${{ needs.acceptance-tests-matrix.outputs.artifactory_version }}
+          TERRAFORM_VERSION: ${{ needs.acceptance-tests-matrix.outputs.tf_version }}
+          OPENTOFU_VERSION: ${{ needs.acceptance-tests-matrix.outputs.tofu_version }}
         run: |
-          sed -i -E "0,/(##\s.+\..+\..+\s\(.+\)).*/ s/(##\s.+\..+\..+\s\(.+\)).*/\1. Tested on Artifactory $ARTIFACTORY_VERSION with $TERRAFORM_VERSION and $OPENTOFU_VERSION/" CHANGELOG.md
+          echo "Adding Artifactory version to CHANGELOG.md"
+          sed -i -E "0,/(##\s.+\..+\..+\s\(.+\)).*/ s/(##\s.+\..+\..+\s\(.+\)).*/\1. Tested on Artifactory $ARTIFACTORY_VERSION with Terraform $TERRAFORM_VERSION and OpenTofu $OPENTOFU_VERSION/" CHANGELOG.md
           head -10 CHANGELOG.md
           git add CHANGELOG.md
           export REGEX="Changes to be committed*"
           export GIT_STATUS=$(git status)
           if [[ ${GIT_STATUS} =~ ${REGEX} ]]; then
-            echo "Adding Artifactory version to CHANGELOG.md"
+            echo "Commiting changes"
             git config --global user.name 'JFrog CI'
             git config --global user.email 'jfrog-solutions-ci+1@jfrog.com'
             git config --get user.name
             git config --get user.email
             git commit --author="JFrog CI <jfrog-solutions-ci+1@jfrog.com>" -m "JFrog Pipelines - Add Artifactory version to CHANGELOG.md"
-            git push origin ${{ github.event.pull_request.base.ref }}
+            git push
           else
             echo "There is nothing to commit: Artifactory version hadn't changed."
           fi
       - name: Send workflow status to Slack
-        id: slack
         uses: slackapi/slack-github-action@v1.26.0
+        if: success()
         with:
           payload: |
             {

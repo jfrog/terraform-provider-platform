@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/jfrog/terraform-provider-shared/testutil"
+	"github.com/jfrog/terraform-provider-shared/util"
 )
 
 func TestAccReverseProxy_full(t *testing.T) {
@@ -27,7 +28,7 @@ func TestAccReverseProxy_full(t *testing.T) {
 		"serverName":        "tempurl.org",
 	}
 
-	config := testutil.ExecuteTemplate(reverseProxyName, temp, testData)
+	config := util.ExecuteTemplate(reverseProxyName, temp, testData)
 
 	updatedTemp := `
 	resource "platform_reverse_proxy" "{{ .name }}" {
@@ -53,7 +54,7 @@ func TestAccReverseProxy_full(t *testing.T) {
 		"sslKeyPath":        "foo/bar.key",
 		"sslCertPath":       "foo/bar.crt",
 	}
-	updatedConfig := testutil.ExecuteTemplate(reverseProxyName, updatedTemp, updatedTestData)
+	updatedConfig := util.ExecuteTemplate(reverseProxyName, updatedTemp, updatedTestData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -124,7 +125,7 @@ func testAccReverseProxy_missing_internal_hostname(t *testing.T, serverProvider 
 		"serverName":        "tempurl.org",
 	}
 
-	config := testutil.ExecuteTemplate(reverseProxyName, temp, testData)
+	config := util.ExecuteTemplate(reverseProxyName, temp, testData)
 
 	return t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -154,7 +155,7 @@ func testAccReverseProxy_missing_public_server_name(t *testing.T, serverProvider
 		"serverProvider":    serverProvider,
 	}
 
-	config := testutil.ExecuteTemplate(reverseProxyName, temp, testData)
+	config := util.ExecuteTemplate(reverseProxyName, temp, testData)
 
 	return t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -197,7 +198,7 @@ func testAccReverseProxy_missing_ssl_key_path(t *testing.T, serverProvider strin
 		"serverName":        "tempurl.org",
 	}
 
-	config := testutil.ExecuteTemplate(reverseProxyName, temp, testData)
+	config := util.ExecuteTemplate(reverseProxyName, temp, testData)
 
 	return t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -231,7 +232,7 @@ func testAccReverseProxy_missing_ssl_certificate_path(t *testing.T, serverProvid
 		"serverName":        "tempurl.org",
 	}
 
-	config := testutil.ExecuteTemplate(reverseProxyName, temp, testData)
+	config := util.ExecuteTemplate(reverseProxyName, temp, testData)
 
 	return t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },

@@ -1,4 +1,4 @@
-## 1.7.4 (May 8, 2024)
+## 1.7.4 (May 8, 2024). Tested on Artifactory 7.84.14 with Terraform 1.8.4 and OpenTofu 1.7.2
 
 BUG FIXES:
 
