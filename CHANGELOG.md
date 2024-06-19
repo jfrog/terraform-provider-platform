@@ -1,3 +1,19 @@
+## 1.8.0 (June 20, 2024)
+
+NOTES:
+
+* provider: `check_license` attribute is deprecated and provider no longer checks Artifactory license during initialization. It will be removed in the next major version release.
+
+BUG FIXES:
+
+* provider: Fix incomplete provider initialization if Artifactory version check fails.
+
+IMPROVEMENTS:
+
+* provider: Now allows JFrog Access Token to be unset (i.e. MyJFrog API token is set and only `platform_myjfrog_ip_allowlist` resource is used). Warning message is displayed when either token is not set.
+
+Issue: [#87](https://github.com/jfrog/terraform-provider-platform/issues/87) PR: [#97](https://github.com/jfrog/terraform-provider-platform/pull/97)
+
 ## 1.7.4 (May 8, 2024). Tested on Artifactory 7.84.14 with Terraform 1.8.4 and OpenTofu 1.7.2
 
 BUG FIXES:
