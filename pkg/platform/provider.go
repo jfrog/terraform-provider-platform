@@ -38,6 +38,7 @@ type platformProviderModel struct {
 	AccessToken      types.String `tfsdk:"access_token"`
 	MyJFrogAPIToken  types.String `tfsdk:"myjfrog_api_token"`
 	OIDCProviderName types.String `tfsdk:"oidc_provider_name"`
+	CheckLicense     types.Bool   `tfsdk:"check_license"`
 }
 
 func NewProvider() func() provider.Provider {
@@ -243,6 +244,11 @@ func (p *PlatformProvider) Schema(ctx context.Context, req provider.SchemaReques
 					stringvalidator.LengthAtLeast(1),
 				},
 				MarkdownDescription: "OIDC provider name. See [Configure an OIDC Integration](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-an-oidc-integration) for more details.",
+			},
+			"check_license": schema.BoolAttribute{
+				Optional:            true,
+				MarkdownDescription: "Toggle for pre-flight checking of Artifactory Pro and Enterprise license. Default to `true`.",
+				DeprecationMessage:  "Remove this attribute from your provider configuration as it is no longer used and the attribute will be removed in the next major version of the provider.",
 			},
 		},
 	}
