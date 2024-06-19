@@ -38,7 +38,6 @@ type platformProviderModel struct {
 	AccessToken      types.String `tfsdk:"access_token"`
 	MyJFrogAPIToken  types.String `tfsdk:"myjfrog_api_token"`
 	OIDCProviderName types.String `tfsdk:"oidc_provider_name"`
-	CheckLicense     types.Bool   `tfsdk:"check_license"`
 }
 
 func NewProvider() func() provider.Provider {
@@ -51,7 +50,6 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 	// Check environment variables, first available OS variable will be assigned to the var
 	url := util.CheckEnvVars([]string{"JFROG_URL"}, "")
 	accessToken := util.CheckEnvVars([]string{"JFROG_ACCESS_TOKEN"}, "")
-	myJFrogAPIToken := util.CheckEnvVars([]string{"JFROG_MYJFROG_API_TOKEN"}, "")
 
 	var config platformProviderModel
 
@@ -103,30 +101,69 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 		accessToken = config.AccessToken.ValueString()
 	}
 
-	if accessToken == "" {
-		resp.Diagnostics.AddError(
-			"Missing JFrog Access Token",
-			"While configuring the provider, the Access Token was not found in the JFROG_ACCESS_TOKEN environment variable, provider configuration block access_token attribute, or Terraform Cloud TFC_WORKLOAD_IDENTITY_TOKEN environment variable.",
-		)
-		return
-	}
-
+	myJFrogAPIToken := util.CheckEnvVars([]string{"JFROG_MYJFROG_API_TOKEN"}, "")
 	if config.MyJFrogAPIToken.ValueString() != "" {
 		myJFrogAPIToken = config.MyJFrogAPIToken.ValueString()
 	}
 
-	var myJFrogClient *resty.Client
-	if len(myJFrogAPIToken) > 0 {
-		c, err := client.Build("https://my.jfrog.com", productId)
+	if accessToken == "" && myJFrogAPIToken == "" {
+		resp.Diagnostics.AddError(
+			"Missing JFrog Access Token and MyJFrog API token",
+			"Neither Access Token nor MyJFrog API Token were found in environment variables or provider configuration. Provider will not function.",
+		)
+		return
+	}
+
+	if accessToken == "" {
+		resp.Diagnostics.AddWarning(
+			"Missing JFrog Access Token",
+			"Access Token was not found in the JFROG_ACCESS_TOKEN environment variable, provider configuration block access_token attribute, or Terraform Cloud TFC_WORKLOAD_IDENTITY_TOKEN environment variable. Platform functionality will be affected.",
+		)
+	}
+
+	if myJFrogAPIToken == "" {
+		resp.Diagnostics.AddWarning(
+			"Missing MyJFrog API Token",
+			"MyJFrog API Token was not found in the JFROG_MYJFROG_API_TOKEN environment variable or provider configuration block myjfrog_api_token attribute. MyJFrog functionality will be affected.",
+		)
+	}
+
+	artifactoryVersion := ""
+	if len(accessToken) > 0 {
+		_, err = client.AddAuth(platformClient, "", accessToken)
 		if err != nil {
 			resp.Diagnostics.AddError(
-				"Error creating Resty client for MyJFrog",
+				"Error adding Auth to Resty client",
 				err.Error(),
 			)
 			return
 		}
 
-		c, err = client.AddAuth(c, "", myJFrogAPIToken)
+		version, err := util.GetArtifactoryVersion(platformClient)
+		if err != nil {
+			resp.Diagnostics.AddWarning(
+				"Error getting Artifactory version",
+				fmt.Sprintf("Provider functionality might be affected by the absence of Artifactory version. %v", err),
+			)
+		}
+
+		artifactoryVersion = version
+
+		featureUsage := fmt.Sprintf("Terraform/%s", req.TerraformVersion)
+		go util.SendUsage(ctx, platformClient.R(), productId, featureUsage)
+	}
+
+	myJFrogClient, err := client.Build("https://my.jfrog.com", productId)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error creating Resty client for MyJFrog",
+			err.Error(),
+		)
+		return
+	}
+
+	if len(myJFrogAPIToken) > 0 {
+		_, err := client.AddAuth(myJFrogClient, "", myJFrogAPIToken)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error adding Auth to Resty client for MyJFrog",
@@ -134,45 +171,12 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 			)
 			return
 		}
-
-		myJFrogClient = c
 	}
-
-	platformClient, err = client.AddAuth(platformClient, "", accessToken)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error adding Auth to Resty client",
-			err.Error(),
-		)
-		return
-	}
-
-	if config.CheckLicense.IsNull() || config.CheckLicense.ValueBool() {
-		if licenseErr := util.CheckArtifactoryLicense(platformClient, "Enterprise", "Commercial", "Edge"); licenseErr != nil {
-			resp.Diagnostics.AddError(
-				"Error getting Artifactory license",
-				licenseErr.Error(),
-			)
-			return
-		}
-	}
-
-	version, err := util.GetArtifactoryVersion(platformClient)
-	if err != nil {
-		resp.Diagnostics.AddWarning(
-			"Error getting Artifactory version",
-			fmt.Sprintf("The provider functionality might be affected by the absence of Artifactory version in the context. %v", err),
-		)
-		return
-	}
-
-	featureUsage := fmt.Sprintf("Terraform/%s", req.TerraformVersion)
-	util.SendUsage(ctx, platformClient.R(), productId, featureUsage)
 
 	meta := PlatformProviderMetadata{
 		ProviderMetadata: util.ProviderMetadata{
 			Client:             platformClient,
-			ArtifactoryVersion: version,
+			ArtifactoryVersion: artifactoryVersion,
 		},
 		MyJFrogClient: myJFrogClient,
 	}
@@ -239,10 +243,6 @@ func (p *PlatformProvider) Schema(ctx context.Context, req provider.SchemaReques
 					stringvalidator.LengthAtLeast(1),
 				},
 				MarkdownDescription: "OIDC provider name. See [Configure an OIDC Integration](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-an-oidc-integration) for more details.",
-			},
-			"check_license": schema.BoolAttribute{
-				Optional:            true,
-				MarkdownDescription: "Toggle for pre-flight checking of Artifactory Pro and Enterprise license. Default to `true`.",
 			},
 		},
 	}
