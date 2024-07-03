@@ -138,10 +138,15 @@ func (r *odicConfigurationResource) Create(ctx context.Context, req resource.Cre
 		return
 	}
 
+	providerType := plan.ProviderType.ValueString()
+	if providerType == "generic" {
+		providerType = "Generic OpenID Connect"
+	}
+
 	odicConfig := odicConfigurationAPIModel{
 		Name:         plan.Name.ValueString(),
 		IssuerURL:    plan.IssuerURL.ValueString(),
-		ProviderType: plan.ProviderType.ValueString(),
+		ProviderType: providerType,
 		Audience:     plan.Audience.ValueString(),
 		Description:  plan.Description.ValueString(),
 	}
@@ -208,7 +213,11 @@ func (r *odicConfigurationResource) Read(ctx context.Context, req resource.ReadR
 		state.Audience = types.StringValue(odicConfig.Audience)
 	}
 
-	state.ProviderType = types.StringValue(odicConfig.ProviderType)
+	if odicConfig.ProviderType == "Generic OpenID Connect" {
+		state.ProviderType = types.StringValue("generic")
+	} else {
+		state.ProviderType = types.StringValue(odicConfig.ProviderType)
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -221,10 +230,15 @@ func (r *odicConfigurationResource) Update(ctx context.Context, req resource.Upd
 		return
 	}
 
+	providerType := plan.ProviderType.ValueString()
+	if providerType == "generic" {
+		providerType = "Generic OpenID Connect"
+	}
+
 	odicConfig := odicConfigurationAPIModel{
 		Name:         plan.Name.ValueString(),
 		IssuerURL:    plan.IssuerURL.ValueString(),
-		ProviderType: plan.ProviderType.ValueString(),
+		ProviderType: providerType,
 		Audience:     plan.Audience.ValueString(),
 		Description:  plan.Description.ValueString(),
 	}
