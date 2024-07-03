@@ -1,3 +1,9 @@
+## 1.8.1 (July 3, 2024). Tested on Artifactory 7.84.16 with Terraform 1.9.1 and OpenTofu 1.7.2
+
+BUG FIXES:
+
+* resource/platform_oidc_configuration: Fix `provider_type` attribute value stored incorrectly when resource is imported. Issue: [#102](https://github.com/jfrog/terraform-provider-platform/issues/102) PR: [#103](https://github.com/jfrog/terraform-provider-platform/pull/103)
+
 ## 1.8.0 (June 20, 2024). Tested on Artifactory 7.84.15 with Terraform 1.8.5 and OpenTofu 1.7.2
 
 NOTES:
