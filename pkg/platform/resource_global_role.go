@@ -216,8 +216,7 @@ func (r *globalRoleResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	// Return error if the HTTP status code is not 201 Created
-	if response.StatusCode() != http.StatusCreated {
+	if response.IsError() {
 		utilfw.UnableToCreateResourceError(resp, response.String())
 		return
 	}
@@ -290,8 +289,7 @@ func (r *globalRoleResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	// Return error if the HTTP status code is not 200 OK
-	if response.StatusCode() != http.StatusOK {
+	if response.IsError() {
 		utilfw.UnableToUpdateResourceError(resp, response.String())
 		return
 	}
@@ -316,7 +314,7 @@ func (r *globalRoleResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	if response.StatusCode() != http.StatusNoContent {
+	if response.IsError() {
 		utilfw.UnableToDeleteResourceError(resp, response.String())
 		return
 	}

@@ -829,8 +829,7 @@ func (r *permissionResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	// Return error if the HTTP status code is not 201 Created
-	if response.StatusCode() != http.StatusCreated {
+	if response.IsError() {
 		utilfw.UnableToCreateResourceError(resp, response.String())
 		return
 	}
@@ -935,7 +934,7 @@ func (r *permissionResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	if response.StatusCode() != http.StatusNoContent {
+	if response.IsError() {
 		utilfw.UnableToDeleteResourceError(resp, response.String())
 		return
 	}

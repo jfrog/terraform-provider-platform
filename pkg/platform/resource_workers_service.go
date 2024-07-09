@@ -349,8 +349,7 @@ func (r *workersServiceResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	// Return error if the HTTP status code is not 201 Created
-	if response.StatusCode() != http.StatusCreated {
+	if response.IsError() {
 		utilfw.UnableToCreateResourceError(resp, response.String())
 		return
 	}
@@ -453,8 +452,7 @@ func (r *workersServiceResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	// Return error if the HTTP status code is not 204 No Content
-	if response.StatusCode() != http.StatusNoContent {
+	if response.IsError() {
 		utilfw.UnableToUpdateResourceError(resp, response.String())
 		return
 	}
@@ -481,7 +479,7 @@ func (r *workersServiceResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
-	if response.StatusCode() != http.StatusNoContent {
+	if response.IsError() {
 		utilfw.UnableToDeleteResourceError(resp, response.String())
 		return
 	}

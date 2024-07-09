@@ -277,7 +277,7 @@ func (r *odicConfigurationResource) Delete(ctx context.Context, req resource.Del
 		return
 	}
 
-	if response.StatusCode() != http.StatusNoContent {
+	if response.IsError() {
 		utilfw.UnableToDeleteResourceError(resp, response.String())
 		return
 	}
