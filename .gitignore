@@ -15,3 +15,4 @@ lib/
 coverage.txt
 .scannerwork
 *.code-workspace
+scripts/artifactory*/
