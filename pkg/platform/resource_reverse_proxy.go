@@ -240,8 +240,7 @@ func (r *reverseProxyResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	// Return error if the HTTP status code is not 201 Created
-	if response.StatusCode() != http.StatusCreated {
+	if response.IsError() {
 		utilfw.UnableToCreateResourceError(resp, response.String())
 		return
 	}
@@ -312,8 +311,7 @@ func (r *reverseProxyResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	// Return error if the HTTP status code is not 201 Created
-	if response.StatusCode() != http.StatusCreated {
+	if response.IsError() {
 		utilfw.UnableToUpdateResourceError(resp, response.String())
 		return
 	}

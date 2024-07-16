@@ -1,3 +1,9 @@
+## 1.8.2 (July 10, 2024). Tested on Artifactory 7.84.17 with Terraform 1.9.2 and OpenTofu 1.7.3
+
+BUG FIXES:
+
+* resource/platform_global_role, resource/platform_oidc_configuration, resource/platform_oidc_identity_mapping, resource/platform_permission, resource/platform_reverse_proxy, resource/platform_workers_service: Fix incorrect API error handling. Issue: [#104](https://github.com/jfrog/terraform-provider-platform/issues/104) PR: [#105](https://github.com/jfrog/terraform-provider-platform/pull/105)
+
 ## 1.8.1 (July 3, 2024). Tested on Artifactory 7.84.16 with Terraform 1.9.1 and OpenTofu 1.7.2
 
 BUG FIXES:
