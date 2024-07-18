@@ -1,5 +1,9 @@
 ## 1.9.0 (July 19, 2024). Tested on Artifactory 7.84.17 with Terraform 1.9.2 and OpenTofu 1.7.3
 
+NOTES:
+
+* resource/platform_myjfrog_ip_allowlist is being deprecated and is moved to new [MyJFrog provider](https://registry.terraform.io/providers/jfrog/myjfrog/latest). Use the `myjfrog_ip_allowlist` resource there instead. PR: [#105](https://github.com/jfrog/terraform-provider-platform/pull/105)
+
 IMPROVEMENTS:
 
 * resource/platform_oidc_configuration: Add `Azure` option for `provider_type` attribute. PR: [#112](https://github.com/jfrog/terraform-provider-platform/pull/112)
