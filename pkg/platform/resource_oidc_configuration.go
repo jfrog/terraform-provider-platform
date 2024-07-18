@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jfrog/terraform-provider-shared/util"
 	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
 )
 
@@ -35,14 +36,17 @@ var _ resource.Resource = (*odicConfigurationResource)(nil)
 
 type odicConfigurationResource struct {
 	ProviderData PlatformProviderMetadata
+	TypeName     string
 }
 
 func NewOIDCConfigurationResource() resource.Resource {
-	return &odicConfigurationResource{}
+	return &odicConfigurationResource{
+		TypeName: "platform_oidc_configuration",
+	}
 }
 
 func (r *odicConfigurationResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_oidc_configuration"
+	resp.TypeName = r.TypeName
 }
 
 func (r *odicConfigurationResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -73,9 +77,9 @@ func (r *odicConfigurationResource) Schema(ctx context.Context, req resource.Sch
 			"provider_type": schema.StringAttribute{
 				Required: true,
 				Validators: []validator.String{
-					stringvalidator.OneOf([]string{"generic", gitHubProviderType}...),
+					stringvalidator.OneOf([]string{"generic", gitHubProviderType, "Azure"}...),
 				},
-				MarkdownDescription: fmt.Sprintf("Type of OIDC provider. Can be `generic` or `%s`.", gitHubProviderType),
+				MarkdownDescription: fmt.Sprintf("Type of OIDC provider. Can be `generic`, `%s`, or `Azure`.", gitHubProviderType),
 			},
 			"audience": schema.StringAttribute{
 				Optional: true,
@@ -131,6 +135,8 @@ func (r *odicConfigurationResource) Configure(ctx context.Context, req resource.
 }
 
 func (r *odicConfigurationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	go util.SendUsageResourceCreate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var plan odicConfigurationResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -168,6 +174,8 @@ func (r *odicConfigurationResource) Create(ctx context.Context, req resource.Cre
 }
 
 func (r *odicConfigurationResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	go util.SendUsageResourceRead(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var state odicConfigurationResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
@@ -223,6 +231,8 @@ func (r *odicConfigurationResource) Read(ctx context.Context, req resource.ReadR
 }
 
 func (r *odicConfigurationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	go util.SendUsageResourceUpdate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var plan odicConfigurationResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -261,6 +271,8 @@ func (r *odicConfigurationResource) Update(ctx context.Context, req resource.Upd
 }
 
 func (r *odicConfigurationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	go util.SendUsageResourceDelete(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var state odicConfigurationResourceModel
 
 	diags := req.State.Get(ctx, &state)
