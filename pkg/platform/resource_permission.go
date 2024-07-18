@@ -33,14 +33,17 @@ var _ resource.Resource = (*permissionResource)(nil)
 
 type permissionResource struct {
 	ProviderData PlatformProviderMetadata
+	TypeName     string
 }
 
 func NewPermissionResource() resource.Resource {
-	return &permissionResource{}
+	return &permissionResource{
+		TypeName: "platform_permission",
+	}
 }
 
 func (r *permissionResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_permission"
+	resp.TypeName = r.TypeName
 }
 
 var usersGroupsAttributeSchema = func(description string) schema.SetNestedAttribute {
@@ -808,6 +811,8 @@ func (r *permissionResource) Configure(ctx context.Context, req resource.Configu
 }
 
 func (r *permissionResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	go util.SendUsageResourceCreate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var plan permissionResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -838,6 +843,8 @@ func (r *permissionResource) Create(ctx context.Context, req resource.CreateRequ
 }
 
 func (r *permissionResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	go util.SendUsageResourceRead(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var state permissionResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
@@ -880,6 +887,8 @@ func (r *permissionResource) Read(ctx context.Context, req resource.ReadRequest,
 }
 
 func (r *permissionResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	go util.SendUsageResourceUpdate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var plan permissionResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -918,6 +927,8 @@ func (r *permissionResource) Update(ctx context.Context, req resource.UpdateRequ
 }
 
 func (r *permissionResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	go util.SendUsageResourceDelete(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var data permissionResourceModel
 
 	diags := req.State.Get(ctx, &data)

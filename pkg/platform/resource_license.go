@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jfrog/terraform-provider-shared/util"
 	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
 	"github.com/samber/lo"
 )
@@ -24,14 +25,17 @@ var _ resource.Resource = (*licenseResource)(nil)
 
 type licenseResource struct {
 	ProviderData PlatformProviderMetadata
+	TypeName     string
 }
 
 func NewLicenseResource() resource.Resource {
-	return &licenseResource{}
+	return &licenseResource{
+		TypeName: "platform_license",
+	}
 }
 
 func (r *licenseResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_license"
+	resp.TypeName = r.TypeName
 }
 
 func (r *licenseResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -108,6 +112,8 @@ func (r *licenseResource) Configure(ctx context.Context, req resource.ConfigureR
 }
 
 func (r *licenseResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	go util.SendUsageResourceCreate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var plan licenseResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -165,6 +171,8 @@ func (r *licenseResource) Create(ctx context.Context, req resource.CreateRequest
 }
 
 func (r *licenseResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	go util.SendUsageResourceRead(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var state licenseResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
@@ -206,6 +214,8 @@ func (r *licenseResource) Read(ctx context.Context, req resource.ReadRequest, re
 }
 
 func (r *licenseResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	go util.SendUsageResourceUpdate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var plan licenseResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -263,6 +273,8 @@ func (r *licenseResource) Update(ctx context.Context, req resource.UpdateRequest
 }
 
 func (r *licenseResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	go util.SendUsageResourceDelete(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	resp.Diagnostics.AddWarning(
 		"Unable to Delete Resource",
 		"License cannot be deleted.",

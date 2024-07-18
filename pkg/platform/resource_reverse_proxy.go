@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jfrog/terraform-provider-shared/util"
 	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
 )
 
@@ -34,14 +35,17 @@ var _ resource.Resource = (*reverseProxyResource)(nil)
 
 type reverseProxyResource struct {
 	ProviderData PlatformProviderMetadata
+	TypeName     string
 }
 
 func NewReverseProxyResource() resource.Resource {
-	return &reverseProxyResource{}
+	return &reverseProxyResource{
+		TypeName: "platform_reverse_proxy",
+	}
 }
 
 func (r *reverseProxyResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_reverse_proxy"
+	resp.TypeName = r.TypeName
 }
 
 func (r *reverseProxyResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -219,6 +223,8 @@ func (r *reverseProxyResource) Configure(ctx context.Context, req resource.Confi
 }
 
 func (r *reverseProxyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	go util.SendUsageResourceCreate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var plan reverseProxyResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -249,6 +255,8 @@ func (r *reverseProxyResource) Create(ctx context.Context, req resource.CreateRe
 }
 
 func (r *reverseProxyResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	go util.SendUsageResourceRead(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var state reverseProxyResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
@@ -290,6 +298,8 @@ func (r *reverseProxyResource) Read(ctx context.Context, req resource.ReadReques
 }
 
 func (r *reverseProxyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	go util.SendUsageResourceUpdate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var plan reverseProxyResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -320,6 +330,8 @@ func (r *reverseProxyResource) Update(ctx context.Context, req resource.UpdateRe
 }
 
 func (r *reverseProxyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	go util.SendUsageResourceDelete(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	resp.Diagnostics.AddWarning(
 		"Unable to Delete Resource",
 		"Reverse proxy cannot be deleted.",

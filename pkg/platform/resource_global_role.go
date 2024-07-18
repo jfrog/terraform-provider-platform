@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/jfrog/terraform-provider-shared/util"
 	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
 )
 
@@ -58,14 +59,17 @@ var _ resource.Resource = (*globalRoleResource)(nil)
 
 type globalRoleResource struct {
 	ProviderData PlatformProviderMetadata
+	TypeName     string
 }
 
 func NewGlobalRoleResource() resource.Resource {
-	return &globalRoleResource{}
+	return &globalRoleResource{
+		TypeName: "platform_global_role",
+	}
 }
 
 func (r *globalRoleResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_global_role"
+	resp.TypeName = r.TypeName
 }
 
 func (r *globalRoleResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -195,6 +199,8 @@ func (r *globalRoleResource) Configure(ctx context.Context, req resource.Configu
 }
 
 func (r *globalRoleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	go util.SendUsageResourceCreate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var plan globalRoleResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -225,6 +231,8 @@ func (r *globalRoleResource) Create(ctx context.Context, req resource.CreateRequ
 }
 
 func (r *globalRoleResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	go util.SendUsageResourceRead(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var state globalRoleResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
@@ -267,6 +275,8 @@ func (r *globalRoleResource) Read(ctx context.Context, req resource.ReadRequest,
 }
 
 func (r *globalRoleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	go util.SendUsageResourceUpdate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var plan globalRoleResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -298,6 +308,8 @@ func (r *globalRoleResource) Update(ctx context.Context, req resource.UpdateRequ
 }
 
 func (r *globalRoleResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	go util.SendUsageResourceDelete(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var state globalRoleResourceModel
 
 	diags := req.State.Get(ctx, &state)
