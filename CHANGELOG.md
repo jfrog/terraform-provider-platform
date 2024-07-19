@@ -2,8 +2,8 @@
 
 NOTES:
 
-* provider: Attribute `myjfrog_api_token` is being deprecated. PR: [#114](https://github.com/jfrog/terraform-provider-platform/pull/114)
-* resource/platform_myjfrog_ip_allowlist is being deprecated and is moved to new [MyJFrog provider](https://registry.terraform.io/providers/jfrog/myjfrog/latest). Use the `myjfrog_ip_allowlist` resource there instead. PR: [#113](https://github.com/jfrog/terraform-provider-platform/pull/113)
+* provider: Attribute `myjfrog_api_token` is being deprecated. Issue: [#99](https://github.com/jfrog/terraform-provider-platform/issues/99) PR: [#114](https://github.com/jfrog/terraform-provider-platform/pull/114)
+* resource/platform_myjfrog_ip_allowlist is being deprecated and is moved to new [MyJFrog provider](https://registry.terraform.io/providers/jfrog/myjfrog/latest). Use the `myjfrog_ip_allowlist` resource there instead.  Issue: [#99](https://github.com/jfrog/terraform-provider-platform/issues/99 PR: [#113](https://github.com/jfrog/terraform-provider-platform/pull/113)
 
 ## 1.9.0 (July 19, 2024). Tested on Artifactory 7.84.17 with Terraform 1.9.2 and OpenTofu 1.7.3
 
