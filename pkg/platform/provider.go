@@ -238,6 +238,7 @@ func (p *PlatformProvider) Schema(ctx context.Context, req provider.SchemaReques
 					stringvalidator.LengthAtLeast(1),
 				},
 				MarkdownDescription: "MyJFrog API token that allows you to make changes to your JFrog account. See [Generate a Token in MyJFrog](https://jfrog.com/help/r/jfrog-hosting-models-documentation/generate-a-token-in-myjfrog) for more details. This can also be sourced from the `JFROG_MYJFROG_API_TOKEN` environment variable.",
+				DeprecationMessage:  "MyJFrog API token is deprecated. Use provider 'jfrog/myjfrog' https://registry.terraform.io/providers/jfrog/myjfrog instead.",
 			},
 			"oidc_provider_name": schema.StringAttribute{
 				Optional: true,
