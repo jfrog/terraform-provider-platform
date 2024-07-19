@@ -114,7 +114,7 @@ func (r *ipAllowListResource) Schema(ctx context.Context, req resource.SchemaReq
 			"To use this resource, you need an access token. Only a Primary Admin can generate MyJFrog tokens. For more information, see [Generate a Token in MyJFrog](https://jfrog.com/help/r/jfrog-hosting-models-documentation/generate-a-token-in-myjfrog).\n\n" +
 			"->This resource is supported only on the Cloud (SaaS) platform.\n\n" +
 			"~>The rate limit is **5 times per hour** for actions that result in a successful outcome (for Create, Update, and Delete actions). See [Allowlist REST API](https://jfrog.com/help/r/jfrog-rest-apis/allowlist-rest-api) for full list of limitations.\n\n" +
-			"!>This resource is being deprecated and moved to the new provider `jfrog/myjfrog`. Use `myjfrog_ip_allowlist` resource there instead.",
+			"!>This resource is being deprecated and moved to the new provider [jfrog/myjfrog](https://registry.terraform.io/providers/jfrog/myjfrog). Use `myjfrog_ip_allowlist` resource there instead.",
 		DeprecationMessage: "This resource is being deprecated and moved to the new provider 'jfrog/myjfrog'. Use 'myjfrog_ip_allowlist' resource there instead.",
 	}
 }
