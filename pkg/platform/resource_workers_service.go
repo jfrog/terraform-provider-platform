@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/jfrog/terraform-provider-shared/util"
 	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
 	"github.com/samber/lo"
 )
@@ -36,14 +37,17 @@ var _ resource.Resource = (*workersServiceResource)(nil)
 
 type workersServiceResource struct {
 	ProviderData PlatformProviderMetadata
+	TypeName     string
 }
 
 func NewWorkerServiceResource() resource.Resource {
-	return &workersServiceResource{}
+	return &workersServiceResource{
+		TypeName: "platform_workers_service",
+	}
 }
 
 func (r *workersServiceResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_workers_service"
+	resp.TypeName = r.TypeName
 }
 
 func (r *workersServiceResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -327,6 +331,8 @@ func (r *workersServiceResource) Configure(ctx context.Context, req resource.Con
 }
 
 func (r *workersServiceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	go util.SendUsageResourceCreate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var plan workersServiceResourceModel
 
 	diags := req.Config.Get(ctx, &plan)
@@ -358,6 +364,8 @@ func (r *workersServiceResource) Create(ctx context.Context, req resource.Create
 }
 
 func (r *workersServiceResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	go util.SendUsageResourceRead(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var state workersServiceResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
@@ -400,6 +408,8 @@ func (r *workersServiceResource) Read(ctx context.Context, req resource.ReadRequ
 }
 
 func (r *workersServiceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	go util.SendUsageResourceUpdate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var plan workersServiceResourceModel
 	var state workersServiceResourceModel
 
@@ -461,6 +471,8 @@ func (r *workersServiceResource) Update(ctx context.Context, req resource.Update
 }
 
 func (r *workersServiceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	go util.SendUsageResourceDelete(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+
 	var data workersServiceResourceModel
 
 	diags := req.State.Get(ctx, &data)

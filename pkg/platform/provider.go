@@ -178,6 +178,7 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 		ProviderMetadata: util.ProviderMetadata{
 			Client:             platformClient,
 			ArtifactoryVersion: artifactoryVersion,
+			ProductId:          productId,
 		},
 		MyJFrogClient: myJFrogClient,
 	}

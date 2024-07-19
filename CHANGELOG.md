@@ -1,3 +1,9 @@
+## 1.9.0 (July 19, 2024). Tested on Artifactory 7.84.17 with Terraform 1.9.2 and OpenTofu 1.7.3
+
+IMPROVEMENTS:
+
+* resource/platform_oidc_configuration: Add `Azure` option for `provider_type` attribute. PR: [#112](https://github.com/jfrog/terraform-provider-platform/pull/112)
+
 ## 1.8.2 (July 16, 2024). Tested on Artifactory 7.84.17 with Terraform 1.9.2 and OpenTofu 1.7.3
 
 BUG FIXES:
