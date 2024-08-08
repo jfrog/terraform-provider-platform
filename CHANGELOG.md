@@ -1,3 +1,9 @@
+## 1.11.0 (August 9, 2024)
+
+FEATURES:
+
+**New Resource:** `platform_saml_settings` - Resource to manage SAML SSO settings. PR: [#118](https://github.com/jfrog/terraform-provider-platform/pull/118)
+
 ## 1.10.0 (July 21, 2024). Tested on Artifactory 7.84.17 with Terraform 1.9.2 and OpenTofu 1.7.3
 
 NOTES:
