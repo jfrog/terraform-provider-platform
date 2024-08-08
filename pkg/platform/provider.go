@@ -210,6 +210,7 @@ func (p *PlatformProvider) Resources(ctx context.Context) []func() resource.Reso
 		NewPermissionResource,
 		NewReverseProxyResource,
 		NewSAMLSettingsResource,
+		NewSCIMUserResource,
 		NewWorkerServiceResource,
 	}
 }
