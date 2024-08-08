@@ -209,6 +209,7 @@ func (p *PlatformProvider) Resources(ctx context.Context) []func() resource.Reso
 		NewMyJFrogIPAllowListResource,
 		NewPermissionResource,
 		NewReverseProxyResource,
+		NewSAMLSettingsResource,
 		NewWorkerServiceResource,
 	}
 }

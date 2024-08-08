@@ -1,0 +1,1 @@
+terraform import platform_saml_settings.my-okta-saml-settings my-okta-saml-settings
