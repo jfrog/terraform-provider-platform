@@ -169,6 +169,12 @@ type SCIMUserGroupAPIModel struct {
 	Value string `json:"value"`
 }
 
+type SCIMErrorAPIModel struct {
+	Status  int      `json:"status"`
+	Detail  string   `json:"detail"`
+	Schemas []string `json:"schemas"`
+}
+
 func (r *SCIMUserResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = r.TypeName
 }
@@ -260,9 +266,11 @@ func (r *SCIMUserResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	var result SCIMUserAPIModel
+	var scimErr SCIMErrorAPIModel
 	response, err := r.ProviderData.Client.R().
 		SetBody(user).
 		SetResult(&result).
+		SetError(&scimErr).
 		Post(SCIMUsersEndpoint)
 
 	if err != nil {
@@ -271,7 +279,7 @@ func (r *SCIMUserResource) Create(ctx context.Context, req resource.CreateReques
 	}
 
 	if response.IsError() {
-		utilfw.UnableToCreateResourceError(resp, response.String())
+		utilfw.UnableToCreateResourceError(resp, scimErr.Detail)
 		return
 	}
 
@@ -297,10 +305,12 @@ func (r *SCIMUserResource) Read(ctx context.Context, req resource.ReadRequest, r
 	}
 
 	var user SCIMUserAPIModel
+	var scimErr SCIMErrorAPIModel
 
 	response, err := r.ProviderData.Client.R().
 		SetPathParam("id", state.Username.ValueString()).
 		SetResult(&user).
+		SetError(&scimErr).
 		Get(SCIMUserEndpoint)
 
 	if err != nil {
@@ -309,7 +319,7 @@ func (r *SCIMUserResource) Read(ctx context.Context, req resource.ReadRequest, r
 	}
 
 	if response.IsError() {
-		utilfw.UnableToRefreshResourceError(resp, response.String())
+		utilfw.UnableToRefreshResourceError(resp, scimErr.Detail)
 		return
 	}
 
@@ -348,10 +358,12 @@ func (r *SCIMUserResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	var result SCIMUserAPIModel
+	var scimErr SCIMErrorAPIModel
 	response, err := r.ProviderData.Client.R().
 		SetPathParam("id", plan.Username.ValueString()).
 		SetBody(user).
 		SetResult(&result).
+		SetError(&scimErr).
 		Put(SCIMUserEndpoint)
 
 	if err != nil {
@@ -360,7 +372,7 @@ func (r *SCIMUserResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	if response.IsError() {
-		utilfw.UnableToUpdateResourceError(resp, response.String())
+		utilfw.UnableToUpdateResourceError(resp, scimErr.Detail)
 		return
 	}
 
@@ -386,8 +398,10 @@ func (r *SCIMUserResource) Delete(ctx context.Context, req resource.DeleteReques
 		return
 	}
 
+	var scimErr SCIMErrorAPIModel
 	response, err := r.ProviderData.Client.R().
 		SetPathParam("id", state.Username.ValueString()).
+		SetError(&scimErr).
 		Delete(SCIMUserEndpoint)
 
 	if err != nil {
@@ -396,7 +410,7 @@ func (r *SCIMUserResource) Delete(ctx context.Context, req resource.DeleteReques
 	}
 
 	if response.IsError() {
-		utilfw.UnableToDeleteResourceError(resp, response.String())
+		utilfw.UnableToDeleteResourceError(resp, scimErr.Detail)
 		return
 	}
 
