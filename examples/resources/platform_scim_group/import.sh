@@ -1,0 +1,1 @@
+terraform import platform_scim_group.my-scim-group my-scim-group

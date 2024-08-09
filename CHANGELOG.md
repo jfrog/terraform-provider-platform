@@ -1,8 +1,11 @@
-## 1.11.0 (August 9, 2024). Tested on Artifactory 7.90.7 with Terraform 1.9.4 and OpenTofu 1.8.1
+## 1.11.0 (August 12, 2024). Tested on Artifactory 7.90.7 with Terraform 1.9.4 and OpenTofu 1.8.1
 
 FEATURES:
 
-**New Resource:** `platform_saml_settings` - Resource to manage SAML SSO settings. PR: [#118](https://github.com/jfrog/terraform-provider-platform/pull/118)
+**New Resource:**
+* `platform_saml_settings` - Resource to manage SAML SSO settings. PR: [#118](https://github.com/jfrog/terraform-provider-platform/pull/118)
+* `platform_scim_user` - Resource to manage SCIM user. PR: [#120](https://github.com/jfrog/terraform-provider-platform/pull/120)
+* `platform_scim_group` - Resource to manage SCIM group. PR: [#120](https://github.com/jfrog/terraform-provider-platform/pull/120)
 
 ## 1.10.0 (July 21, 2024). Tested on Artifactory 7.84.17 with Terraform 1.9.2 and OpenTofu 1.7.3
 
