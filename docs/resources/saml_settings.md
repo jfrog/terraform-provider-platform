@@ -50,7 +50,7 @@ resource "platform_saml_settings" "my-okta-saml-settings" {
 
 - `allow_user_to_access_profile` (Boolean) When set, auto created users will have access to their profile page and will be able to perform actions such as generating an API key. Default value is `false`.
 - `auto_redirect` (Boolean) When set, clicking on the login link will direct users to the configured SAML login URL. Default value is `false`.
-- `email_attribute` (String) If `no_auto_user_creation` is diabled or an internal user exists, the system will set the user's email to the value in this attribute that is returned by the SAML login XML response..
+- `email_attribute` (String) If `no_auto_user_creation` is diabled or an internal user exists, the system will set the user's email to the value in this attribute that is returned by the SAML login XML response.
 - `enable` (Boolean) When set, SAML integration is enabled and users may be authenticated via a SAML server. Default value is `true`.
 - `group_attribute` (String) The group attribute in the SAML login XML response. Note that the system will search for a case-sensitive match to an existing group..
 - `name_id_attribute` (String) The username attribute used to configure the SSO URL for the identity provider.
