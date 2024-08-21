@@ -56,7 +56,7 @@ type SCIMGroupMemberAPIModel struct {
 	Display string `json:"display"`
 }
 
-func (r *SCIMGroupResourceModel) toAPIModel(ctx context.Context, apiModel *SCIMGroupAPIModel) (ds diag.Diagnostics) {
+func (r *SCIMGroupResourceModel) toAPIModel(_ context.Context, apiModel *SCIMGroupAPIModel) (ds diag.Diagnostics) {
 	apiModel.Schemas = []string{"urn:ietf:params:scim:schemas:core:2.0:Group"}
 
 	apiModel.ID = r.ID.ValueString()
@@ -83,7 +83,7 @@ var SCIMGroupMemberResourceModelAttributeType map[string]attr.Type = map[string]
 	"display": types.StringType,
 }
 
-func (r *SCIMGroupResourceModel) fromAPIModel(ctx context.Context, apiModel *SCIMGroupAPIModel) (ds diag.Diagnostics) {
+func (r *SCIMGroupResourceModel) fromAPIModel(_ context.Context, apiModel *SCIMGroupAPIModel) (ds diag.Diagnostics) {
 	r.ID = types.StringValue(apiModel.ID)
 	r.DisplayName = types.StringValue(apiModel.DisplayName)
 

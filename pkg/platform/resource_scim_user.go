@@ -46,7 +46,7 @@ type SCIMUserResourceModel struct {
 	Meta     types.Map    `tfsdk:"meta"`
 }
 
-func (r *SCIMUserResourceModel) toAPIModel(ctx context.Context, apiModel *SCIMUserAPIModel) (ds diag.Diagnostics) {
+func (r *SCIMUserResourceModel) toAPIModel(_ context.Context, apiModel *SCIMUserAPIModel) (ds diag.Diagnostics) {
 	apiModel.Schemas = []string{"urn:ietf:params:scim:schemas:core:2.0:User"}
 
 	apiModel.Username = r.Username.ValueString()
@@ -77,7 +77,7 @@ var SCIMUserGroupResourceModelAttributeType map[string]attr.Type = map[string]at
 	"value": types.StringType,
 }
 
-func (r *SCIMUserResourceModel) fromAPIModel(ctx context.Context, apiModel *SCIMUserAPIModel) (ds diag.Diagnostics) {
+func (r *SCIMUserResourceModel) fromAPIModel(_ context.Context, apiModel *SCIMUserAPIModel) (ds diag.Diagnostics) {
 	r.Username = types.StringValue(apiModel.Username)
 	r.Active = types.BoolValue(apiModel.Active)
 
