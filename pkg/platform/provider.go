@@ -174,6 +174,9 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 		}
 	}
 
+	featureUsage := fmt.Sprintf("Terraform/%s", req.TerraformVersion)
+	go util.SendUsage(ctx, platformClient.R(), productId, featureUsage)
+
 	meta := PlatformProviderMetadata{
 		ProviderMetadata: util.ProviderMetadata{
 			Client:             platformClient,
