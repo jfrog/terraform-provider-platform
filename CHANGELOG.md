@@ -1,3 +1,9 @@
+## 1.11.1 (September 9, 2024)
+
+IMPROVEMENTS:
+
+* resource/platform_workers_service: Replace beta warning message in documentation with GA note. PR: [#124](https://github.com/jfrog/terraform-provider-platform/pull/124)
+
 ## 1.11.0 (August 12, 2024). Tested on Artifactory 7.90.7 with Terraform 1.9.4 and OpenTofu 1.8.1
 
 FEATURES:
