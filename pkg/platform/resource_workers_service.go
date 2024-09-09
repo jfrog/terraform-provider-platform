@@ -121,7 +121,8 @@ func (r *workersServiceResource) Schema(ctx context.Context, req resource.Schema
 				},
 			},
 		},
-		Description: "Provides a JFrog [Workers Service](https://jfrog.com/help/r/jfrog-platform-administration-documentation/workers-service) resource. This can be used to create and manage Workers Service.\n\n!>JFrog Workers Service is only available for JFrog Cloud customers to use free of charge during the beta period. The API may not be backward compatible after the beta period is over. Be aware of this caveat when you create workers during this period.",
+		Description: "Provides a JFrog [Workers Service](https://jfrog.com/help/r/jfrog-platform-administration-documentation/workers-service) resource. This can be used to create and manage Workers Service.\n\n" +
+			"->From Artifactory 7.94 the Workers service will be available in a general availability release to Enterprise X and Enterprise+ licenses.",
 	}
 }
 
