@@ -4,11 +4,14 @@ page_title: "platform_aws_iam_role Resource - terraform-provider-platform"
 subcategory: ""
 description: |-
   Provides a resource to manage AWS IAM roles for JFrog platform users. You can use the AWS IAM roles for passwordless access to Amazon EKS. For more information, see Passwordless Access for Amazon EKS https://jfrog.com/help/r/jfrog-installation-setup-documentation/passwordless-access-for-amazon-eks.
+  ->Only available for Artifactory 7.90.10 or later.
 ---
 
 # platform_aws_iam_role (Resource)
 
 Provides a resource to manage AWS IAM roles for JFrog platform users. You can use the AWS IAM roles for passwordless access to Amazon EKS. For more information, see [Passwordless Access for Amazon EKS](https://jfrog.com/help/r/jfrog-installation-setup-documentation/passwordless-access-for-amazon-eks).
+
+->Only available for Artifactory 7.90.10 or later.
 
 ## Example Usage
 

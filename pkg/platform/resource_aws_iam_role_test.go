@@ -102,7 +102,7 @@ func testAccAWSIAMRoleDestroy(id string) func(*terraform.State) error {
 			return err
 		}
 
-		if resp != nil && resp.StatusCode() == http.StatusNotFound {
+		if resp != nil && resp.StatusCode() == http.StatusBadRequest {
 			return nil
 		}
 

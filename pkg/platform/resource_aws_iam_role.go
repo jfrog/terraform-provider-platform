@@ -2,6 +2,7 @@ package platform
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"regexp"
 
@@ -68,7 +69,8 @@ func (r *AWSIAMRoleResource) Schema(ctx context.Context, req resource.SchemaRequ
 				MarkdownDescription: "The AWS IAM role. Must follow the regex, \"^arn:aws:iam::\\d{12}:role/[\\w+=,.@:-]+$\"",
 			},
 		},
-		MarkdownDescription: "Provides a resource to manage AWS IAM roles for JFrog platform users. You can use the AWS IAM roles for passwordless access to Amazon EKS. For more information, see [Passwordless Access for Amazon EKS](https://jfrog.com/help/r/jfrog-installation-setup-documentation/passwordless-access-for-amazon-eks).",
+		MarkdownDescription: "Provides a resource to manage AWS IAM roles for JFrog platform users. You can use the AWS IAM roles for passwordless access to Amazon EKS. For more information, see [Passwordless Access for Amazon EKS](https://jfrog.com/help/r/jfrog-installation-setup-documentation/passwordless-access-for-amazon-eks).\n\n" +
+			"->Only available for Artifactory 7.90.10 or later.",
 	}
 }
 
@@ -78,6 +80,23 @@ func (r *AWSIAMRoleResource) Configure(ctx context.Context, req resource.Configu
 		return
 	}
 	r.ProviderData = req.ProviderData.(PlatformProviderMetadata)
+
+	supported, err := util.CheckVersion(r.ProviderData.ArtifactoryVersion, "7.90.10")
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to check Artifactory version",
+			err.Error(),
+		)
+		return
+	}
+
+	if !supported {
+		resp.Diagnostics.AddError(
+			"Unsupported Artifactory version",
+			fmt.Sprintf("This resource is supported by Artifactory version 7.90.10 or later. Current version: %s", r.ProviderData.ArtifactoryVersion),
+		)
+		return
+	}
 }
 
 func (r *AWSIAMRoleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
