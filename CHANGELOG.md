@@ -1,3 +1,10 @@
+## 1.12.0 (September 12, 2024)
+
+FEATURES:
+
+**New Resource:**
+* `platform_aws_iam_role` - Resource to manage AWS IAM role. PR: [#125](https://github.com/jfrog/terraform-provider-platform/pull/125)
+
 ## 1.11.1 (September 9, 2024). Tested on Artifactory 7.90.9 with Terraform 1.9.5 and OpenTofu 1.8.2
 
 IMPROVEMENTS:
