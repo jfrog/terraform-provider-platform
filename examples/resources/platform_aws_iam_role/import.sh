@@ -1,0 +1,1 @@
+terraform import platform_aws_iam_role.myuser-aws-iam-role myuser
