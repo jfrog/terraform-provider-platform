@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -18,6 +19,7 @@ import (
 	"github.com/jfrog/terraform-provider-shared/util"
 	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
 	validatorfw_string "github.com/jfrog/terraform-provider-shared/validator/fw/string"
+	"github.com/samber/lo"
 )
 
 const (
@@ -36,7 +38,7 @@ type SAMLSettingsResource struct {
 	TypeName     string
 }
 
-type SAMLSettingsResourceModel struct {
+type SAMLSettingsResourceModelV0 struct {
 	Name                      types.String `tfsdk:"name"`
 	Enable                    types.Bool   `tfsdk:"enable"`
 	Certificate               types.String `tfsdk:"certificate"`
@@ -54,7 +56,12 @@ type SAMLSettingsResourceModel struct {
 	UseEncryptedAssertion     types.Bool   `tfsdk:"use_encrypted_assertion"`
 }
 
-func (r *SAMLSettingsResourceModel) toAPIModel(_ context.Context, apiModel *SAMLSettingsAPIModel) diag.Diagnostics {
+type SAMLSettingsResourceModelV1 struct {
+	SAMLSettingsResourceModelV0
+	AutoUserCreation types.Bool `tfsdk:"auto_user_creation"`
+}
+
+func (r *SAMLSettingsResourceModelV1) toAPIModel(_ context.Context, apiModel *SAMLSettingsAPIModel) diag.Diagnostics {
 
 	apiModel.Name = r.Name.ValueString()
 	apiModel.Enable = r.Enable.ValueBool()
@@ -64,7 +71,13 @@ func (r *SAMLSettingsResourceModel) toAPIModel(_ context.Context, apiModel *SAML
 	apiModel.NameIDAttribute = r.NameIDAttribute.ValueString()
 	apiModel.LoginURL = r.LoginURL.ValueString()
 	apiModel.LogoutURL = r.LogoutURL.ValueString()
-	apiModel.NoAutoUserCreation = r.NoAutoUserCreation.ValueBool()
+
+	if !r.AutoUserCreation.IsNull() {
+		apiModel.AutoUserCreation = r.AutoUserCreation.ValueBool()
+	} else {
+		apiModel.AutoUserCreation = !r.NoAutoUserCreation.ValueBool()
+	}
+
 	apiModel.ServiceProviderName = r.ServiceProviderName.ValueString()
 	apiModel.AllowUserToAccessProfile = r.AllowUserToAccessProfile.ValueBool()
 	apiModel.AutoRedirect = r.AutoRedirect.ValueBool()
@@ -75,7 +88,7 @@ func (r *SAMLSettingsResourceModel) toAPIModel(_ context.Context, apiModel *SAML
 	return nil
 }
 
-func (r *SAMLSettingsResourceModel) fromAPIModel(_ context.Context, apiModel *SAMLSettingsAPIModel) (ds diag.Diagnostics) {
+func (r *SAMLSettingsResourceModelV1) fromAPIModel(_ context.Context, apiModel *SAMLSettingsAPIModel) (ds diag.Diagnostics) {
 	r.Name = types.StringValue(apiModel.Name)
 	r.Enable = types.BoolValue(apiModel.Enable)
 	r.Certificate = types.StringValue(apiModel.Certificate)
@@ -94,7 +107,9 @@ func (r *SAMLSettingsResourceModel) fromAPIModel(_ context.Context, apiModel *SA
 
 	r.LoginURL = types.StringValue(apiModel.LoginURL)
 	r.LogoutURL = types.StringValue(apiModel.LogoutURL)
-	r.NoAutoUserCreation = types.BoolValue(apiModel.NoAutoUserCreation)
+
+	r.AutoUserCreation = types.BoolValue(apiModel.AutoUserCreation)
+
 	r.ServiceProviderName = types.StringValue(apiModel.ServiceProviderName)
 	r.AllowUserToAccessProfile = types.BoolValue(apiModel.AllowUserToAccessProfile)
 	r.AutoRedirect = types.BoolValue(apiModel.AutoRedirect)
@@ -108,133 +123,188 @@ func (r *SAMLSettingsResourceModel) fromAPIModel(_ context.Context, apiModel *SA
 type SAMLSettingsAPIModel struct {
 	Name                      string `json:"name"`
 	Enable                    bool   `json:"enable_integration"`
-	Certificate               string `json:"certificate"`
-	EmailAttribute            string `json:"email_attribute"`
-	GroupAttribute            string `json:"group_attribute"`
-	NameIDAttribute           string `json:"name_id_attribute"`
+	VerifyAudienceRestriction bool   `json:"verify_audience_restriction"`
 	LoginURL                  string `json:"login_url"`
 	LogoutURL                 string `json:"logout_url"`
-	NoAutoUserCreation        bool   `json:"no_auto_user_creation"`
 	ServiceProviderName       string `json:"service_provider_name"`
+	AutoUserCreation          bool   `json:"auto_user_creation"`
 	AllowUserToAccessProfile  bool   `json:"allow_user_to_access_profile"`
+	UseEncryptedAssertion     bool   `json:"use_encrypted_assertion"`
 	AutoRedirect              bool   `json:"auto_redirect"`
 	SyncGroups                bool   `json:"sync_groups"`
-	VerifyAudienceRestriction bool   `json:"verify_audience_restriction"`
-	UseEncryptedAssertion     bool   `json:"use_encrypted_assertion"`
+	Certificate               string `json:"certificate"`
+	GroupAttribute            string `json:"group_attribute"`
+	EmailAttribute            string `json:"email_attribute"`
+	NameIDAttribute           string `json:"name_id_attribute"`
 }
 
 func (r *SAMLSettingsResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = r.TypeName
 }
 
+var samlSettingsSchemaV0 = map[string]schema.Attribute{
+	"name": schema.StringAttribute{
+		Required: true,
+		Validators: []validator.String{
+			stringvalidator.LengthAtLeast(1),
+		},
+		PlanModifiers: []planmodifier.String{
+			stringplanmodifier.RequiresReplace(),
+		},
+		Description: "SAML Settings name.",
+	},
+	"enable": schema.BoolAttribute{
+		Optional:            true,
+		Computed:            true,
+		Default:             booldefault.StaticBool(true),
+		MarkdownDescription: "When set, SAML integration is enabled and users may be authenticated via a SAML server. Default value is `true`.",
+	},
+	"certificate": schema.StringAttribute{
+		Required: true,
+		Validators: []validator.String{
+			stringvalidator.LengthAtLeast(1),
+		},
+		MarkdownDescription: "The certificate for SAML Authentication in Base64 format. NOTE! The certificate must contain the public key to allow Artifactory to verify sign-in requests.",
+	},
+	"email_attribute": schema.StringAttribute{
+		Optional: true,
+		Validators: []validator.String{
+			stringvalidator.LengthAtLeast(1),
+		},
+		MarkdownDescription: "If `no_auto_user_creation` is diabled or an internal user exists, the system will set the user's email to the value in this attribute that is returned by the SAML login XML response.",
+	},
+	"group_attribute": schema.StringAttribute{
+		Optional: true,
+		Validators: []validator.String{
+			stringvalidator.LengthAtLeast(1),
+		},
+		MarkdownDescription: "The group attribute in the SAML login XML response. Note that the system will search for a case-sensitive match to an existing group..",
+	},
+	"name_id_attribute": schema.StringAttribute{
+		Optional: true,
+		Validators: []validator.String{
+			stringvalidator.LengthAtLeast(1),
+		},
+		MarkdownDescription: "The username attribute used to configure the SSO URL for the identity provider.",
+	},
+	"login_url": schema.StringAttribute{
+		Required: true,
+		Validators: []validator.String{
+			stringvalidator.LengthAtLeast(1),
+			validatorfw_string.IsURLHttpOrHttps(),
+		},
+		Description: "The identity provider login URL (when you try to login, the service provider redirects to this URL).",
+	},
+	"logout_url": schema.StringAttribute{
+		Required: true,
+		Validators: []validator.String{
+			stringvalidator.LengthAtLeast(1),
+			validatorfw_string.IsURLHttpOrHttps(),
+		},
+		Description: "The identity provider logout URL (when you try to logout, the service provider redirects to this URL).",
+	},
+	"no_auto_user_creation": schema.BoolAttribute{
+		Optional:            true,
+		Computed:            true,
+		Default:             booldefault.StaticBool(false),
+		MarkdownDescription: "When disabled, the system will automatically create new users for those who have logged in using SAML, and assign them to the default groups. Default value is `false`.",
+	},
+	"service_provider_name": schema.StringAttribute{
+		Required: true,
+		Validators: []validator.String{
+			stringvalidator.LengthAtLeast(1),
+		},
+		MarkdownDescription: "The SAML service provider name. This should be a URI that is also known as the entityID, providerID, or entity identity.",
+	},
+	"allow_user_to_access_profile": schema.BoolAttribute{
+		Optional:            true,
+		Computed:            true,
+		Default:             booldefault.StaticBool(true),
+		MarkdownDescription: "When set, auto created users will have access to their profile page and will be able to perform actions such as generating an API key. Default value is `false`.",
+	},
+	"auto_redirect": schema.BoolAttribute{
+		Optional:            true,
+		Computed:            true,
+		Default:             booldefault.StaticBool(false),
+		MarkdownDescription: "When set, clicking on the login link will direct users to the configured SAML login URL. Default value is `false`.",
+	},
+	"sync_groups": schema.BoolAttribute{
+		Optional:            true,
+		Computed:            true,
+		Default:             booldefault.StaticBool(false),
+		MarkdownDescription: "When set, in addition to the groups the user is already associated with, he will also be associated with the groups returned in the SAML login response. Note that the user's association with the returned groups is not persistent. It is only valid for the current login session. Default value is `false`.",
+	},
+	"verify_audience_restriction": schema.BoolAttribute{
+		Optional:            true,
+		Computed:            true,
+		Default:             booldefault.StaticBool(true),
+		MarkdownDescription: "Set this flag to specify who the assertion is intended for. The \"audience\" will be the service provider and is typically a URL but can technically be formatted as any string of data. Default value is `true`.",
+	},
+	"use_encrypted_assertion": schema.BoolAttribute{
+		Optional:            true,
+		Computed:            true,
+		Default:             booldefault.StaticBool(false),
+		MarkdownDescription: "When set, an X.509 public certificate will be created by Artifactory. Download this certificate and upload it to your IDP and choose your own encryption algorithm. This process will let you encrypt the assertion section in your SAML response. Default value is `false`.",
+	},
+}
+
+var samlSettingsSchemaV1 = lo.Assign(
+	samlSettingsSchemaV0,
+	map[string]schema.Attribute{
+		"no_auto_user_creation": schema.BoolAttribute{
+			Optional:            true,
+			Computed:            true,
+			Default:             booldefault.StaticBool(false),
+			MarkdownDescription: "When disabled, the system will automatically create new users for those who have logged in using SAML, and assign them to the default groups. Default value is `false`.",
+			DeprecationMessage:  "Use `auto_user_creation` instead.",
+		},
+		"auto_user_creation": schema.BoolAttribute{
+			Optional: true,
+			Computed: true,
+			Default:  booldefault.StaticBool(true),
+			Validators: []validator.Bool{
+				boolvalidator.ExactlyOneOf(
+					path.MatchRoot("no_auto_user_creation"),
+				),
+			},
+			MarkdownDescription: "When set, authenticated users are automatically created in Artifactory. When not set, for every request from an SSO user, the user is temporarily associated with default groups (if such groups are defined), and the permissions for these groups apply. Without automatic user creation, you must manually create the user inside Artifactory to manage user permissions not attached to their default groups. Default value is `true`.",
+		},
+	},
+)
+
 func (r *SAMLSettingsResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Attributes: map[string]schema.Attribute{
-			"name": schema.StringAttribute{
-				Required: true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-				Description: "SAML Settings name.",
+		Version:             1,
+		Attributes:          samlSettingsSchemaV1,
+		MarkdownDescription: "Provides a JFrog [SAML SSO Settings](https://jfrog.com/help/r/jfrog-platform-administration-documentation/saml-sso) resource.\n\n~>Only available for self-hosted instances.",
+	}
+}
+
+func (r *SAMLSettingsResource) UpgradeState(ctx context.Context) map[int64]resource.StateUpgrader {
+	return map[int64]resource.StateUpgrader{
+		// State upgrade implementation from 0 (prior state version) to 1 (Schema.Version)
+		0: {
+			PriorSchema: &schema.Schema{
+				Attributes: samlSettingsSchemaV0,
 			},
-			"enable": schema.BoolAttribute{
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(true),
-				MarkdownDescription: "When set, SAML integration is enabled and users may be authenticated via a SAML server. Default value is `true`.",
-			},
-			"certificate": schema.StringAttribute{
-				Required: true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-				MarkdownDescription: "The certificate for SAML Authentication in Base64 format. NOTE! The certificate must contain the public key to allow Artifactory to verify sign-in requests.",
-			},
-			"email_attribute": schema.StringAttribute{
-				Optional: true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-				MarkdownDescription: "If `no_auto_user_creation` is diabled or an internal user exists, the system will set the user's email to the value in this attribute that is returned by the SAML login XML response.",
-			},
-			"group_attribute": schema.StringAttribute{
-				Optional: true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-				MarkdownDescription: "The group attribute in the SAML login XML response. Note that the system will search for a case-sensitive match to an existing group..",
-			},
-			"name_id_attribute": schema.StringAttribute{
-				Optional: true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-				MarkdownDescription: "The username attribute used to configure the SSO URL for the identity provider.",
-			},
-			"login_url": schema.StringAttribute{
-				Required: true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-					validatorfw_string.IsURLHttpOrHttps(),
-				},
-				Description: "The identity provider login URL (when you try to login, the service provider redirects to this URL).",
-			},
-			"logout_url": schema.StringAttribute{
-				Required: true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-					validatorfw_string.IsURLHttpOrHttps(),
-				},
-				Description: "The identity provider logout URL (when you try to logout, the service provider redirects to this URL).",
-			},
-			"no_auto_user_creation": schema.BoolAttribute{
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
-				MarkdownDescription: "When disabled, the system will automatically create new users for those who have logged in using SAML, and assign them to the default groups. Default value is `false`.",
-			},
-			"service_provider_name": schema.StringAttribute{
-				Required: true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-				MarkdownDescription: "The SAML service provider name. This should be a URI that is also known as the entityID, providerID, or entity identity.",
-			},
-			"allow_user_to_access_profile": schema.BoolAttribute{
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(true),
-				MarkdownDescription: "When set, auto created users will have access to their profile page and will be able to perform actions such as generating an API key. Default value is `false`.",
-			},
-			"auto_redirect": schema.BoolAttribute{
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
-				MarkdownDescription: "When set, clicking on the login link will direct users to the configured SAML login URL. Default value is `false`.",
-			},
-			"sync_groups": schema.BoolAttribute{
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
-				MarkdownDescription: "When set, in addition to the groups the user is already associated with, he will also be associated with the groups returned in the SAML login response. Note that the user's association with the returned groups is not persistent. It is only valid for the current login session. Default value is `false`.",
-			},
-			"verify_audience_restriction": schema.BoolAttribute{
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(true),
-				MarkdownDescription: "Set this flag to specify who the assertion is intended for. The \"audience\" will be the service provider and is typically a URL but can technically be formatted as any string of data. Default value is `true`.",
-			},
-			"use_encrypted_assertion": schema.BoolAttribute{
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
-				MarkdownDescription: "When set, an X.509 public certificate will be created by Artifactory. Download this certificate and upload it to your IDP and choose your own encryption algorithm. This process will let you encrypt the assertion section in your SAML response. Default value is `false`.",
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				var priorStateData SAMLSettingsResourceModelV0
+
+				resp.Diagnostics.Append(req.State.Get(ctx, &priorStateData)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+
+				upgradedStateData := SAMLSettingsResourceModelV1{
+					SAMLSettingsResourceModelV0: priorStateData,
+					AutoUserCreation:            types.BoolValue(true),
+				}
+
+				upgradedStateData.AutoUserCreation = types.BoolValue(!priorStateData.NoAutoUserCreation.ValueBool())
+
+				resp.Diagnostics.Append(resp.State.Set(ctx, upgradedStateData)...)
 			},
 		},
-		MarkdownDescription: "Provides a JFrog [SAML SSO Settings](https://jfrog.com/help/r/jfrog-platform-administration-documentation/saml-sso) resource.\n\n~>Only available for self-hosted instances.",
 	}
 }
 
@@ -266,7 +336,7 @@ func (r *SAMLSettingsResource) Configure(ctx context.Context, req resource.Confi
 func (r *SAMLSettingsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	go util.SendUsageResourceCreate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
-	var plan SAMLSettingsResourceModel
+	var plan SAMLSettingsResourceModelV1
 
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -301,7 +371,7 @@ func (r *SAMLSettingsResource) Create(ctx context.Context, req resource.CreateRe
 func (r *SAMLSettingsResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	go util.SendUsageResourceRead(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
-	var state SAMLSettingsResourceModel
+	var state SAMLSettingsResourceModelV1
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -345,7 +415,7 @@ func (r *SAMLSettingsResource) Read(ctx context.Context, req resource.ReadReques
 func (r *SAMLSettingsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	go util.SendUsageResourceUpdate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
-	var plan SAMLSettingsResourceModel
+	var plan SAMLSettingsResourceModelV1
 
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -381,7 +451,7 @@ func (r *SAMLSettingsResource) Update(ctx context.Context, req resource.UpdateRe
 func (r *SAMLSettingsResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	go util.SendUsageResourceDelete(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
-	var state SAMLSettingsResourceModel
+	var state SAMLSettingsResourceModelV1
 
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
