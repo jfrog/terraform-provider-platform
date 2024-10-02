@@ -1,3 +1,13 @@
+## 1.13.0 (October 3, 2024)
+
+NOTES:
+
+* resource/platform_saml_settings: `no_auto_user_creation` attribute is being deprecated in favor of `auto_user_creation`.
+
+BUG FIXES:
+
+* resource/platform_saml_settings: Fix `no_auto_user_creation` attribute has no effect. Replace it with new attribute `auto_user_creation` to match SAML Settings in the UI and REST API. Issue: [#133](https://github.com/jfrog/terraform-provider-platform/issues/133) PR: [#134](https://github.com/jfrog/terraform-provider-platform/pull/134)
+
 ## 1.12.0 (September 16, 2024). Tested on Artifactory 7.90.10 with Terraform 1.9.5 and OpenTofu 1.8.2
 
 FEATURES:
