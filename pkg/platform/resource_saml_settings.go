@@ -255,7 +255,7 @@ var samlSettingsSchemaV1 = lo.Assign(
 			Optional:            true,
 			Computed:            true,
 			Default:             booldefault.StaticBool(false),
-			MarkdownDescription: "When disabled, the system will automatically create new users for those who have logged in using SAML, and assign them to the default groups. Default value is `false`.",
+			MarkdownDescription: "**Deprecated** Use `auto_user_creation` instead. When disabled, the system will automatically create new users for those who have logged in using SAML, and assign them to the default groups. Default value is `false`.",
 			DeprecationMessage:  "Use `auto_user_creation` instead.",
 		},
 		"auto_user_creation": schema.BoolAttribute{
