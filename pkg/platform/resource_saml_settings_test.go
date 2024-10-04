@@ -25,7 +25,7 @@ func TestAccSAMLSettings_full(t *testing.T) {
 		name_id_attribute            = "{{ .name_id_attribute }}"
 		login_url                    = "http://tempurl.org/login"
 		logout_url                   = "http://tempurl.org/logout"
-		no_auto_user_creation        = false
+		auto_user_creation           = {{ .auto_user_creation }}
 		service_provider_name        = "okta"
 		allow_user_to_access_profile = true
 		auto_redirect                = true
@@ -35,21 +35,23 @@ func TestAccSAMLSettings_full(t *testing.T) {
 	}`
 
 	testData := map[string]string{
-		"name":              name,
-		"certificate":       "MIICTjCCAbegAwIBAgIBADANBgkqhkiG9w0BAQ0FADBEMQswCQYDVQQGEwJ1czELMAkGA1UECAwCQ0ExFjAUBgNVBAoMDUpGcm9nIFRlc3RpbmcxEDAOBgNVBAMMB1Rlc3RpbmcwHhcNMjQwODA4MTgzNjMxWhcNMjUwODA4MTgzNjMxWjBEMQswCQYDVQQGEwJ1czELMAkGA1UECAwCQ0ExFjAUBgNVBAoMDUpGcm9nIFRlc3RpbmcxEDAOBgNVBAMMB1Rlc3RpbmcwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJAoGBAOPwKU3SxuRaJply2by60NxYmbIPfelhM6sObgPRXbm49Mz4o1nbwH/vwhz1K+klVO4hOiKc5aP5GtQEoBejZbxOXlYlf8YirNqbtEXlIattvZA3tlC8O9oNOzBuT6tRdAA9CvN035p17fN0tpejz7Ptn1G1yUAt9klTUBBZ8eERAgMBAAGjUDBOMB0GA1UdDgQWBBR2y2SefjbqeSHTj+URrKc540YkGTAfBgNVHSMEGDAWgBR2y2SefjbqeSHTj+URrKc540YkGTAMBgNVHRMEBTADAQH/MA0GCSqGSIb3DQEBDQUAA4GBAKxnkFRgLZnQ4U6fWjfuJnx29cKbIq4oBr9RuWEKH2Hhx+jWy/3baNrxE0AsNWTLX6gGVd2qJbfae803AN6ZLx+VrLCWKl+c5MTTZBhuX6G/JvWviavE44P1U4cl2c6w4qvAmY+SY0cnJeWGLCBJ2vJ/fauXS/TIr0IfziSRcVYY",
-		"email_attribute":   "email",
-		"group_attribute":   "group",
-		"name_id_attribute": "name",
+		"name":               name,
+		"certificate":        "MIICTjCCAbegAwIBAgIBADANBgkqhkiG9w0BAQ0FADBEMQswCQYDVQQGEwJ1czELMAkGA1UECAwCQ0ExFjAUBgNVBAoMDUpGcm9nIFRlc3RpbmcxEDAOBgNVBAMMB1Rlc3RpbmcwHhcNMjQwODA4MTgzNjMxWhcNMjUwODA4MTgzNjMxWjBEMQswCQYDVQQGEwJ1czELMAkGA1UECAwCQ0ExFjAUBgNVBAoMDUpGcm9nIFRlc3RpbmcxEDAOBgNVBAMMB1Rlc3RpbmcwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJAoGBAOPwKU3SxuRaJply2by60NxYmbIPfelhM6sObgPRXbm49Mz4o1nbwH/vwhz1K+klVO4hOiKc5aP5GtQEoBejZbxOXlYlf8YirNqbtEXlIattvZA3tlC8O9oNOzBuT6tRdAA9CvN035p17fN0tpejz7Ptn1G1yUAt9klTUBBZ8eERAgMBAAGjUDBOMB0GA1UdDgQWBBR2y2SefjbqeSHTj+URrKc540YkGTAfBgNVHSMEGDAWgBR2y2SefjbqeSHTj+URrKc540YkGTAMBgNVHRMEBTADAQH/MA0GCSqGSIb3DQEBDQUAA4GBAKxnkFRgLZnQ4U6fWjfuJnx29cKbIq4oBr9RuWEKH2Hhx+jWy/3baNrxE0AsNWTLX6gGVd2qJbfae803AN6ZLx+VrLCWKl+c5MTTZBhuX6G/JvWviavE44P1U4cl2c6w4qvAmY+SY0cnJeWGLCBJ2vJ/fauXS/TIr0IfziSRcVYY",
+		"email_attribute":    "email",
+		"group_attribute":    "group",
+		"name_id_attribute":  "name",
+		"auto_user_creation": "false",
 	}
 
 	config := util.ExecuteTemplate(name, temp, testData)
 
 	updatedTestData := map[string]string{
-		"name":              name,
-		"certificate":       "MIICTjCCAbegAwIBAgIBADANBgkqhkiG9w0BAQ0FADBEMQswCQYDVQQGEwJ1czELMAkGA1UECAwCQ0ExFjAUBgNVBAoMDUpGcm9nIFRlc3RpbmcxEDAOBgNVBAMMB1Rlc3RpbmcwHhcNMjQwODA4MTgzNjMxWhcNMjUwODA4MTgzNjMxWjBEMQswCQYDVQQGEwJ1czELMAkGA1UECAwCQ0ExFjAUBgNVBAoMDUpGcm9nIFRlc3RpbmcxEDAOBgNVBAMMB1Rlc3RpbmcwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJAoGBAOPwKU3SxuRaJply2by60NxYmbIPfelhM6sObgPRXbm49Mz4o1nbwH/vwhz1K+klVO4hOiKc5aP5GtQEoBejZbxOXlYlf8YirNqbtEXlIattvZA3tlC8O9oNOzBuT6tRdAA9CvN035p17fN0tpejz7Ptn1G1yUAt9klTUBBZ8eERAgMBAAGjUDBOMB0GA1UdDgQWBBR2y2SefjbqeSHTj+URrKc540YkGTAfBgNVHSMEGDAWgBR2y2SefjbqeSHTj+URrKc540YkGTAMBgNVHRMEBTADAQH/MA0GCSqGSIb3DQEBDQUAA4GBAKxnkFRgLZnQ4U6fWjfuJnx29cKbIq4oBr9RuWEKH2Hhx+jWy/3baNrxE0AsNWTLX6gGVd2qJbfae803AN6ZLx+VrLCWKl+c5MTTZBhuX6G/JvWviavE44P1U4cl2c6w4qvAmY+SY0cnJeWGLCBJ2vJ/fauXS/TIr0IfziSRcVYY",
-		"email_attribute":   "email2",
-		"group_attribute":   "group2",
-		"name_id_attribute": "name2",
+		"name":               name,
+		"certificate":        "MIICTjCCAbegAwIBAgIBADANBgkqhkiG9w0BAQ0FADBEMQswCQYDVQQGEwJ1czELMAkGA1UECAwCQ0ExFjAUBgNVBAoMDUpGcm9nIFRlc3RpbmcxEDAOBgNVBAMMB1Rlc3RpbmcwHhcNMjQwODA4MTgzNjMxWhcNMjUwODA4MTgzNjMxWjBEMQswCQYDVQQGEwJ1czELMAkGA1UECAwCQ0ExFjAUBgNVBAoMDUpGcm9nIFRlc3RpbmcxEDAOBgNVBAMMB1Rlc3RpbmcwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJAoGBAOPwKU3SxuRaJply2by60NxYmbIPfelhM6sObgPRXbm49Mz4o1nbwH/vwhz1K+klVO4hOiKc5aP5GtQEoBejZbxOXlYlf8YirNqbtEXlIattvZA3tlC8O9oNOzBuT6tRdAA9CvN035p17fN0tpejz7Ptn1G1yUAt9klTUBBZ8eERAgMBAAGjUDBOMB0GA1UdDgQWBBR2y2SefjbqeSHTj+URrKc540YkGTAfBgNVHSMEGDAWgBR2y2SefjbqeSHTj+URrKc540YkGTAMBgNVHRMEBTADAQH/MA0GCSqGSIb3DQEBDQUAA4GBAKxnkFRgLZnQ4U6fWjfuJnx29cKbIq4oBr9RuWEKH2Hhx+jWy/3baNrxE0AsNWTLX6gGVd2qJbfae803AN6ZLx+VrLCWKl+c5MTTZBhuX6G/JvWviavE44P1U4cl2c6w4qvAmY+SY0cnJeWGLCBJ2vJ/fauXS/TIr0IfziSRcVYY",
+		"email_attribute":    "email2",
+		"group_attribute":    "group2",
+		"name_id_attribute":  "name2",
+		"auto_user_creation": "true",
 	}
 
 	updatedConfig := util.ExecuteTemplate(name, temp, updatedTestData)
@@ -70,7 +72,7 @@ func TestAccSAMLSettings_full(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "name_id_attribute", testData["name_id_attribute"]),
 					resource.TestCheckResourceAttr(fqrn, "login_url", "http://tempurl.org/login"),
 					resource.TestCheckResourceAttr(fqrn, "logout_url", "http://tempurl.org/logout"),
-					resource.TestCheckResourceAttr(fqrn, "no_auto_user_creation", "false"),
+					resource.TestCheckResourceAttr(fqrn, "auto_user_creation", testData["auto_user_creation"]),
 					resource.TestCheckResourceAttr(fqrn, "service_provider_name", "okta"),
 					resource.TestCheckResourceAttr(fqrn, "allow_user_to_access_profile", "true"),
 					resource.TestCheckResourceAttr(fqrn, "auto_redirect", "true"),
@@ -90,7 +92,7 @@ func TestAccSAMLSettings_full(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "name_id_attribute", updatedTestData["name_id_attribute"]),
 					resource.TestCheckResourceAttr(fqrn, "login_url", "http://tempurl.org/login"),
 					resource.TestCheckResourceAttr(fqrn, "logout_url", "http://tempurl.org/logout"),
-					resource.TestCheckResourceAttr(fqrn, "no_auto_user_creation", "false"),
+					resource.TestCheckResourceAttr(fqrn, "auto_user_creation", updatedTestData["auto_user_creation"]),
 					resource.TestCheckResourceAttr(fqrn, "service_provider_name", "okta"),
 					resource.TestCheckResourceAttr(fqrn, "allow_user_to_access_profile", "true"),
 					resource.TestCheckResourceAttr(fqrn, "auto_redirect", "true"),
@@ -105,6 +107,7 @@ func TestAccSAMLSettings_full(t *testing.T) {
 				ImportStateVerify:                    true,
 				ImportStateId:                        name,
 				ImportStateVerifyIdentifierAttribute: "name",
+				ImportStateVerifyIgnore:              []string{"no_auto_user_creation"},
 			},
 		},
 	})
