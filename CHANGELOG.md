@@ -1,3 +1,9 @@
+## 1.13.1 (October 8, 2024)
+
+BUG FIXES:
+
+* resource/platform_saml_settings: Fix `certificate` attribute not being set as 'sensitive' so its value is redacted in CLI output/log. Issue: [#135](https://github.com/jfrog/terraform-provider-platform/issues/135) PR: [#136](https://github.com/jfrog/terraform-provider-platform/pull/136)
+
 ## 1.13.0 (October 4, 2024). Tested on Artifactory 7.90.13 with Terraform 1.9.7 and OpenTofu 1.8.3
 
 NOTES:
