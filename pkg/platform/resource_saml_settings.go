@@ -160,7 +160,8 @@ var samlSettingsSchemaV0 = map[string]schema.Attribute{
 		MarkdownDescription: "When set, SAML integration is enabled and users may be authenticated via a SAML server. Default value is `true`.",
 	},
 	"certificate": schema.StringAttribute{
-		Required: true,
+		Required:  true,
+		Sensitive: true,
 		Validators: []validator.String{
 			stringvalidator.LengthAtLeast(1),
 		},
