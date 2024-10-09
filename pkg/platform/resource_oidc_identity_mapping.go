@@ -98,7 +98,7 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 						Validators: []validator.String{
 							stringvalidator.RegexMatches(
 								regexp.MustCompile(`^(applied-permissions\/admin|applied-permissions\/user|applied-permissions\/groups|applied-permissions\/roles:.+)$`),
-                                "must start with either 'applied-permissions/admin', 'applied-permissions/user', 'applied-permissions/groups', or 'applied-permissions/roles:'",
+                                "must start with either 'applied-permissions/admin', 'applied-permissions/user', 'applied-permissions/groups:', or 'applied-permissions/roles:'",
 							),
 						},
 						MarkdownDescription: "Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, `applied-permissions/roles`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\\\"readers\\\",\\\"my-group\\\",`",

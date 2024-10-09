@@ -127,6 +127,48 @@ func TestAccOIDCIdentityMapping_full(t *testing.T) {
 	})
 }
 
+func TestAccOIDCIdentityMapping_roles_scope(t *testing.T) {
+	_, _, configName := testutil.MkNames("test-oidc-configuration", "platform_oidc_configuration")
+	_, fqrn, identityMappingName := testutil.MkNames("test-oidc-identity-mapping", "platform_oidc_identity_mapping")
+
+	temp := `
+	resource "platform_oidc_configuration" "{{ .configName }}" {
+		name          = "{{ .configName }}"
+		description   = "Test description"
+		issuer_url    = "{{ .issuerURL }}"
+		provider_type = "{{ .providerType }}"
+		audience      = "{{ .audience }}"
+	}
+
+	resource "platform_oidc_identity_mapping" "{{ .identityMappingName }}" {
+		name          = "{{ .identityMappingName }}"
+		description   = "Test description"
+		provider_name = platform_oidc_configuration.{{ .configName }}.name
+		priority      = {{ .priority }}
+		claims_json   = jsonencode({
+			sub = "{{ .sub }}",
+			updated_at = 1490198843
+		})
+		token_spec = {
+            scope      = "applied-permissions/roles:myProject:\"developer\",\"qa\""
+			audience   = "*@*"
+			expires_in = 120
+		}
+	}`
+
+	testData := map[string]string{
+		"configName":          configName,
+		"identityMappingName": identityMappingName,
+		"issuerURL":           "https://tempurl.org",
+		"providerType":        "generic",
+		"audience":            "test-audience",
+		"priority":            fmt.Sprintf("%d", testutil.RandomInt()),
+		"sub":                 fmt.Sprintf("test-subscriber-%d", testutil.RandomInt()),
+        "scope":               "applied-permissions/roles:myProject:\"developer\",\"qa\"",
+	}
+
+}
+
 func TestAccOIDCIdentityMapping_groups_scope(t *testing.T) {
 	_, _, configName := testutil.MkNames("test-oidc-configuration", "platform_oidc_configuration")
 	_, fqrn, identityMappingName := testutil.MkNames("test-oidc-identity-mapping", "platform_oidc_identity_mapping")
