@@ -1,3 +1,13 @@
+## 1.14.0 (October 12, 2024)
+
+IMPROVEMENTS:
+
+* resource/platform_oidc_configuration: Add `project_key` attribute to support project scope OIDC configuration.
+* resource/platform_oidc_identity_mapping: Add `project_key` attribute to support project scope OIDC identity mapping.
+* resource/platform_oidc_identity_mapping: Add support for `applied-permissions/roles` to `scope` attribute to support project role scope.
+
+PR: [#137](https://github.com/jfrog/terraform-provider-platform/pull/137) and [#138](https://github.com/jfrog/terraform-provider-platform/pull/138)
+
 ## 1.13.1 (October 8, 2024). Tested on Artifactory 7.90.13 with Terraform 1.9.7 and OpenTofu 1.8.3
 
 BUG FIXES:
