@@ -25,6 +25,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"github.com/jfrog/terraform-provider-shared/util"
 	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
+	validatorfw_string "github.com/jfrog/terraform-provider-shared/validator/fw/string"
 )
 
 const odicIdentityMappingEndpoint = "/access/api/v1/oidc/{provider_name}/identity_mappings"
@@ -97,11 +98,11 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 						Required: true,
 						Validators: []validator.String{
 							stringvalidator.RegexMatches(
-								regexp.MustCompile(`^(applied-permissions\/admin|applied-permissions\/user|applied-permissions\/groups|applied-permissions\/roles:.+)$`),
-                                "must start with either 'applied-permissions/admin', 'applied-permissions/user', 'applied-permissions/groups:', or 'applied-permissions/roles:'",
+								regexp.MustCompile(`^(applied-permissions\/admin|applied-permissions\/user|applied-permissions\/groups:.+|applied-permissions\/roles:.+)$`),
+								"must start with either 'applied-permissions/admin', 'applied-permissions/user', 'applied-permissions/groups:', or 'applied-permissions/roles:'",
 							),
 						},
-                        MarkdownDescription: "Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, `applied-permissions/roles`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\\\"readers\\\",\\\"my-group\\\",` Role permissions must be comma-separated, double quotes wrapped, and provide a project name, e.g. `applied-permissions:roles:<Your Artifactory Project Name>:\"Developer\",\"Viewer\"",
+						MarkdownDescription: "Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, `applied-permissions/roles:`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\\\"readers\\\",\\\"my-group\\\",` Role permissions must be comma-separated, double quotes wrapped, e.g. `applied-permissions:roles:\"Developer\",\"Viewer\"",
 					},
 					"audience": schema.StringAttribute{
 						Optional: true,
@@ -124,6 +125,16 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 				},
 				Description: "Specifications of the token. In case of success, a token with the following details will be generated and passed to OIDC Provider.",
 			},
+			"project_key": schema.StringAttribute{
+				Optional: true,
+				Validators: []validator.String{
+					validatorfw_string.ProjectKey(),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+				Description: "If set, this Identity Mapping will be available in the scope of the given project (editable by platform admin and project admin). If not set, this Identity Mapping will be global and only editable by platform admin. Once set, the projectKey cannot be changed.",
+			},
 		},
 		MarkdownDescription: "Manage OIDC identity mapping for an OIDC configuration in JFrog platform. See the JFrog [OIDC identity mappings documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-identity-mappings) for more information.",
 	}
@@ -136,6 +147,7 @@ type odicIdentityMappingResourceModel struct {
 	Priority     types.Int64  `tfsdk:"priority"`
 	ClaimsJSON   types.String `tfsdk:"claims_json"`
 	TokenSpec    types.Object `tfsdk:"token_spec"`
+	ProjectKey   types.String `tfsdk:"project_key"`
 }
 
 type odicIdentityMappingTokenSpecResourceModel struct {
@@ -180,6 +192,7 @@ func (r *odicIdentityMappingResourceModel) toAPIModel(ctx context.Context, apiMo
 			Audience:  tokenSpec.Audience.ValueString(),
 			ExpiresIn: tokenSpec.ExpiresIn.ValueInt64(),
 		},
+		ProjectKey: r.ProjectKey.ValueString(),
 	}
 
 	return
@@ -238,6 +251,7 @@ type odicIdentityMappingAPIModel struct {
 	Priority     int64                                `json:"priority"`
 	Claims       map[string]any                       `json:"claims"`
 	TokenSpec    odicIdentityMappingTokenSpecAPIModel `json:"token_spec"`
+	ProjectKey   string                               `json:"project_key,omitempty"`
 }
 
 type odicIdentityMappingTokenSpecAPIModel struct {
@@ -405,7 +419,7 @@ func (r *odicIdentityMappingResource) Delete(ctx context.Context, req resource.D
 func (r *odicIdentityMappingResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	idParts := strings.Split(req.ID, ":")
 
-	if len(idParts) != 2 || len(idParts[0]) == 0 || len(idParts[1]) == 0 {
+	if len(idParts) < 2 || len(idParts[0]) == 0 || len(idParts[1]) == 0 {
 		resp.Diagnostics.AddError(
 			"Unexpected Import Identifier",
 			fmt.Sprintf("Expected import identifier with format: identity_mapping_name:provider_name. Got: %q", req.ID),
@@ -415,4 +429,8 @@ func (r *odicIdentityMappingResource) ImportState(ctx context.Context, req resou
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), idParts[0])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("provider_name"), idParts[1])...)
+
+	if len(idParts) == 3 && idParts[2] != "" {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_key"), idParts[2])...)
+	}
 }

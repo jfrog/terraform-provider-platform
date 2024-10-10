@@ -3,6 +3,7 @@ package platform_test
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -127,11 +128,151 @@ func TestAccOIDCIdentityMapping_full(t *testing.T) {
 	})
 }
 
-func TestAccOIDCIdentityMapping_roles_scope(t *testing.T) {
+func TestAccOIDCIdentityMapping_with_project(t *testing.T) {
+	_, _, projectName := testutil.MkNames("test-project-", "project")
+	projectKey := strings.ToLower(fmt.Sprintf("proj%d", testutil.RandomInt()))
 	_, _, configName := testutil.MkNames("test-oidc-configuration", "platform_oidc_configuration")
 	_, fqrn, identityMappingName := testutil.MkNames("test-oidc-identity-mapping", "platform_oidc_identity_mapping")
 
 	temp := `
+	resource "project" "{{ .projectName }}" {
+		key = "{{ .projectKey }}"
+		display_name = "{{ .projectName }}"
+		description = "test description"
+		admin_privileges {
+			manage_members = true
+			manage_resources = true
+			index_resources = true
+		}
+		max_storage_in_gibibytes = 1
+		block_deployments_on_limit = true
+		email_notification = false
+	}
+
+	resource "platform_oidc_configuration" "{{ .configName }}" {
+		name          = "{{ .configName }}"
+		issuer_url    = "{{ .issuerURL }}"
+		provider_type = "{{ .providerType }}"
+		audience      = "{{ .audience }}"
+		project_key   = project.{{ .projectName }}.key
+	}
+
+	resource "platform_oidc_identity_mapping" "{{ .identityMappingName }}" {
+		name          = "{{ .identityMappingName }}"
+		provider_name = platform_oidc_configuration.{{ .configName }}.name
+		priority      = {{ .priority }}
+		claims_json   = jsonencode({
+			sub = "{{ .sub }}",
+			updated_at = 1490198843
+		})
+		token_spec = {
+			username   = "{{ .username }}"
+			scope      = "applied-permissions/user"
+		}
+		project_key   = project.{{ .projectName }}.key
+	}`
+
+	testData := map[string]string{
+		"projectName":         projectName,
+		"projectKey":          projectKey,
+		"configName":          configName,
+		"identityMappingName": identityMappingName,
+		"issuerURL":           "https://tempurl.org",
+		"providerType":        "generic",
+		"audience":            "test-audience",
+		"priority":            fmt.Sprintf("%d", testutil.RandomInt()),
+		"sub":                 fmt.Sprintf("test-subscriber-%d", testutil.RandomInt()),
+		"username":            fmt.Sprintf("test-user-%d", testutil.RandomInt()),
+	}
+
+	config := util.ExecuteTemplate(identityMappingName, temp, testData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() { testAccPreCheck(t) },
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"project": {
+				Source: "jfrog/project",
+			},
+		},
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["identityMappingName"]),
+					resource.TestCheckResourceAttr(fqrn, "priority", testData["priority"]),
+					resource.TestCheckResourceAttr(fqrn, "claims_json", fmt.Sprintf("{\"sub\":\"%s\",\"updated_at\":1490198843}", testData["sub"])),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.username", testData["username"]),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.scope", "applied-permissions/user"),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.audience", "*@*"),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.expires_in", "60"),
+				),
+			},
+			{
+				ResourceName:                         fqrn,
+				ImportState:                          true,
+				ImportStateId:                        fmt.Sprintf("%s:%s:%s", identityMappingName, configName, projectKey),
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "name",
+			},
+		},
+	})
+}
+
+func TestAccOIDCIdentityMapping_roles_scope(t *testing.T) {
+	_, _, projectName := testutil.MkNames("test-project-", "project")
+	projectKey := strings.ToLower(fmt.Sprintf("proj%d", testutil.RandomInt()))
+	_, _, userName := testutil.MkNames("test-project-user-", "project_user")
+
+	_, _, configName := testutil.MkNames("test-oidc-configuration", "platform_oidc_configuration")
+	_, fqrn, identityMappingName := testutil.MkNames("test-oidc-identity-mapping", "platform_oidc_identity_mapping")
+
+	temp := `
+	resource "artifactory_managed_user" "{{ .username }}" {
+		name     = "{{ .username }}"
+		email    = "{{ .email }}"
+		password = "Password1!"
+		admin    = false
+	}
+		
+	resource "project" "{{ .projectName }}" {
+		key = "{{ .projectKey }}"
+		display_name = "{{ .projectName }}"
+		description = "test description"
+		admin_privileges {
+			manage_members = true
+			manage_resources = true
+			index_resources = true
+		}
+		max_storage_in_gibibytes = 1
+		block_deployments_on_limit = true
+		email_notification = false
+	}
+	
+	resource "project_role" "role1" {
+		name = "role1"
+		type = "CUSTOM"
+		project_key = project.{{ .projectName }}.key
+		
+		environments = ["DEV"]
+		actions = ["READ_REPOSITORY"]
+	}
+
+	resource "project_role" "role2" {
+		name = "role2"
+		type = "CUSTOM"
+		project_key = project.{{ .projectName }}.key
+		
+		environments = ["DEV"]
+		actions = ["READ_REPOSITORY"]
+	}
+
+	resource "project_user" "{{ .username }}" {
+		project_key = project.{{ .projectName }}.key
+		name = artifactory_managed_user.{{ .username }}.name
+		roles = ["Project Admin"]
+	}
+
 	resource "platform_oidc_configuration" "{{ .configName }}" {
 		name          = "{{ .configName }}"
 		description   = "Test description"
@@ -150,13 +291,18 @@ func TestAccOIDCIdentityMapping_roles_scope(t *testing.T) {
 			updated_at = 1490198843
 		})
 		token_spec = {
-            scope      = "applied-permissions/roles:myProject:\"developer\",\"qa\""
+			username   = project_user.{{ .username }}.name
+			scope      = "applied-permissions/roles:\"${project_role.role1.name}\",\"${project_role.role2.name}\""
 			audience   = "*@*"
 			expires_in = 120
 		}
 	}`
 
 	testData := map[string]string{
+		"username":            userName,
+		"email":               userName + "@tempurl.org",
+		"projectName":         projectName,
+		"projectKey":          projectKey,
 		"configName":          configName,
 		"identityMappingName": identityMappingName,
 		"issuerURL":           "https://tempurl.org",
@@ -164,13 +310,20 @@ func TestAccOIDCIdentityMapping_roles_scope(t *testing.T) {
 		"audience":            "test-audience",
 		"priority":            fmt.Sprintf("%d", testutil.RandomInt()),
 		"sub":                 fmt.Sprintf("test-subscriber-%d", testutil.RandomInt()),
-        "scope":               "applied-permissions/roles:myProject:\"developer\",\"qa\"",
 	}
 
 	config := util.ExecuteTemplate(identityMappingName, temp, testData)
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
+		PreCheck: func() { testAccPreCheck(t) },
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"artifactory": {
+				Source: "jfrog/artifactory",
+			},
+			"project": {
+				Source: "jfrog/project",
+			},
+		},
 		ProtoV6ProviderFactories: testAccProviders(),
 		Steps: []resource.TestStep{
 			{
@@ -179,14 +332,13 @@ func TestAccOIDCIdentityMapping_roles_scope(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "name", testData["identityMappingName"]),
 					resource.TestCheckResourceAttr(fqrn, "priority", testData["priority"]),
 					resource.TestCheckResourceAttr(fqrn, "claims_json", fmt.Sprintf("{\"sub\":\"%s\",\"updated_at\":1490198843}", testData["sub"])),
-					resource.TestCheckResourceAttr(fqrn, "token_spec.scope", "applied-permissions/roles:myProject:\"developer\",\"qa\""),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.scope", "applied-permissions/roles:\"role1\",\"role2\""),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.audience", "*@*"),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.expires_in", "120"),
 				),
 			},
 		},
 	})
-
 }
 
 func TestAccOIDCIdentityMapping_groups_scope(t *testing.T) {
@@ -226,7 +378,6 @@ func TestAccOIDCIdentityMapping_groups_scope(t *testing.T) {
 		"audience":            "test-audience",
 		"priority":            fmt.Sprintf("%d", testutil.RandomInt()),
 		"sub":                 fmt.Sprintf("test-subscriber-%d", testutil.RandomInt()),
-		"scope":               "applied-permissions/groups:\"readers\",\"test\"",
 	}
 
 	config := util.ExecuteTemplate(identityMappingName, temp, testData)

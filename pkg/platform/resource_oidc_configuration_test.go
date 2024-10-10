@@ -1,7 +1,9 @@
 package platform_test
 
 import (
+	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -70,6 +72,71 @@ func TestAccOIDCConfiguration_full(t *testing.T) {
 				ResourceName:                         fqrn,
 				ImportState:                          true,
 				ImportStateId:                        configName,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "name",
+			},
+		},
+	})
+}
+
+func TestAccOIDCConfiguration_with_project(t *testing.T) {
+	_, _, projectName := testutil.MkNames("test-project-", "project")
+	projectKey := strings.ToLower(fmt.Sprintf("proj%d", testutil.RandomInt()))
+	_, fqrn, configName := testutil.MkNames("test-oidc-configuration", "platform_oidc_configuration")
+
+	temp := `
+	resource "project" "{{ .projectName }}" {
+		key = "{{ .projectKey }}"
+		display_name = "{{ .projectName }}"
+		description = "test description"
+		admin_privileges {
+			manage_members = true
+			manage_resources = true
+			index_resources = true
+		}
+		max_storage_in_gibibytes = 1
+		block_deployments_on_limit = true
+		email_notification = false
+	}
+
+	resource "platform_oidc_configuration" "{{ .name }}" {
+		name          = "{{ .name }}"
+		issuer_url    = "{{ .issuerURL }}"
+		provider_type = "{{ .providerType }}"
+		project_key   = project.{{ .projectName }}.key
+	}`
+
+	testData := map[string]string{
+		"projectName":  projectName,
+		"projectKey":   projectKey,
+		"name":         configName,
+		"issuerURL":    "https://tempurl.org",
+		"providerType": "generic",
+	}
+
+	config := util.ExecuteTemplate(configName, temp, testData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() { testAccPreCheck(t) },
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"project": {
+				Source: "jfrog/project",
+			},
+		},
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
+					resource.TestCheckResourceAttr(fqrn, "issuer_url", testData["issuerURL"]),
+					resource.TestCheckResourceAttr(fqrn, "provider_type", testData["providerType"]),
+				),
+			},
+			{
+				ResourceName:                         fqrn,
+				ImportState:                          true,
+				ImportStateId:                        fmt.Sprintf("%s:%s", configName, projectKey),
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
 			},
