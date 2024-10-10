@@ -43,6 +43,7 @@ resource "platform_oidc_configuration" "my-generic-oidc-configuration" {
 
 - `audience` (String) Informational field that you can use to include details of the audience that uses the OIDC configuration.
 - `description` (String) Description of the OIDC provider
+- `project_key` (String) If set, this Identity Configuration will be available in the scope of the given project (editable by platform admin and project admin). If not set, this Identity Configuration will be global and only editable by platform admin. Once set, the projectKey cannot be changed.
 
 ## Import
 
@@ -50,4 +51,6 @@ Import is supported using the following syntax:
 
 ```shell
 terraform import platform_oidc_configuration.my-oidc-configuration my-oidc-configuration
+
+terraform import platform_oidc_configuration.my-oidc-configuration my-oidc-configuration:myproj
 ```

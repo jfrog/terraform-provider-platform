@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -16,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/jfrog/terraform-provider-shared/util"
 	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
+	validatorfw_string "github.com/jfrog/terraform-provider-shared/validator/fw/string"
 )
 
 const (
@@ -88,6 +90,16 @@ func (r *odicConfigurationResource) Schema(ctx context.Context, req resource.Sch
 				},
 				Description: "Informational field that you can use to include details of the audience that uses the OIDC configuration.",
 			},
+			"project_key": schema.StringAttribute{
+				Optional: true,
+				Validators: []validator.String{
+					validatorfw_string.ProjectKey(),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+				Description: "If set, this Identity Configuration will be available in the scope of the given project (editable by platform admin and project admin). If not set, this Identity Configuration will be global and only editable by platform admin. Once set, the projectKey cannot be changed.",
+			},
 		},
 		MarkdownDescription: "Manage OIDC configuration in JFrog platform. See the JFrog [OIDC configuration documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-an-oidc-integration) for more information.",
 	}
@@ -116,6 +128,7 @@ type odicConfigurationResourceModel struct {
 	IssuerURL    types.String `tfsdk:"issuer_url"`
 	ProviderType types.String `tfsdk:"provider_type"`
 	Audience     types.String `tfsdk:"audience"`
+	ProjectKey   types.String `tfsdk:"project_key"`
 }
 
 type odicConfigurationAPIModel struct {
@@ -124,6 +137,7 @@ type odicConfigurationAPIModel struct {
 	IssuerURL    string `json:"issuer_url"`
 	ProviderType string `json:"provider_type"`
 	Audience     string `json:"audience,omitempty"`
+	ProjectKey   string `json:"project_key,omitempty"`
 }
 
 func (r *odicConfigurationResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -155,6 +169,7 @@ func (r *odicConfigurationResource) Create(ctx context.Context, req resource.Cre
 		ProviderType: providerType,
 		Audience:     plan.Audience.ValueString(),
 		Description:  plan.Description.ValueString(),
+		ProjectKey:   plan.ProjectKey.ValueString(),
 	}
 
 	response, err := r.ProviderData.Client.R().
@@ -251,6 +266,7 @@ func (r *odicConfigurationResource) Update(ctx context.Context, req resource.Upd
 		ProviderType: providerType,
 		Audience:     plan.Audience.ValueString(),
 		Description:  plan.Description.ValueString(),
+		ProjectKey:   plan.ProjectKey.ValueString(),
 	}
 
 	response, err := r.ProviderData.Client.R().
@@ -299,5 +315,13 @@ func (r *odicConfigurationResource) Delete(ctx context.Context, req resource.Del
 }
 
 func (r *odicConfigurationResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("name"), req, resp)
+	parts := strings.SplitN(req.ID, ":", 2)
+
+	if len(parts) > 0 && parts[0] != "" {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), parts[0])...)
+	}
+
+	if len(parts) == 2 && parts[1] != "" {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_key"), parts[1])...)
+	}
 }

@@ -65,19 +65,20 @@ resource "platform_oidc_identity_mapping" "my-github-oidc-group-identity-mapping
 ### Optional
 
 - `description` (String) Description of the OIDC mapping
+- `project_key` (String) If set, this Identity Mapping will be available in the scope of the given project (editable by platform admin and project admin). If not set, this Identity Mapping will be global and only editable by platform admin. Once set, the projectKey cannot be changed.
 
 <a id="nestedatt--token_spec"></a>
 ### Nested Schema for `token_spec`
 
 Required:
 
-- `scope` (String) Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\"readers\",\"my-group\",`
+- `scope` (String) Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, `applied-permissions/roles:`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\"readers\",\"my-group\",` Role permissions must be comma-separated, double quotes wrapped, e.g. `applied-permissions:roles:"Developer","Viewer". `username` is also required when setting role permission.
 
 Optional:
 
 - `audience` (String) Sets of (space separated) the JFrog services to which the mapping applies. Default value is `*@*`, which applies to all services.
 - `expires_in` (Number) Token expiry time in seconds. Default value is 60.
-- `username` (String) User name of the OIDC user. Not applicable when `scope` is set to `applied-permissions/groups`
+- `username` (String) User name of the OIDC user. Not applicable when `scope` is set to `applied-permissions/groups`. Must be set when `scope` is set to `applied-permissions/roles`.
 
 ## Import
 
@@ -85,4 +86,6 @@ Import is supported using the following syntax:
 
 ```shell
 terraform import platform_oidc_identity_mapping.my-oidc-identity-mapping my-oidc-identity-mapping:my-oidc-configuration
+
+terraform import platform_oidc_identity_mapping.my-oidc-identity-mapping my-oidc-identity-mapping:my-oidc-configuration:myproj
 ```
