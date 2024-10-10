@@ -1,4 +1,4 @@
-## 1.14.0 (October 12, 2024). Tested on Artifactory 7.90.14 with Terraform 1.9.7 and OpenTofu 1.8.3
+## 1.14.0 (October 11, 2024). Tested on Artifactory 7.90.14 with Terraform 1.9.7 and OpenTofu 1.8.3
 
 IMPROVEMENTS:
 
