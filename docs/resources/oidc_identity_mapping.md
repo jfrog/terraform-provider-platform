@@ -72,13 +72,13 @@ resource "platform_oidc_identity_mapping" "my-github-oidc-group-identity-mapping
 
 Required:
 
-- `scope` (String) Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, `applied-permissions/roles:`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\"readers\",\"my-group\",` Role permissions must be comma-separated, double quotes wrapped, e.g. `applied-permissions:roles:"Developer","Viewer"
+- `scope` (String) Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, `applied-permissions/roles:`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\"readers\",\"my-group\",` Role permissions must be comma-separated, double quotes wrapped, e.g. `applied-permissions:roles:"Developer","Viewer". `username` is also required when setting role permission.
 
 Optional:
 
 - `audience` (String) Sets of (space separated) the JFrog services to which the mapping applies. Default value is `*@*`, which applies to all services.
 - `expires_in` (Number) Token expiry time in seconds. Default value is 60.
-- `username` (String) User name of the OIDC user. Not applicable when `scope` is set to `applied-permissions/groups`
+- `username` (String) User name of the OIDC user. Not applicable when `scope` is set to `applied-permissions/groups`. Must be set when `scope` is set to `applied-permissions/roles`.
 
 ## Import
 

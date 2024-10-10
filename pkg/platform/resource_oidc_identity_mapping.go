@@ -92,7 +92,7 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 						Validators: []validator.String{
 							stringvalidator.LengthAtLeast(1),
 						},
-						Description: "User name of the OIDC user. Not applicable when `scope` is set to `applied-permissions/groups`",
+						Description: "User name of the OIDC user. Not applicable when `scope` is set to `applied-permissions/groups`. Must be set when `scope` is set to `applied-permissions/roles`.",
 					},
 					"scope": schema.StringAttribute{
 						Required: true,
@@ -102,7 +102,7 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 								"must start with either 'applied-permissions/admin', 'applied-permissions/user', 'applied-permissions/groups:', or 'applied-permissions/roles:'",
 							),
 						},
-						MarkdownDescription: "Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, `applied-permissions/roles:`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\\\"readers\\\",\\\"my-group\\\",` Role permissions must be comma-separated, double quotes wrapped, e.g. `applied-permissions:roles:\"Developer\",\"Viewer\"",
+						MarkdownDescription: "Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, `applied-permissions/roles:`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\\\"readers\\\",\\\"my-group\\\",` Role permissions must be comma-separated, double quotes wrapped, e.g. `applied-permissions:roles:\"Developer\",\"Viewer\". `username` is also required when setting role permission.",
 					},
 					"audience": schema.StringAttribute{
 						Optional: true,
