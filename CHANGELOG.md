@@ -1,3 +1,9 @@
+## 1.15.0 (October 16, 2024)
+
+IMPROVEMENTS:
+
+* provider: Add `tfc_credential_tag_name` configuration attribute to support use of different/[multiple Workload Identity Token in Terraform Cloud Platform](https://developer.hashicorp.com/terraform/cloud-docs/workspaces/dynamic-provider-credentials/manual-generation#generating-multiple-tokens). Issue: [#68](https://github.com/jfrog/terraform-provider-shared/issues/68) PR: [#139](https://github.com/jfrog/terraform-provider-platform/pull/139)
+
 ## 1.14.0 (October 11, 2024). Tested on Artifactory 7.90.14 with Terraform 1.9.7 and OpenTofu 1.8.3
 
 IMPROVEMENTS:
