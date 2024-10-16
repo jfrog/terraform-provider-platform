@@ -3,9 +3,11 @@ PRODUCT=platform
 GO_ARCH=$(shell go env GOARCH)
 TARGET_ARCH=$(shell go env GOOS)_${GO_ARCH}
 GORELEASER_ARCH=${TARGET_ARCH}
+LINUX_GORELEASER_ARCH=linux_${GO_ARCH}
 
 ifeq ($(GO_ARCH), amd64)
 GORELEASER_ARCH=${TARGET_ARCH}_$(shell go env GOAMD64)
+LINUX_GORELEASER_ARCH:=${LINUX_GORELEASER_ARCH}_$(shell go env GOAMD64)
 endif
 
 PKG_NAME=pkg/${PRODUCT}
@@ -25,6 +27,7 @@ TF_ACC_PROVIDER_HOST="registry.opentofu.org"
 endif
 
 BUILD_PATH=terraform.d/plugins/${REGISTRY_HOST}/jfrog/${PRODUCT}/${NEXT_VERSION}/${TARGET_ARCH}
+LINUX_BUILD_PATH=terraform.d/plugins/${REGISTRY_HOST}/jfrog/${PRODUCT}/${NEXT_VERSION}/linux_amd64
 
 SONAR_SCANNER_VERSION?=4.7.0.2747
 SONAR_SCANNER_HOME?=${HOME}/.sonar/sonar-scanner-${SONAR_SCANNER_VERSION}-macosx
@@ -34,10 +37,14 @@ default: build
 install: clean build
 	rm -fR .terraform.d && \
 	mkdir -p ${BUILD_PATH} && \
+	mkdir -p ${LINUX_BUILD_PATH} && \
 		mv -v dist/terraform-provider-${PRODUCT}_${GORELEASER_ARCH}/terraform-provider-${PRODUCT}_v${NEXT_VERSION}* ${BUILD_PATH} && \
 		rm -f .terraform.lock.hcl && \
 		sed -i.bak '0,/version = ".*"/s//version = "${NEXT_VERSION}"/' sample.tf && rm sample.tf.bak && \
 		${TERRAFORM_CLI} init
+
+		# move this line up when testing on TFC
+		# mv -v dist/terraform-provider-${PRODUCT}_${LINUX_GORELEASER_ARCH}/terraform-provider-${PRODUCT}_v${NEXT_PROVIDER_VERSION}* ${LINUX_BUILD_PATH} && \
 
 clean:
 	rm -fR dist terraform.d/ .terraform terraform.tfstate* .terraform.lock.hcl
@@ -52,7 +59,7 @@ update_pkg_cache:
 	GOPROXY=https://proxy.golang.org GO111MODULE=on go get github.com/jfrog/terraform-provider-${PRODUCT}@v${VERSION}
 
 build: fmt
-	GORELEASER_CURRENT_TAG=${NEXT_VERSION} goreleaser build --single-target --clean --snapshot
+	GORELEASER_CURRENT_TAG=${NEXT_VERSION} goreleaser build --clean --snapshot # --single-target
 
 test:
 	@echo "==> Starting unit tests"
