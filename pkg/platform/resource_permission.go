@@ -67,14 +67,14 @@ var usersGroupsAttributeSchema = func(description string) schema.SetNestedAttrib
 			},
 		},
 		Optional: true,
+		Computed: true,
+		Default:  setdefault.StaticValue(types.SetValueMust(usersGroupsResourceModelAttributeTypes, []attr.Value{})),
 		Validators: []validator.Set{
 			setvalidator.AtLeastOneOf(path.MatchRelative().AtParent().AtName("users"), path.MatchRelative().AtParent().AtName("groups")),
-			setvalidator.SizeAtLeast(1),
 		},
 		PlanModifiers: []planmodifier.Set{
 			setplanmodifier.UseStateForUnknown(),
 		},
-		MarkdownDescription: "Must contain at least one item.",
 	}
 }
 
@@ -449,7 +449,7 @@ func (r *permissionResourceModel) toResourceAPIModel(ctx context.Context, tfReso
 		return
 	}
 
-	actions := permissionActionsAPIModel{}
+	var actions *permissionActionsAPIModel
 	if !resource.Actions.IsNull() {
 		var actionsResource permissionActionsResourceModel
 		ds.Append(resource.Actions.As(ctx, &actionsResource, basetypes.ObjectAsOptions{})...)
@@ -458,7 +458,7 @@ func (r *permissionResourceModel) toResourceAPIModel(ctx context.Context, tfReso
 		}
 
 		users := make(map[string][]string)
-		if !actionsResource.Users.IsNull() {
+		if !actionsResource.Users.IsNull() || len(actionsResource.Users.Elements()) > 0 {
 			var usersResources []permissionUsersGroupsResourceModel
 			ds.Append(actionsResource.Users.ElementsAs(ctx, &usersResources, false)...)
 			if ds.HasError() {
@@ -472,7 +472,7 @@ func (r *permissionResourceModel) toResourceAPIModel(ctx context.Context, tfReso
 		}
 
 		groups := make(map[string][]string)
-		if !actionsResource.Groups.IsNull() {
+		if !actionsResource.Groups.IsNull() || len(actionsResource.Groups.Elements()) > 0 {
 			var groupsResources []permissionUsersGroupsResourceModel
 			ds.Append(actionsResource.Groups.ElementsAs(ctx, &groupsResources, false)...)
 			if ds.HasError() {
@@ -485,7 +485,7 @@ func (r *permissionResourceModel) toResourceAPIModel(ctx context.Context, tfReso
 			}
 		}
 
-		actions = permissionActionsAPIModel{
+		actions = &permissionActionsAPIModel{
 			Users:  users,
 			Groups: groups,
 		}
@@ -511,7 +511,7 @@ func (r *permissionResourceModel) toResourceAPIModel(ctx context.Context, tfReso
 	}
 
 	*apiResource = permissionActionsTargetsAPIModel{
-		Actions: &actions,
+		Actions: actions,
 		Targets: targets,
 	}
 
@@ -591,11 +591,6 @@ var resourceResourceModelAttributeTypes map[string]attr.Type = map[string]attr.T
 }
 
 func (r *permissionResourceModel) fromUsersGroupsAPIModel(ctx context.Context, usersGroups map[string][]string) (set types.Set, ds diag.Diagnostics) {
-	if len(usersGroups) == 0 {
-		set = types.SetNull(usersGroupsResourceModelAttributeTypes)
-		return
-	}
-
 	userGroupSet := lo.MapToSlice(
 		usersGroups,
 		func(name string, permissions []string) attr.Value {
@@ -645,8 +640,7 @@ func (r *permissionResourceModel) fromResourceAPIModel(ctx context.Context, reso
 	}
 
 	actions := types.ObjectNull(actionsResourceModelAttributeTypes)
-	if resourceAPIModel.Actions != nil &&
-		(len(resourceAPIModel.Actions.Users) > 0 || len(resourceAPIModel.Actions.Groups) > 0) {
+	if resourceAPIModel.Actions != nil {
 		usersSet, d := r.fromUsersGroupsAPIModel(ctx, resourceAPIModel.Actions.Users)
 		if d != nil {
 			ds = append(ds, d...)
@@ -776,13 +770,13 @@ type PermissionAPIModel struct {
 }
 
 type permissionActionsTargetsAPIModel struct {
-	Actions *permissionActionsAPIModel           `json:"actions"`
-	Targets map[string]permissionTargetsAPIModel `json:"targets"`
+	Actions *permissionActionsAPIModel           `json:"actions,omitempty"`
+	Targets map[string]permissionTargetsAPIModel `json:"targets,omitempty"`
 }
 
 type permissionActionsAPIModel struct {
-	Users  map[string][]string `json:"users"`
-	Groups map[string][]string `json:"groups"`
+	Users  map[string][]string `json:"users,omitempty"`
+	Groups map[string][]string `json:"groups,omitempty"`
 }
 
 type permissionTargetsAPIModel struct {
