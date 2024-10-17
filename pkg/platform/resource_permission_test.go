@@ -91,6 +91,8 @@ func TestAccPermission_full(t *testing.T) {
 						permissions = ["READ", "WRITE"]
 					}
 				]
+
+				groups = []
 			}
 
 			targets = [
@@ -115,6 +117,11 @@ func TestAccPermission_full(t *testing.T) {
 		}
 
 		build = {
+			actions = {
+				users = []
+				groups = []
+			}
+
 			targets = [
 				{
 					name = "artifactory-build-info"
@@ -245,9 +252,9 @@ func TestAccPermission_full(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.0.permissions.#", "2"),
 					resource.TestCheckTypeSetElemAttr(fqrn, "artifact.actions.users.0.permissions.*", "READ"),
 					resource.TestCheckTypeSetElemAttr(fqrn, "artifact.actions.users.0.permissions.*", "WRITE"),
-					resource.TestCheckNoResourceAttr(fqrn, "artifact.actions.groups"),
+					resource.TestCheckResourceAttr(fqrn, "artifact.actions.groups.#", "0"),
 					resource.TestCheckResourceAttr(fqrn, "artifact.targets.#", "4"),
-					resource.TestCheckNoResourceAttr(fqrn, "build.actions"),
+					resource.TestCheckResourceAttr(fqrn, "build.actions.users.#", "0"),
 					resource.TestCheckResourceAttr(fqrn, "build.targets.#", "1"),
 					resource.TestCheckResourceAttr(fqrn, "build.targets.0.name", "artifactory-build-info"),
 					resource.TestCheckResourceAttr(fqrn, "build.targets.0.include_patterns.#", "1"),
@@ -506,15 +513,15 @@ func TestAccPermission_empty_users_state_migration(t *testing.T) {
 				},
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
-					resource.TestCheckNoResourceAttr(fqrn, "artifact.actions.users"),
+					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.#", "0"),
 					resource.TestCheckResourceAttr(fqrn, "artifact.actions.groups.#", "1"),
-					resource.TestCheckNoResourceAttr(fqrn, "build.actions.users"),
+					resource.TestCheckResourceAttr(fqrn, "build.actions.users.#", "0"),
 					resource.TestCheckResourceAttr(fqrn, "build.actions.groups.#", "1"),
-					resource.TestCheckNoResourceAttr(fqrn, "release_bundle.actions.users"),
+					resource.TestCheckResourceAttr(fqrn, "release_bundle.actions.users.#", "0"),
 					resource.TestCheckResourceAttr(fqrn, "release_bundle.actions.groups.#", "1"),
-					resource.TestCheckNoResourceAttr(fqrn, "destination.actions.users"),
+					resource.TestCheckResourceAttr(fqrn, "destination.actions.users.#", "0"),
 					resource.TestCheckResourceAttr(fqrn, "destination.actions.groups.#", "1"),
-					resource.TestCheckNoResourceAttr(fqrn, "pipeline_source.actions.users"),
+					resource.TestCheckResourceAttr(fqrn, "pipeline_source.actions.users.#", "0"),
 					resource.TestCheckResourceAttr(fqrn, "pipeline_source.actions.groups.#", "1"),
 				),
 			},
@@ -587,7 +594,7 @@ func TestAccPermission_no_users_state_migration(t *testing.T) {
 				},
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
-					resource.TestCheckNoResourceAttr(fqrn, "artifact.actions.users"),
+					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.#", "0"),
 					resource.TestCheckResourceAttr(fqrn, "artifact.actions.groups.#", "1"),
 				),
 			},
@@ -805,15 +812,15 @@ func TestAccPermission_empty_groups_state_migration(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
 					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.#", "1"),
-					resource.TestCheckNoResourceAttr(fqrn, "artifact.actions.groups"),
+					resource.TestCheckResourceAttr(fqrn, "artifact.actions.groups.#", "0"),
 					resource.TestCheckResourceAttr(fqrn, "build.actions.users.#", "1"),
-					resource.TestCheckNoResourceAttr(fqrn, "build.actions.groups"),
+					resource.TestCheckResourceAttr(fqrn, "build.actions.groups.#", "0"),
 					resource.TestCheckResourceAttr(fqrn, "release_bundle.actions.users.#", "1"),
-					resource.TestCheckNoResourceAttr(fqrn, "release_bundle.actions.groups"),
+					resource.TestCheckResourceAttr(fqrn, "release_bundle.actions.groups.#", "0"),
 					resource.TestCheckResourceAttr(fqrn, "destination.actions.users.#", "1"),
-					resource.TestCheckNoResourceAttr(fqrn, "destination.actions.groups"),
+					resource.TestCheckResourceAttr(fqrn, "destination.actions.groups.#", "0"),
 					resource.TestCheckResourceAttr(fqrn, "pipeline_source.actions.users.#", "1"),
-					resource.TestCheckNoResourceAttr(fqrn, "pipeline_source.actions.groups"),
+					resource.TestCheckResourceAttr(fqrn, "pipeline_source.actions.groups.#", "0"),
 				),
 			},
 		},
@@ -888,7 +895,7 @@ func TestAccPermission_no_groups_state_migration(t *testing.T) {
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
 					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.#", "1"),
-					resource.TestCheckNoResourceAttr(fqrn, "artifact.actions.groups"),
+					resource.TestCheckResourceAttr(fqrn, "artifact.actions.groups.#", "0"),
 				),
 			},
 		},

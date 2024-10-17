@@ -1,3 +1,9 @@
+## 1.15.1 (October 18, 2024). Tested on Artifactory 7.90.14 with Terraform 1.9.8 and OpenTofu 1.8.3
+
+IMPROVEMENTS:
+
+* resource/artifactory_local_repository_multi_replication: Update validation for `actions.users` and `actions.groups` attributes to allow empty list. Issue: [#142](https://github.com/jfrog/terraform-provider-platform/issues/142) PR: [#143](https://github.com/jfrog/terraform-provider-platform/pull/143)
+
 ## 1.15.0 (October 16, 2024). Tested on Artifactory 7.90.14 with Terraform 1.9.7 and OpenTofu 1.8.3
 
 IMPROVEMENTS:
