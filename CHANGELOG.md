@@ -1,3 +1,9 @@
+## 1.16.0 (November 1, 2024). Tested on Artifactory 7.98.7 with Terraform 1.9.8 and OpenTofu 1.8.4
+
+IMPROVEMENTS:
+
+* resource/platform_oidc_identity_mapping: Add `username_pattern` and `groups_pattern` attributes to username and groups patterns. Attribute `scope` is now optional to support patterns. Issue: [#145](https://github.com/jfrog/terraform-provider-platform/issues/145) PR: [#147](https://github.com/jfrog/terraform-provider-platform/pull/147)
+
 ## 1.15.1 (October 18, 2024). Tested on Artifactory 7.90.14 with Terraform 1.9.8 and OpenTofu 1.8.3
 
 IMPROVEMENTS:

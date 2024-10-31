@@ -90,19 +90,48 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 					"username": schema.StringAttribute{
 						Optional: true,
 						Validators: []validator.String{
+							stringvalidator.AlsoRequires(
+								path.MatchRelative().AtParent().AtName("scope"),
+							),
+							stringvalidator.ConflictsWith(
+								path.MatchRelative().AtParent().AtName("username_pattern"),
+								path.MatchRelative().AtParent().AtName("groups_pattern"),
+							),
 							stringvalidator.LengthAtLeast(1),
 						},
 						Description: "User name of the OIDC user. Not applicable when `scope` is set to `applied-permissions/groups`. Must be set when `scope` is set to `applied-permissions/roles`.",
 					},
+					"username_pattern": schema.StringAttribute{
+						Optional: true,
+						Validators: []validator.String{
+							stringvalidator.ConflictsWith(
+								path.MatchRelative().AtParent().AtName("username"),
+								path.MatchRelative().AtParent().AtName("groups_pattern"),
+							),
+							stringvalidator.LengthAtLeast(1),
+						},
+						Description: "Provide a pattern which is used to map OIDC user to Artifactory user.",
+					},
+					"groups_pattern": schema.StringAttribute{
+						Optional: true,
+						Validators: []validator.String{
+							stringvalidator.ConflictsWith(
+								path.MatchRelative().AtParent().AtName("username"),
+								path.MatchRelative().AtParent().AtName("username_pattern"),
+							),
+							stringvalidator.LengthAtLeast(1),
+						},
+						Description: "Provide a pattern which is used to map OIDC groups to Artifactory groups.",
+					},
 					"scope": schema.StringAttribute{
-						Required: true,
+						Optional: true,
 						Validators: []validator.String{
 							stringvalidator.RegexMatches(
 								regexp.MustCompile(`^(applied-permissions\/admin|applied-permissions\/user|applied-permissions\/groups:.+|applied-permissions\/roles:.+)$`),
 								"must start with either 'applied-permissions/admin', 'applied-permissions/user', 'applied-permissions/groups:', or 'applied-permissions/roles:'",
 							),
 						},
-						MarkdownDescription: "Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, `applied-permissions/roles:`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\\\"readers\\\",\\\"my-group\\\",` Role permissions must be comma-separated, double quotes wrapped, e.g. `applied-permissions:roles:\"Developer\",\"Viewer\". `username` is also required when setting role permission.",
+						MarkdownDescription: "Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, `applied-permissions/roles:`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\\\"readers\\\",\\\"my-group\\\",` Role permissions are only applicable when in project scope and must be comma-separated, double quotes wrapped, e.g. `applied-permissions:roles:<project-key>:\"Developer\",\"Viewer\". `username` is also required when setting role permission.",
 					},
 					"audience": schema.StringAttribute{
 						Optional: true,
@@ -151,17 +180,21 @@ type odicIdentityMappingResourceModel struct {
 }
 
 type odicIdentityMappingTokenSpecResourceModel struct {
-	Username  types.String `tfsdk:"username"`
-	Scope     types.String `tfsdk:"scope"`
-	Audience  types.String `tfsdk:"audience"`
-	ExpiresIn types.Int64  `tfsdk:"expires_in"`
+	Username        types.String `tfsdk:"username"`
+	UsernamePattern types.String `tfsdk:"username_pattern"`
+	GroupsPattern   types.String `tfsdk:"groups_pattern"`
+	Scope           types.String `tfsdk:"scope"`
+	Audience        types.String `tfsdk:"audience"`
+	ExpiresIn       types.Int64  `tfsdk:"expires_in"`
 }
 
 var odicIdentityMappingTokenSpecResourceModelAttributeType map[string]attr.Type = map[string]attr.Type{
-	"username":   types.StringType,
-	"scope":      types.StringType,
-	"audience":   types.StringType,
-	"expires_in": types.Int64Type,
+	"username":         types.StringType,
+	"username_pattern": types.StringType,
+	"groups_pattern":   types.StringType,
+	"scope":            types.StringType,
+	"audience":         types.StringType,
+	"expires_in":       types.Int64Type,
 }
 
 func (r *odicIdentityMappingResourceModel) toAPIModel(ctx context.Context, apiModel *odicIdentityMappingAPIModel) (ds diag.Diagnostics) {
@@ -187,10 +220,12 @@ func (r *odicIdentityMappingResourceModel) toAPIModel(ctx context.Context, apiMo
 		Priority:     r.Priority.ValueInt64(),
 		Claims:       claims,
 		TokenSpec: odicIdentityMappingTokenSpecAPIModel{
-			Username:  tokenSpec.Username.ValueString(),
-			Scope:     tokenSpec.Scope.ValueString(),
-			Audience:  tokenSpec.Audience.ValueString(),
-			ExpiresIn: tokenSpec.ExpiresIn.ValueInt64(),
+			Username:        tokenSpec.Username.ValueString(),
+			UsernamePattern: tokenSpec.UsernamePattern.ValueString(),
+			GroupsPattern:   tokenSpec.GroupsPattern.ValueString(),
+			Scope:           tokenSpec.Scope.ValueString(),
+			Audience:        tokenSpec.Audience.ValueString(),
+			ExpiresIn:       tokenSpec.ExpiresIn.ValueInt64(),
 		},
 		ProjectKey: r.ProjectKey.ValueString(),
 	}
@@ -218,12 +253,25 @@ func (r *odicIdentityMappingResourceModel) fromAPIModel(ctx context.Context, api
 	r.ClaimsJSON = types.StringValue(string(claimsBytes))
 
 	tokenSpecResource := odicIdentityMappingTokenSpecResourceModel{
-		Scope:     types.StringValue(apiModel.TokenSpec.Scope),
 		ExpiresIn: types.Int64Value(apiModel.TokenSpec.ExpiresIn),
 	}
+
 	if len(apiModel.TokenSpec.Username) > 0 {
 		tokenSpecResource.Username = types.StringValue(apiModel.TokenSpec.Username)
 	}
+
+	if len(apiModel.TokenSpec.UsernamePattern) > 0 {
+		tokenSpecResource.UsernamePattern = types.StringValue(apiModel.TokenSpec.UsernamePattern)
+	}
+
+	if len(apiModel.TokenSpec.GroupsPattern) > 0 {
+		tokenSpecResource.GroupsPattern = types.StringValue(apiModel.TokenSpec.GroupsPattern)
+	}
+
+	if len(apiModel.TokenSpec.Scope) > 0 {
+		tokenSpecResource.Scope = types.StringValue(apiModel.TokenSpec.Scope)
+	}
+
 	if len(apiModel.TokenSpec.Audience) > 0 {
 		tokenSpecResource.Audience = types.StringValue(apiModel.TokenSpec.Audience)
 	}
@@ -255,10 +303,12 @@ type odicIdentityMappingAPIModel struct {
 }
 
 type odicIdentityMappingTokenSpecAPIModel struct {
-	Username  string `json:"username,omitempty"`
-	Scope     string `json:"scope"`
-	Audience  string `json:"audience"`
-	ExpiresIn int64  `json:"expires_in"`
+	Username        string `json:"username,omitempty"`
+	UsernamePattern string `json:"username_pattern,omitempty"`
+	GroupsPattern   string `json:"groups_pattern,omitempty"`
+	Scope           string `json:"scope"`
+	Audience        string `json:"audience"`
+	ExpiresIn       int64  `json:"expires_in"`
 }
 
 func (r *odicIdentityMappingResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {

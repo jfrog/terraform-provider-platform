@@ -219,7 +219,233 @@ func TestAccOIDCIdentityMapping_with_project(t *testing.T) {
 	})
 }
 
-func TestAccOIDCIdentityMapping_roles_scope(t *testing.T) {
+func TestAccOIDCIdentityMapping_username_pattern(t *testing.T) {
+	_, _, configName := testutil.MkNames("test-oidc-configuration", "platform_oidc_configuration")
+	_, fqrn, identityMappingName := testutil.MkNames("test-oidc-identity-mapping", "platform_oidc_identity_mapping")
+
+	temp := `
+	resource "platform_oidc_configuration" "{{ .configName }}" {
+		name          = "{{ .configName }}"
+		issuer_url    = "{{ .issuerURL }}"
+		provider_type = "{{ .providerType }}"
+		audience      = "{{ .audience }}"
+	}
+
+	resource "platform_oidc_identity_mapping" "{{ .identityMappingName }}" {
+		name          = "{{ .identityMappingName }}"
+		provider_name = platform_oidc_configuration.{{ .configName }}.name
+		priority      = {{ .priority }}
+		claims_json   = jsonencode({
+			sub = "{{ .sub }}",
+			updated_at = 1490198843
+		})
+		token_spec = {
+			username_pattern = "{{ .username_pattern }}"
+		}
+	}`
+
+	testData := map[string]string{
+		"configName":          configName,
+		"identityMappingName": identityMappingName,
+		"issuerURL":           "https://tempurl.org",
+		"providerType":        "generic",
+		"audience":            "test-audience",
+		"priority":            fmt.Sprintf("%d", testutil.RandomInt()),
+		"sub":                 fmt.Sprintf("test-subscriber-%d", testutil.RandomInt()),
+		"username_pattern":    "{{user}}",
+	}
+
+	config := util.ExecuteTemplate(identityMappingName, temp, testData)
+
+	updatedTemp := `
+	resource "platform_oidc_configuration" "{{ .configName }}" {
+		name          = "{{ .configName }}"
+		issuer_url    = "{{ .issuerURL }}"
+		provider_type = "{{ .providerType }}"
+		audience      = "{{ .audience }}"
+	}
+
+	resource "platform_oidc_identity_mapping" "{{ .identityMappingName }}" {
+		name          = "{{ .identityMappingName }}"
+		description   = "Test description"
+		provider_name = platform_oidc_configuration.{{ .configName }}.name
+		priority      = {{ .priority }}
+		claims_json   = jsonencode({
+			sub = "{{ .sub }}",
+			updated_at = 1490198843
+		})
+		token_spec = {
+			username_pattern = "{{ .username_pattern }}"
+			audience         = "jfrt@* jfac@* jfmc@* jfmd@* jfevt@* jfxfer@* jflnk@* jfint@* jfwks@*"
+			expires_in       = 120
+		}
+	}`
+
+	updatedTestData := map[string]string{
+		"configName":          configName,
+		"identityMappingName": identityMappingName,
+		"issuerURL":           "https://tempurl.org",
+		"providerType":        "generic",
+		"audience":            "test-audience",
+		"priority":            fmt.Sprintf("%d", testutil.RandomInt()),
+		"sub":                 fmt.Sprintf("test-subscriber-%d", testutil.RandomInt()),
+		"username_pattern":    "{{user}}",
+	}
+
+	updatedConfig := util.ExecuteTemplate(identityMappingName, updatedTemp, updatedTestData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["identityMappingName"]),
+					resource.TestCheckResourceAttr(fqrn, "priority", testData["priority"]),
+					resource.TestCheckResourceAttr(fqrn, "claims_json", fmt.Sprintf("{\"sub\":\"%s\",\"updated_at\":1490198843}", testData["sub"])),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.username_pattern", testData["username_pattern"]),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.audience", "*@*"),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.expires_in", "60"),
+				),
+			},
+			{
+				Config: updatedConfig,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", updatedTestData["identityMappingName"]),
+					resource.TestCheckResourceAttr(fqrn, "description", "Test description"),
+					resource.TestCheckResourceAttr(fqrn, "priority", updatedTestData["priority"]),
+					resource.TestCheckResourceAttr(fqrn, "claims_json", fmt.Sprintf("{\"sub\":\"%s\",\"updated_at\":1490198843}", updatedTestData["sub"])),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.username_pattern", testData["username_pattern"]),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.audience", "jfrt@* jfac@* jfmc@* jfmd@* jfevt@* jfxfer@* jflnk@* jfint@* jfwks@*"),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.expires_in", "120"),
+				),
+			},
+			{
+				ResourceName:                         fqrn,
+				ImportState:                          true,
+				ImportStateId:                        fmt.Sprintf("%s:%s", identityMappingName, configName),
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "name",
+			},
+		},
+	})
+}
+
+func TestAccOIDCIdentityMapping_groups_pattern(t *testing.T) {
+	_, _, configName := testutil.MkNames("test-oidc-configuration", "platform_oidc_configuration")
+	_, fqrn, identityMappingName := testutil.MkNames("test-oidc-identity-mapping", "platform_oidc_identity_mapping")
+
+	temp := `
+	resource "platform_oidc_configuration" "{{ .configName }}" {
+		name          = "{{ .configName }}"
+		issuer_url    = "{{ .issuerURL }}"
+		provider_type = "{{ .providerType }}"
+		audience      = "{{ .audience }}"
+	}
+
+	resource "platform_oidc_identity_mapping" "{{ .identityMappingName }}" {
+		name          = "{{ .identityMappingName }}"
+		provider_name = platform_oidc_configuration.{{ .configName }}.name
+		priority      = {{ .priority }}
+		claims_json   = jsonencode({
+			sub = "{{ .sub }}",
+			updated_at = 1490198843
+		})
+		token_spec = {
+			groups_pattern = "{{ .groups_pattern }}"
+		}
+	}`
+
+	testData := map[string]string{
+		"configName":          configName,
+		"identityMappingName": identityMappingName,
+		"issuerURL":           "https://tempurl.org",
+		"providerType":        "generic",
+		"audience":            "test-audience",
+		"priority":            fmt.Sprintf("%d", testutil.RandomInt()),
+		"sub":                 fmt.Sprintf("test-subscriber-%d", testutil.RandomInt()),
+		"groups_pattern":      "{{groups}}",
+	}
+
+	config := util.ExecuteTemplate(identityMappingName, temp, testData)
+
+	updatedTemp := `
+	resource "platform_oidc_configuration" "{{ .configName }}" {
+		name          = "{{ .configName }}"
+		issuer_url    = "{{ .issuerURL }}"
+		provider_type = "{{ .providerType }}"
+		audience      = "{{ .audience }}"
+	}
+
+	resource "platform_oidc_identity_mapping" "{{ .identityMappingName }}" {
+		name          = "{{ .identityMappingName }}"
+		description   = "Test description"
+		provider_name = platform_oidc_configuration.{{ .configName }}.name
+		priority      = {{ .priority }}
+		claims_json   = jsonencode({
+			sub = "{{ .sub }}",
+			updated_at = 1490198843
+		})
+		token_spec = {
+			groups_pattern = "{{ .groups_pattern }}"
+			audience       = "jfrt@* jfac@* jfmc@* jfmd@* jfevt@* jfxfer@* jflnk@* jfint@* jfwks@*"
+			expires_in     = 120
+		}
+	}`
+
+	updatedTestData := map[string]string{
+		"configName":          configName,
+		"identityMappingName": identityMappingName,
+		"issuerURL":           "https://tempurl.org",
+		"providerType":        "generic",
+		"audience":            "test-audience",
+		"priority":            fmt.Sprintf("%d", testutil.RandomInt()),
+		"sub":                 fmt.Sprintf("test-subscriber-%d", testutil.RandomInt()),
+		"groups_pattern":      "{{groups}}",
+	}
+
+	updatedConfig := util.ExecuteTemplate(identityMappingName, updatedTemp, updatedTestData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["identityMappingName"]),
+					resource.TestCheckResourceAttr(fqrn, "priority", testData["priority"]),
+					resource.TestCheckResourceAttr(fqrn, "claims_json", fmt.Sprintf("{\"sub\":\"%s\",\"updated_at\":1490198843}", testData["sub"])),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.groups_pattern", testData["groups_pattern"]),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.audience", "*@*"),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.expires_in", "60"),
+				),
+			},
+			{
+				Config: updatedConfig,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", updatedTestData["identityMappingName"]),
+					resource.TestCheckResourceAttr(fqrn, "description", "Test description"),
+					resource.TestCheckResourceAttr(fqrn, "priority", updatedTestData["priority"]),
+					resource.TestCheckResourceAttr(fqrn, "claims_json", fmt.Sprintf("{\"sub\":\"%s\",\"updated_at\":1490198843}", updatedTestData["sub"])),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.groups_pattern", testData["groups_pattern"]),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.audience", "jfrt@* jfac@* jfmc@* jfmd@* jfevt@* jfxfer@* jflnk@* jfint@* jfwks@*"),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.expires_in", "120"),
+				),
+			},
+			{
+				ResourceName:                         fqrn,
+				ImportState:                          true,
+				ImportStateId:                        fmt.Sprintf("%s:%s", identityMappingName, configName),
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "name",
+			},
+		},
+	})
+}
+
+func TestAccOIDCIdentityMapping_roles_scope_with_project(t *testing.T) {
 	_, _, projectName := testutil.MkNames("test-project-", "project")
 	projectKey := strings.ToLower(fmt.Sprintf("proj%d", testutil.RandomInt()))
 	_, _, userName := testutil.MkNames("test-project-user-", "project_user")
@@ -228,13 +454,6 @@ func TestAccOIDCIdentityMapping_roles_scope(t *testing.T) {
 	_, fqrn, identityMappingName := testutil.MkNames("test-oidc-identity-mapping", "platform_oidc_identity_mapping")
 
 	temp := `
-	resource "artifactory_managed_user" "{{ .username }}" {
-		name     = "{{ .username }}"
-		email    = "{{ .email }}"
-		password = "Password1!"
-		admin    = false
-	}
-		
 	resource "project" "{{ .projectName }}" {
 		key = "{{ .projectKey }}"
 		display_name = "{{ .projectName }}"
@@ -267,12 +486,6 @@ func TestAccOIDCIdentityMapping_roles_scope(t *testing.T) {
 		actions = ["READ_REPOSITORY"]
 	}
 
-	resource "project_user" "{{ .username }}" {
-		project_key = project.{{ .projectName }}.key
-		name = artifactory_managed_user.{{ .username }}.name
-		roles = ["Project Admin"]
-	}
-
 	resource "platform_oidc_configuration" "{{ .configName }}" {
 		name          = "{{ .configName }}"
 		description   = "Test description"
@@ -291,15 +504,14 @@ func TestAccOIDCIdentityMapping_roles_scope(t *testing.T) {
 			updated_at = 1490198843
 		})
 		token_spec = {
-			username   = project_user.{{ .username }}.name
-			scope      = "applied-permissions/roles:\"${project_role.role1.name}\",\"${project_role.role2.name}\""
+			scope      = "applied-permissions/roles:${project.{{ .projectName }}.key}:\"${project_role.role1.name}\",\"${project_role.role2.name}\""
 			audience   = "*@*"
 			expires_in = 120
 		}
+		project_key   = project.{{ .projectName }}.key
 	}`
 
 	testData := map[string]string{
-		"username":            userName,
 		"email":               userName + "@tempurl.org",
 		"projectName":         projectName,
 		"projectKey":          projectKey,
@@ -332,7 +544,7 @@ func TestAccOIDCIdentityMapping_roles_scope(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "name", testData["identityMappingName"]),
 					resource.TestCheckResourceAttr(fqrn, "priority", testData["priority"]),
 					resource.TestCheckResourceAttr(fqrn, "claims_json", fmt.Sprintf("{\"sub\":\"%s\",\"updated_at\":1490198843}", testData["sub"])),
-					resource.TestCheckResourceAttr(fqrn, "token_spec.scope", "applied-permissions/roles:\"role1\",\"role2\""),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.scope", fmt.Sprintf("applied-permissions/roles:%s:\"role1\",\"role2\"", projectKey)),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.audience", "*@*"),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.expires_in", "120"),
 				),
