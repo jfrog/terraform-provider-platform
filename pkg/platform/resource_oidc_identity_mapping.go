@@ -131,7 +131,7 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 								"must start with either 'applied-permissions/admin', 'applied-permissions/user', 'applied-permissions/groups:', or 'applied-permissions/roles:'",
 							),
 						},
-						MarkdownDescription: "Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, `applied-permissions/roles:`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\\\"readers\\\",\\\"my-group\\\",` Role permissions are only applicable when in project scope and must be comma-separated, double quotes wrapped, e.g. `applied-permissions:roles:`project-key`:\"Developer\",\"Viewer\". `username` is also required when setting role permission.",
+						MarkdownDescription: "Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, `applied-permissions/roles:`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\\\"readers\\\",\\\"my-group\\\",` Role permissions are only applicable when in project scope and must be comma-separated, double quotes wrapped, e.g. `applied-permissions:roles:<project-key>:\"Developer\",\"Viewer\". `username` is also required when setting role permission.",
 					},
 					"audience": schema.StringAttribute{
 						Optional: true,

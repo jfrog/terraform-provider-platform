@@ -131,7 +131,7 @@ Optional:
 - `audience` (String) Sets of (space separated) the JFrog services to which the mapping applies. Default value is `*@*`, which applies to all services.
 - `expires_in` (Number) Token expiry time in seconds. Default value is 60.
 - `groups_pattern` (String) Provide a pattern which is used to map OIDC groups to Artifactory groups.
-- `scope` (String) Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, `applied-permissions/roles:`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\"readers\",\"my-group\",` Role permissions are only applicable when in project scope and must be comma-separated, double quotes wrapped, e.g. `applied-permissions:roles:`project-key`:"Developer","Viewer". `username` is also required when setting role permission.
+- `scope` (String) Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, `applied-permissions/roles:`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\"readers\",\"my-group\",` Role permissions are only applicable when in project scope and must be comma-separated, double quotes wrapped, e.g. `applied-permissions:roles:<project-key>:"Developer","Viewer". `username` is also required when setting role permission.
 - `username` (String) User name of the OIDC user. Not applicable when `scope` is set to `applied-permissions/groups`. Must be set when `scope` is set to `applied-permissions/roles`.
 - `username_pattern` (String) Provide a pattern which is used to map OIDC user to Artifactory user.
 
