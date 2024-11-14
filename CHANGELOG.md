@@ -1,3 +1,11 @@
+## 1.17.0 (November 15, 2024)
+
+FEATURES:
+
+**New Resource:**
+
+* `platform_group` - Resource to manage Group, using [Platform API](https://jfrog.com/help/r/jfrog-rest-apis/groups). This replaces the `artifactory_group` resource in [Artifactory provider](https://registry.terraform.io/providers/jfrog/artifactory/latest/docs/resources/group), which uses the (deprecated) Artifactory Security API. PR: [#155](https://github.com/jfrog/terraform-provider-platform/pull/155)
+
 ## 1.16.0 (November 1, 2024). Tested on Artifactory 7.98.7 with Terraform 1.9.8 and OpenTofu 1.8.4
 
 IMPROVEMENTS:
