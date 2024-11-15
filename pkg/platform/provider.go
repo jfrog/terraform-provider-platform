@@ -212,6 +212,7 @@ func (p *PlatformProvider) Resources(ctx context.Context) []func() resource.Reso
 		NewAWSIAMRoleResource,
 		NewLicenseResource,
 		NewGlobalRoleResource,
+		NewGroupResource,
 		NewOIDCConfigurationResource,
 		NewOIDCIdentityMappingResource,
 		NewMyJFrogIPAllowListResource,
