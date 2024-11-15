@@ -424,7 +424,7 @@ func (r *workersServiceResource) Update(ctx context.Context, req resource.Update
 		return
 	}
 
-	planSecrets := lo.Map[attr.Value](
+	planSecrets := lo.Map(
 		plan.Secrets.Elements(),
 		func(elem attr.Value, index int) secretAPIModel {
 			attrs := elem.(types.Object).Attributes()
@@ -434,15 +434,15 @@ func (r *workersServiceResource) Update(ctx context.Context, req resource.Update
 		},
 	)
 
-	stateSecrets := lo.Map[attr.Value](state.Secrets.Elements(), func(elem attr.Value, index int) secretAPIModel {
+	stateSecrets := lo.Map(state.Secrets.Elements(), func(elem attr.Value, index int) secretAPIModel {
 		attrs := elem.(types.Object).Attributes()
 		return secretAPIModel{
 			Key: attrs["key"].(types.String).ValueString(),
 		}
 	})
 
-	_, secretsToBeRemoved := lo.Difference[secretAPIModel](planSecrets, stateSecrets)
-	secretKeysToBeRemovedKeys := lo.Map[secretAPIModel](
+	_, secretsToBeRemoved := lo.Difference(planSecrets, stateSecrets)
+	secretKeysToBeRemovedKeys := lo.Map(
 		secretsToBeRemoved,
 		func(x secretAPIModel, index int) string {
 			return x.Key

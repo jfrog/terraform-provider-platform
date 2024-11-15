@@ -21,26 +21,21 @@ import (
 	"github.com/samber/lo"
 )
 
-const (
-	GroupsEndpoint = "access/api/v2/groups"
-	GroupEndpoint  = "access/api/v2/groups/{name}"
-)
-
 var _ resource.Resource = (*groupResource)(nil)
 
 type groupResource struct {
-	ProviderData util.ProviderMetadata
-	TypeName     string
+	util.JFrogResource
 }
 
 func NewGroupResource() resource.Resource {
 	return &groupResource{
-		TypeName: "platform_group",
+		JFrogResource: util.JFrogResource{
+			TypeName:                "platform_group",
+			ValidArtifactoryVersion: "7.49.3",
+			CollectionEndpoint:      "access/api/v2/groups",
+			DocumentEndpoint:        "access/api/v2/groups/{name}",
+		},
 	}
-}
-
-func (r *groupResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = r.TypeName
 }
 
 func (r *groupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
@@ -192,7 +187,8 @@ func (r *groupResource) Configure(ctx context.Context, req resource.ConfigureReq
 	if req.ProviderData == nil {
 		return
 	}
-	r.ProviderData = req.ProviderData.(PlatformProviderMetadata).ProviderMetadata
+	m := req.ProviderData.(PlatformProviderMetadata).ProviderMetadata
+	r.ProviderData = &m
 }
 
 func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -212,12 +208,12 @@ func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, 
 	}
 
 	var newGroup groupAPIModel
-	var apiErrs PlatformErrors
+	var apiErrs util.JFrogErrors
 	response, err := r.ProviderData.Client.R().
 		SetBody(group).
 		SetResult(&newGroup).
 		SetError(&apiErrs).
-		Post(GroupsEndpoint)
+		Post(r.JFrogResource.CollectionEndpoint)
 
 	if err != nil {
 		utilfw.UnableToCreateResourceError(resp, err.Error())
@@ -247,12 +243,12 @@ func (r *groupResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	}
 
 	var group groupAPIModel
-	var apiErrs PlatformErrors
+	var apiErrs util.JFrogErrors
 	response, err := r.ProviderData.Client.R().
 		SetPathParam("name", state.Name.ValueString()).
 		SetResult(&group).
 		SetError(&apiErrs).
-		Get(GroupEndpoint)
+		Get(r.JFrogResource.DocumentEndpoint)
 
 	if err != nil {
 		utilfw.UnableToRefreshResourceError(resp, err.Error())
@@ -305,13 +301,13 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 
 	var updatedGroup groupAPIModel
-	var apiErrs PlatformErrors
+	var apiErrs util.JFrogErrors
 	response, err := r.ProviderData.Client.R().
 		SetPathParam("name", plan.Name.ValueString()).
 		SetBody(group).
 		SetResult(&updatedGroup).
 		SetError(&apiErrs).
-		Patch(GroupEndpoint)
+		Patch(r.JFrogResource.DocumentEndpoint)
 	if err != nil {
 		utilfw.UnableToUpdateResourceError(resp, err.Error())
 		return
@@ -352,7 +348,7 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 			SetBody(membersReq).
 			SetResult(&membersRes).
 			SetError(&apiErrs).
-			Patch(GroupEndpoint + "/members")
+			Patch(r.JFrogResource.DocumentEndpoint + "/members")
 		if err != nil {
 			utilfw.UnableToUpdateResourceError(resp, err.Error())
 			return
@@ -383,11 +379,11 @@ func (r *groupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
-	var apiErrs PlatformErrors
+	var apiErrs util.JFrogErrors
 	response, err := r.ProviderData.Client.R().
 		SetPathParam("name", state.Name.ValueString()).
 		SetError(&apiErrs).
-		Delete(GroupEndpoint)
+		Delete(r.JFrogResource.DocumentEndpoint)
 
 	if err != nil {
 		utilfw.UnableToDeleteResourceError(resp, err.Error())
