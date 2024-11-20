@@ -3,12 +3,12 @@
 page_title: "platform_group Resource - terraform-provider-platform"
 subcategory: ""
 description: |-
-  Provides a group resource. This can be used to create and manage groups. A group represents a role in the system and is assigned a set of permissions.
+  Provides a group resource to create and manage groups, and manages membership. A group represents a role and is used with RBAC (Role-Based Access Control) rules. See JFrog documentation https://jfrog.com/help/r/jfrog-platform-administration-documentation/create-and-edit-groups for more details.
 ---
 
 # platform_group (Resource)
 
-Provides a group resource. This can be used to create and manage groups. A group represents a role in the system and is assigned a set of permissions.
+Provides a group resource to create and manage groups, and manages membership. A group represents a role and is used with RBAC (Role-Based Access Control) rules. See [JFrog documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/create-and-edit-groups) for more details.
 
 ## Example Usage
 

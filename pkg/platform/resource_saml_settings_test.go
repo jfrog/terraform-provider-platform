@@ -32,6 +32,7 @@ func TestAccSAMLSettings_full(t *testing.T) {
 		sync_groups                  = true
 		verify_audience_restriction  = true
 		use_encrypted_assertion      = false
+		ldap_group_settings          = {{ .ldap_groups }}
 	}`
 
 	testData := map[string]string{
@@ -41,6 +42,7 @@ func TestAccSAMLSettings_full(t *testing.T) {
 		"group_attribute":    "group",
 		"name_id_attribute":  "name",
 		"auto_user_creation": "false",
+		"ldap_groups":        "[\"test-group-1\"]",
 	}
 
 	config := util.ExecuteTemplate(name, temp, testData)
@@ -52,6 +54,7 @@ func TestAccSAMLSettings_full(t *testing.T) {
 		"group_attribute":    "group2",
 		"name_id_attribute":  "name2",
 		"auto_user_creation": "true",
+		"ldap_groups":        "[\"test-group-1\", \"test-group-2\"]",
 	}
 
 	updatedConfig := util.ExecuteTemplate(name, temp, updatedTestData)
@@ -79,6 +82,8 @@ func TestAccSAMLSettings_full(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "sync_groups", "true"),
 					resource.TestCheckResourceAttr(fqrn, "verify_audience_restriction", "true"),
 					resource.TestCheckResourceAttr(fqrn, "use_encrypted_assertion", "false"),
+					resource.TestCheckResourceAttr(fqrn, "ldap_group_settings.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "ldap_group_settings.0", "test-group-1"),
 				),
 			},
 			{
@@ -99,6 +104,9 @@ func TestAccSAMLSettings_full(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "sync_groups", "true"),
 					resource.TestCheckResourceAttr(fqrn, "verify_audience_restriction", "true"),
 					resource.TestCheckResourceAttr(fqrn, "use_encrypted_assertion", "false"),
+					resource.TestCheckResourceAttr(fqrn, "ldap_group_settings.#", "2"),
+					resource.TestCheckResourceAttr(fqrn, "ldap_group_settings.0", "test-group-1"),
+					resource.TestCheckResourceAttr(fqrn, "ldap_group_settings.1", "test-group-2"),
 				),
 			},
 			{
@@ -126,7 +134,7 @@ func testAccSamlSettingsDestroy(id string) func(*terraform.State) error {
 		resp, err := c.R().
 			SetPathParam("name", rs.Primary.Attributes["name"]).
 			SetResult(&samlSettings).
-			Get(platform.SAMLSettingEndpoint)
+			Get("access/api/v1/saml/{name}")
 		if err != nil {
 			return err
 		}

@@ -1,3 +1,9 @@
+## 1.18.0 (November 21, 2024). Tested on Artifactory 7.98.8 with Terraform 1.9.8 and OpenTofu 1.8.5
+
+IMPROVEMENTS:
+
+* resource/platform_saml_settings: Add `ldap_group_settings` attribute to support LDAP groups synchronization. Issue: [#154](https://github.com/jfrog/terraform-provider-platform/issues/154) PR: [#158](https://github.com/jfrog/terraform-provider-platform/pull/158)
+
 ## 1.17.0 (November 15, 2024). Tested on Artifactory 7.98.8 with Terraform 1.9.8 and OpenTofu 1.8.5
 
 FEATURES:

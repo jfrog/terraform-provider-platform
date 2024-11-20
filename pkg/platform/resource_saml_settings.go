@@ -2,10 +2,10 @@ package platform
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -22,20 +22,19 @@ import (
 	"github.com/samber/lo"
 )
 
-const (
-	SAMLSettingsEndpoint = "access/api/v1/saml"
-	SAMLSettingEndpoint  = "access/api/v1/saml/{name}"
-)
-
 func NewSAMLSettingsResource() resource.Resource {
 	return &SAMLSettingsResource{
-		TypeName: "platform_saml_settings",
+		JFrogResource: util.JFrogResource{
+			TypeName:                "platform_saml_settings",
+			ValidArtifactoryVersion: "7.83.1",
+			DocumentEndpoint:        "access/api/v1/saml/{name}",
+			CollectionEndpoint:      "access/api/v1/saml",
+		},
 	}
 }
 
 type SAMLSettingsResource struct {
-	ProviderData PlatformProviderMetadata
-	TypeName     string
+	util.JFrogResource
 }
 
 type SAMLSettingsResourceModelV0 struct {
@@ -58,10 +57,12 @@ type SAMLSettingsResourceModelV0 struct {
 
 type SAMLSettingsResourceModelV1 struct {
 	SAMLSettingsResourceModelV0
-	AutoUserCreation types.Bool `tfsdk:"auto_user_creation"`
+	AutoUserCreation  types.Bool `tfsdk:"auto_user_creation"`
+	LDAPGroupSettings types.Set  `tfsdk:"ldap_group_settings"`
 }
 
-func (r *SAMLSettingsResourceModelV1) toAPIModel(_ context.Context, apiModel *SAMLSettingsAPIModel) diag.Diagnostics {
+func (r *SAMLSettingsResourceModelV1) toAPIModel(ctx context.Context, apiModel *SAMLSettingsAPIModel) diag.Diagnostics {
+	diags := diag.Diagnostics{}
 
 	apiModel.Name = r.Name.ValueString()
 	apiModel.Enable = r.Enable.ValueBool()
@@ -85,10 +86,19 @@ func (r *SAMLSettingsResourceModelV1) toAPIModel(_ context.Context, apiModel *SA
 	apiModel.VerifyAudienceRestriction = r.VerifyAudienceRestriction.ValueBool()
 	apiModel.UseEncryptedAssertion = r.UseEncryptedAssertion.ValueBool()
 
-	return nil
+	var ldapGroupSettings []string
+	d := r.LDAPGroupSettings.ElementsAs(ctx, &ldapGroupSettings, false)
+	if d.HasError() {
+		diags.Append(d...)
+		return diags
+	}
+
+	apiModel.LDAPGroupSettings = ldapGroupSettings
+
+	return diags
 }
 
-func (r *SAMLSettingsResourceModelV1) fromAPIModel(_ context.Context, apiModel *SAMLSettingsAPIModel) (ds diag.Diagnostics) {
+func (r *SAMLSettingsResourceModelV1) fromAPIModel(ctx context.Context, apiModel *SAMLSettingsAPIModel) (ds diag.Diagnostics) {
 	r.Name = types.StringValue(apiModel.Name)
 	r.Enable = types.BoolValue(apiModel.Enable)
 	r.Certificate = types.StringValue(apiModel.Certificate)
@@ -117,29 +127,39 @@ func (r *SAMLSettingsResourceModelV1) fromAPIModel(_ context.Context, apiModel *
 	r.VerifyAudienceRestriction = types.BoolValue(apiModel.VerifyAudienceRestriction)
 	r.UseEncryptedAssertion = types.BoolValue(apiModel.UseEncryptedAssertion)
 
+	ldapGroupSettings := types.SetNull(types.StringType)
+	if len(apiModel.LDAPGroupSettings) > 0 {
+		ls, d := types.SetValueFrom(ctx, types.StringType, apiModel.LDAPGroupSettings)
+		if d.HasError() {
+			ds.Append(d...)
+			return
+		}
+
+		ldapGroupSettings = ls
+	}
+
+	r.LDAPGroupSettings = ldapGroupSettings
+
 	return
 }
 
 type SAMLSettingsAPIModel struct {
-	Name                      string `json:"name"`
-	Enable                    bool   `json:"enable_integration"`
-	VerifyAudienceRestriction bool   `json:"verify_audience_restriction"`
-	LoginURL                  string `json:"login_url"`
-	LogoutURL                 string `json:"logout_url"`
-	ServiceProviderName       string `json:"service_provider_name"`
-	AutoUserCreation          bool   `json:"auto_user_creation"`
-	AllowUserToAccessProfile  bool   `json:"allow_user_to_access_profile"`
-	UseEncryptedAssertion     bool   `json:"use_encrypted_assertion"`
-	AutoRedirect              bool   `json:"auto_redirect"`
-	SyncGroups                bool   `json:"sync_groups"`
-	Certificate               string `json:"certificate"`
-	GroupAttribute            string `json:"group_attribute"`
-	EmailAttribute            string `json:"email_attribute"`
-	NameIDAttribute           string `json:"name_id_attribute"`
-}
-
-func (r *SAMLSettingsResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = r.TypeName
+	Name                      string   `json:"name"`
+	Enable                    bool     `json:"enable_integration"`
+	VerifyAudienceRestriction bool     `json:"verify_audience_restriction"`
+	LoginURL                  string   `json:"login_url"`
+	LogoutURL                 string   `json:"logout_url"`
+	ServiceProviderName       string   `json:"service_provider_name"`
+	AutoUserCreation          bool     `json:"auto_user_creation"`
+	AllowUserToAccessProfile  bool     `json:"allow_user_to_access_profile"`
+	UseEncryptedAssertion     bool     `json:"use_encrypted_assertion"`
+	AutoRedirect              bool     `json:"auto_redirect"`
+	SyncGroups                bool     `json:"sync_groups"`
+	Certificate               string   `json:"certificate"`
+	GroupAttribute            string   `json:"group_attribute"`
+	EmailAttribute            string   `json:"email_attribute"`
+	NameIDAttribute           string   `json:"name_id_attribute"`
+	LDAPGroupSettings         []string `json:"ldap_group_settings,omitempty"`
 }
 
 var samlSettingsSchemaV0 = map[string]schema.Attribute{
@@ -270,6 +290,14 @@ var samlSettingsSchemaV1 = lo.Assign(
 			},
 			MarkdownDescription: "When set, authenticated users are automatically created in Artifactory. When not set, for every request from an SSO user, the user is temporarily associated with default groups (if such groups are defined), and the permissions for these groups apply. Without automatic user creation, you must manually create the user inside Artifactory to manage user permissions not attached to their default groups. Default value is `true`.",
 		},
+		"ldap_group_settings": schema.SetAttribute{
+			ElementType: types.StringType,
+			Validators: []validator.Set{
+				setvalidator.SizeAtLeast(1),
+			},
+			Optional:            true,
+			MarkdownDescription: "List of LDAP group setting names. Only support in Artifactory 7.98 or later. See [Enabling Synchronization of LDAP Groups for SAML SSO](https://jfrog.com/help/r/jfrog-platform-administration-documentation/enabling-synchronization-of-ldap-groups-for-saml-sso) for more details.",
+		},
 	},
 )
 
@@ -314,24 +342,8 @@ func (r *SAMLSettingsResource) Configure(ctx context.Context, req resource.Confi
 	if req.ProviderData == nil {
 		return
 	}
-	r.ProviderData = req.ProviderData.(PlatformProviderMetadata)
-
-	supported, err := util.CheckVersion(r.ProviderData.ArtifactoryVersion, "7.83.1")
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Failed to check Artifactory version",
-			err.Error(),
-		)
-		return
-	}
-
-	if !supported {
-		resp.Diagnostics.AddError(
-			"Unsupported Artifactory version",
-			fmt.Sprintf("This resource is supported by Artifactory version 7.83.1 or later. Current version: %s", r.ProviderData.ArtifactoryVersion),
-		)
-		return
-	}
+	m := req.ProviderData.(PlatformProviderMetadata).ProviderMetadata
+	r.ProviderData = &m
 }
 
 func (r *SAMLSettingsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -353,7 +365,7 @@ func (r *SAMLSettingsResource) Create(ctx context.Context, req resource.CreateRe
 
 	response, err := r.ProviderData.Client.R().
 		SetBody(samlSettings).
-		Post(SAMLSettingsEndpoint)
+		Post(r.CollectionEndpoint)
 
 	if err != nil {
 		utilfw.UnableToCreateResourceError(resp, err.Error())
@@ -384,7 +396,7 @@ func (r *SAMLSettingsResource) Read(ctx context.Context, req resource.ReadReques
 	response, err := r.ProviderData.Client.R().
 		SetPathParam("name", state.Name.ValueString()).
 		SetResult(&samlSettings).
-		Get(SAMLSettingEndpoint)
+		Get(r.DocumentEndpoint)
 
 	if err != nil {
 		utilfw.UnableToRefreshResourceError(resp, err.Error())
@@ -433,7 +445,7 @@ func (r *SAMLSettingsResource) Update(ctx context.Context, req resource.UpdateRe
 	response, err := r.ProviderData.Client.R().
 		SetPathParam("name", plan.Name.ValueString()).
 		SetBody(samlSettings).
-		Put(SAMLSettingEndpoint)
+		Put(r.DocumentEndpoint)
 
 	if err != nil {
 		utilfw.UnableToUpdateResourceError(resp, err.Error())
@@ -462,7 +474,7 @@ func (r *SAMLSettingsResource) Delete(ctx context.Context, req resource.DeleteRe
 
 	response, err := r.ProviderData.Client.R().
 		SetPathParam("name", state.Name.ValueString()).
-		Delete(SAMLSettingEndpoint)
+		Delete(r.DocumentEndpoint)
 	if err != nil {
 		utilfw.UnableToDeleteResourceError(resp, err.Error())
 		return
