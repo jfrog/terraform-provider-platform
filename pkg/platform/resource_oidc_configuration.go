@@ -113,11 +113,11 @@ func (r odicConfigurationResource) ValidateConfig(ctx context.Context, req resou
 		return
 	}
 
-	if data.ProviderType.ValueString() == gitHubProviderType && strings.HasPrefix(data.IssuerURL.ValueString(), gitHubProviderURL) {
+	if data.ProviderType.ValueString() == gitHubProviderType && !strings.HasPrefix(data.IssuerURL.ValueString(), gitHubProviderURL) {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("issuer_url"),
 			"Invalid Attribute Configuration",
-			fmt.Sprintf("issuer_url must starts with %s when provider_type is set to '%s'.", gitHubProviderURL, gitHubProviderType),
+			fmt.Sprintf("issuer_url must start with %s when provider_type is set to '%s'.", gitHubProviderURL, gitHubProviderType),
 		)
 	}
 }

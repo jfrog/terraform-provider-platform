@@ -242,7 +242,7 @@ func TestAccOIDCConfiguration_invalid_provider_type_issuer_url(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config:      config,
-				ExpectError: regexp.MustCompile(`must be start with https:\/\/token\.actions\.githubusercontent\.com[^\/]`),
+				ExpectError: regexp.MustCompile(`.*must start with https:\/\/token\.actions\.githubusercontent\.com[^\/].*`),
 			},
 		},
 	})
@@ -275,7 +275,7 @@ func TestAccOIDCConfiguration_custom_provider_type_issuer_url(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: config,
-				Check:  resource.TestCheckResourceAttr(fqrn, "issuer_url", testData["issuer_url"])},
+				Check:  resource.TestCheckResourceAttr(fqrn, "issuer_url", testData["issuerURL"])},
 		},
 	})
 }
