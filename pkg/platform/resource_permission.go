@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -820,8 +821,10 @@ func (r *permissionResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
+	var jfrogErrors util.JFrogErrors
 	response, err := r.ProviderData.Client.R().
 		SetBody(&permission).
+		SetError(&jfrogErrors).
 		Post(PermissionEndpoint)
 	if err != nil {
 		utilfw.UnableToCreateResourceError(resp, err.Error())
@@ -829,7 +832,7 @@ func (r *permissionResource) Create(ctx context.Context, req resource.CreateRequ
 	}
 
 	if response.IsError() {
-		utilfw.UnableToCreateResourceError(resp, response.String())
+		utilfw.UnableToCreateResourceError(resp, jfrogErrors.String())
 		return
 	}
 
@@ -847,10 +850,12 @@ func (r *permissionResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	var permission PermissionAPIModel
+	var jfrogErrors util.JFrogErrors
 
 	response, err := r.ProviderData.Client.R().
 		SetPathParam("name", state.Name.ValueString()).
 		SetResult(&permission).
+		SetError(&jfrogErrors).
 		Get(PermissionEndpoint + "/{name}")
 
 	if err != nil {
@@ -866,7 +871,7 @@ func (r *permissionResource) Read(ctx context.Context, req resource.ReadRequest,
 	}
 
 	if response.IsError() {
-		utilfw.UnableToRefreshResourceError(resp, response.String())
+		utilfw.UnableToRefreshResourceError(resp, jfrogErrors.String())
 		return
 	}
 
@@ -884,36 +889,82 @@ func (r *permissionResource) Update(ctx context.Context, req resource.UpdateRequ
 	go util.SendUsageResourceUpdate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
 	var plan permissionResourceModel
+	var state permissionResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var permission PermissionAPIModel
-	resp.Diagnostics.Append(plan.toAPIModel(ctx, &permission)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
+	var planPermission PermissionAPIModel
+	resp.Diagnostics.Append(plan.toAPIModel(ctx, &planPermission)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var statePermission PermissionAPIModel
+	resp.Diagnostics.Append(state.toAPIModel(ctx, &statePermission)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var response *resty.Response
+	var err error
+	var jfrogErrors util.JFrogErrors
+
 	// permission can only be updated by resource type, not in its entirety!
 	// so loop through every field and update each value
-	for resourceType, resourceValue := range permission.Resources {
-		response, err := r.ProviderData.Client.R().
+	for resourceType, resourceValue := range planPermission.Resources {
+		request := r.ProviderData.Client.R().
 			SetPathParams(map[string]string{
 				"name":         plan.Name.ValueString(),
 				"resourceType": resourceType,
 			}).
+			SetError(&jfrogErrors)
+
+		// replace the permission resource
+		response, err = request.
 			SetBody(resourceValue).
 			Put(PermissionEndpoint + "/{name}/{resourceType}")
+
 		if err != nil {
 			utilfw.UnableToUpdateResourceError(resp, err.Error())
 			return
 		}
 
 		if response.IsError() {
-			utilfw.UnableToUpdateResourceError(resp, response.String())
+			utilfw.UnableToUpdateResourceError(resp, jfrogErrors.String())
 			return
+		}
+	}
+
+	// check if resource in the state no longer exists in the plan
+	for resourceType := range statePermission.Resources {
+		// resourceType doesn't exist in plan any more
+		if _, ok := planPermission.Resources[resourceType]; !ok {
+			// delete the permission resource
+			response, err = r.ProviderData.Client.R().
+				SetPathParams(map[string]string{
+					"name":         plan.Name.ValueString(),
+					"resourceType": resourceType,
+				}).
+				SetError(&jfrogErrors).
+				Delete(PermissionEndpoint + "/{name}/{resourceType}")
+
+			if err != nil {
+				utilfw.UnableToUpdateResourceError(resp, err.Error())
+				return
+			}
+
+			if response.IsError() {
+				utilfw.UnableToUpdateResourceError(resp, jfrogErrors.String())
+				return
+			}
 		}
 	}
 
@@ -931,16 +982,20 @@ func (r *permissionResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
+	var jfrogErrors util.JFrogErrors
+
 	response, err := r.ProviderData.Client.R().
 		SetPathParam("name", data.Name.ValueString()).
+		SetError(&jfrogErrors).
 		Delete(PermissionEndpoint + "/{name}")
+
 	if err != nil {
 		utilfw.UnableToDeleteResourceError(resp, err.Error())
 		return
 	}
 
 	if response.IsError() {
-		utilfw.UnableToDeleteResourceError(resp, response.String())
+		utilfw.UnableToDeleteResourceError(resp, jfrogErrors.String())
 		return
 	}
 
