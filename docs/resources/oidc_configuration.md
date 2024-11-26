@@ -21,6 +21,14 @@ resource "platform_oidc_configuration" "my-github-oidc-configuration" {
   audience      = "jfrog-github"
 }
 
+resource "platform_oidc_configuration" "my-github-oidc-enterprise-configuration" {
+  name          = "my-github-oidc-enterprise-configuration"
+  description   = "My GitHub OIDC enterprise configuration"
+  issuer_url    = "https://token.actions.githubusercontent.com/jfrog"
+  provider_type = "GitHub"
+  audience      = "jfrog-github"
+}
+
 resource "platform_oidc_configuration" "my-generic-oidc-configuration" {
   name          = "my-generic-oidc-configuration"
   description   = "My generic OIDC configuration"
@@ -35,7 +43,7 @@ resource "platform_oidc_configuration" "my-generic-oidc-configuration" {
 
 ### Required
 
-- `issuer_url` (String) OIDC issuer URL. For GitHub actions, the URL must be https://token.actions.githubusercontent.com.
+- `issuer_url` (String) OIDC issuer URL. For GitHub actions, the URL must start with https://token.actions.githubusercontent.com.
 - `name` (String) Name of the OIDC provider
 - `provider_type` (String) Type of OIDC provider. Can be `generic`, `GitHub`, or `Azure`.
 

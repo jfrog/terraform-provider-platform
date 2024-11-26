@@ -40,7 +40,7 @@ func TestAccOIDCConfiguration_full(t *testing.T) {
 
 	updatedTestData := map[string]string{
 		"name":         configName,
-		"issuerURL":    "https://token.actions.githubusercontent.com",
+		"issuerURL":    "https://token.actions.githubusercontent.com/jfrog",
 		"providerType": "GitHub",
 		"audience":     "test-audience-2",
 	}
@@ -242,8 +242,40 @@ func TestAccOIDCConfiguration_invalid_provider_type_issuer_url(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config:      config,
-				ExpectError: regexp.MustCompile(`must be set to https:\/\/token\.actions\.githubusercontent\.com[^\/]`),
+				ExpectError: regexp.MustCompile(`must be start with https:\/\/token\.actions\.githubusercontent\.com[^\/]`),
 			},
+		},
+	})
+}
+
+func TestAccOIDCConfiguration_custom_provider_type_issuer_url(t *testing.T) {
+	_, fqrn, configName := testutil.MkNames("test-oidc-configuration", "platform_oidc_configuration")
+
+	temp := `
+	resource "platform_oidc_configuration" "{{ .name }}" {
+		name          = "{{ .name }}"
+		description   = "Test description"
+		issuer_url    = "{{ .issuerURL }}"
+		provider_type = "{{ .providerType }}"
+		audience      = "{{ .audience }}"
+	}`
+
+	testData := map[string]string{
+		"name":         configName,
+		"issuerURL":    "https://token.actions.githubusercontent.com/jfrog",
+		"providerType": "GitHub",
+		"audience":     "test-audience",
+	}
+
+	config := util.ExecuteTemplate(configName, temp, testData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check:  resource.TestCheckResourceAttr(fqrn, "issuer_url", testData["issuer_url"])},
 		},
 	})
 }
