@@ -4,7 +4,7 @@ BUG FIXES:
 
 * resource/platform_oidc_configuration: Update validation for `issuer` attribute to support GitHub actions customization for enterprise. See [Customizing the issuer value for an enterprise](https://docs.github.com/en/enterprise-cloud@latest/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect#customizing-the-issuer-value-for-an-enterprise). PR: [#163](https://github.com/jfrog/terraform-provider-platform/pull/163) and [#164](https://github.com/jfrog/terraform-provider-platform/pull/164)
 
-## 1.18.0 (November 21, 2024). Tested on Artifactory 7.98.8 with Terraform 1.9.8 and OpenTofu 1.8.5
+## 1.18.0 (November 21, 2024). Tested on Artifactory 7.98.9 with Terraform 1.9.8 and OpenTofu 1.8.6
 
 IMPROVEMENTS:
 
