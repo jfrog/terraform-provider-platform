@@ -63,6 +63,21 @@ func TestAccPermission_full(t *testing.T) {
 				}
 			]
 		}
+
+		build = {
+			actions = {
+				users = []
+				groups = []
+			}
+
+			targets = [
+				{
+					name = "artifactory-build-info"
+					include_patterns = ["**"]
+					exclude_patterns = ["{{ .excludePattern }}"]
+				}
+			] 
+		}
 	}`
 
 	updatedTemp := `
@@ -114,21 +129,6 @@ func TestAccPermission_full(t *testing.T) {
 					include_patterns = ["**", "*.js"]
 				}
 			]
-		}
-
-		build = {
-			actions = {
-				users = []
-				groups = []
-			}
-
-			targets = [
-				{
-					name = "artifactory-build-info"
-					include_patterns = ["**"]
-					exclude_patterns = ["{{ .excludePattern }}"]
-				}
-			] 
 		}
 
 		release_bundle = {
@@ -241,6 +241,13 @@ func TestAccPermission_full(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "artifact.targets.0.include_patterns.0", "**"),
 					resource.TestCheckResourceAttr(fqrn, "artifact.targets.0.exclude_patterns.#", "1"),
 					resource.TestCheckResourceAttr(fqrn, "artifact.targets.0.exclude_patterns.0", testData["excludePattern"]),
+					resource.TestCheckResourceAttr(fqrn, "build.actions.users.#", "0"),
+					resource.TestCheckResourceAttr(fqrn, "build.targets.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "build.targets.0.name", "artifactory-build-info"),
+					resource.TestCheckResourceAttr(fqrn, "build.targets.0.include_patterns.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "build.targets.0.include_patterns.0", "**"),
+					resource.TestCheckResourceAttr(fqrn, "build.targets.0.exclude_patterns.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "build.targets.0.exclude_patterns.0", testData["excludePattern"]),
 				),
 			},
 			{
@@ -254,13 +261,7 @@ func TestAccPermission_full(t *testing.T) {
 					resource.TestCheckTypeSetElemAttr(fqrn, "artifact.actions.users.0.permissions.*", "WRITE"),
 					resource.TestCheckResourceAttr(fqrn, "artifact.actions.groups.#", "0"),
 					resource.TestCheckResourceAttr(fqrn, "artifact.targets.#", "4"),
-					resource.TestCheckResourceAttr(fqrn, "build.actions.users.#", "0"),
-					resource.TestCheckResourceAttr(fqrn, "build.targets.#", "1"),
-					resource.TestCheckResourceAttr(fqrn, "build.targets.0.name", "artifactory-build-info"),
-					resource.TestCheckResourceAttr(fqrn, "build.targets.0.include_patterns.#", "1"),
-					resource.TestCheckResourceAttr(fqrn, "build.targets.0.include_patterns.0", "**"),
-					resource.TestCheckResourceAttr(fqrn, "build.targets.0.exclude_patterns.#", "1"),
-					resource.TestCheckResourceAttr(fqrn, "build.targets.0.exclude_patterns.0", updatedTestData["excludePattern"]),
+					resource.TestCheckNoResourceAttr(fqrn, "build"),
 					resource.TestCheckResourceAttr(fqrn, "release_bundle.actions.users.#", "1"),
 					resource.TestCheckResourceAttr(fqrn, "release_bundle.actions.users.0.permissions.#", "2"),
 					resource.TestCheckTypeSetElemAttr(fqrn, "release_bundle.actions.users.0.permissions.*", "READ"),
