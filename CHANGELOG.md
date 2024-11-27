@@ -1,10 +1,10 @@
-# 1.18.2 (November 27, 2024)
+# 1.18.2 (November 27, 2024). Tested on Artifactory 7.98.9 with Terraform 1.9.8 and OpenTofu 1.8.6
 
 BUG FIXES:
 
 * resource/platform_permission: Fix permission resource not being deleted correctly. Permission resources that were in the Terraform state from previously apply but now are removed from the plan were not deleted. Now we check for the removal and delete the permission resource correctly. Issue: [#141](https://github.com/jfrog/terraform-provider-platform/issues/141) PR: [#165](https://github.com/jfrog/terraform-provider-platform/pull/165)
 
-# 1.18.1 (November 26, 2024). Tested on Artifactory 7.98.9 with Terraform 1.9.8 and OpenTofu 1.8.6
+# 1.18.1 (November 26, 2024). Tested on Artifactory 7.98.8 with Terraform 1.9.8 and OpenTofu 1.8.5
 
 BUG FIXES:
 
