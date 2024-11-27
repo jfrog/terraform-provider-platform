@@ -12,13 +12,13 @@ BUG FIXES:
 
 * resource/platform_permission: Fix permission resource not being deleted correctly. Permission resources that were in the Terraform state from previously apply but now are removed from the plan were not deleted. Now we check for the removal and delete the permission resource correctly. Issue: [#141](https://github.com/jfrog/terraform-provider-platform/issues/141) PR: [#165](https://github.com/jfrog/terraform-provider-platform/pull/165)
 
-## 1.18.1 (November 26, 2024). Tested on Artifactory 7.98.8 with Terraform 1.9.8 and OpenTofu 1.8.5
+## 1.18.1 (November 26, 2024). Tested on Artifactory 7.98.9 with Terraform 1.9.8 and OpenTofu 1.8.6
 
 BUG FIXES:
 
 * resource/platform_oidc_configuration: Update validation for `issuer` attribute to support GitHub actions customization for enterprise. See [Customizing the issuer value for an enterprise](https://docs.github.com/en/enterprise-cloud@latest/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect#customizing-the-issuer-value-for-an-enterprise). PR: [#163](https://github.com/jfrog/terraform-provider-platform/pull/163) and [#164](https://github.com/jfrog/terraform-provider-platform/pull/164)
 
-## 1.18.0 (November 21, 2024). Tested on Artifactory 7.98.9 with Terraform 1.10.0 and OpenTofu 1.8.6
+## 1.18.0 (November 21, 2024). Tested on Artifactory 7.98.8 with Terraform 1.9.8 and OpenTofu 1.8.5
 
 IMPROVEMENTS:
 
