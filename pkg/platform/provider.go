@@ -210,6 +210,7 @@ func (p *PlatformProvider) DataSources(ctx context.Context) []func() datasource.
 func (p *PlatformProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewAWSIAMRoleResource,
+		NewCrowdSettingsResource,
 		NewLicenseResource,
 		NewGlobalRoleResource,
 		NewGroupResource,
