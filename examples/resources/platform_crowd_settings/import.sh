@@ -1,0 +1,1 @@
+terraform import platform_crowd_settings.my-crowd-settings my-crowd-settings
