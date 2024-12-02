@@ -86,11 +86,13 @@ func (r *SAMLSettingsResourceModelV1) toAPIModel(ctx context.Context, apiModel *
 	apiModel.VerifyAudienceRestriction = r.VerifyAudienceRestriction.ValueBool()
 	apiModel.UseEncryptedAssertion = r.UseEncryptedAssertion.ValueBool()
 
-	var ldapGroupSettings []string
-	d := r.LDAPGroupSettings.ElementsAs(ctx, &ldapGroupSettings, false)
-	if d.HasError() {
-		diags.Append(d...)
-		return diags
+	ldapGroupSettings := []string{} // API treats absent or null value as noop so needs empty array to reset
+	if !r.LDAPGroupSettings.IsNull() {
+		d := r.LDAPGroupSettings.ElementsAs(ctx, &ldapGroupSettings, false)
+		if d.HasError() {
+			diags.Append(d...)
+			return diags
+		}
 	}
 
 	apiModel.LDAPGroupSettings = ldapGroupSettings
@@ -159,7 +161,7 @@ type SAMLSettingsAPIModel struct {
 	GroupAttribute            string   `json:"group_attribute"`
 	EmailAttribute            string   `json:"email_attribute"`
 	NameIDAttribute           string   `json:"name_id_attribute"`
-	LDAPGroupSettings         []string `json:"ldap_group_settings,omitempty"`
+	LDAPGroupSettings         []string `json:"ldap_group_settings"`
 }
 
 var samlSettingsSchemaV0 = map[string]schema.Attribute{
