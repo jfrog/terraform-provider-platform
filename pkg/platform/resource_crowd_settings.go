@@ -45,7 +45,7 @@ type CrowdSettingsResourceModel struct {
 	OverrideAllGroupsUponLogin types.Bool   `tfsdk:"override_all_groups_upon_login"`
 }
 
-func (r *CrowdSettingsResourceModel) toAPIModel(ctx context.Context, apiModel *CrowdSettingsAPIModel) diag.Diagnostics {
+func (r *CrowdSettingsResourceModel) toAPIModel(_ context.Context, apiModel *CrowdSettingsAPIModel) diag.Diagnostics {
 	diags := diag.Diagnostics{}
 
 	apiModel.Enable = r.Enable.ValueBool()
@@ -62,7 +62,7 @@ func (r *CrowdSettingsResourceModel) toAPIModel(ctx context.Context, apiModel *C
 	return diags
 }
 
-func (r *CrowdSettingsResourceModel) fromAPIModel(ctx context.Context, apiModel *CrowdSettingsAPIModel) (ds diag.Diagnostics) {
+func (r *CrowdSettingsResourceModel) fromAPIModel(_ context.Context, apiModel *CrowdSettingsAPIModel) (ds diag.Diagnostics) {
 	r.Enable = types.BoolValue(apiModel.Enable)
 	r.ServerURL = types.StringValue(apiModel.ServerURL)
 	r.ApplicationName = types.StringValue(apiModel.ApplicationName)
