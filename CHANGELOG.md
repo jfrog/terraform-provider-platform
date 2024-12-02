@@ -1,4 +1,4 @@
-## 1.19.0 (December 3, 2024)
+## 1.19.0 (December 3, 2024). Tested on Artifactory 7.98.9 with Terraform 1.10.0 and OpenTofu 1.8.6
 
 FEATURES:
 
