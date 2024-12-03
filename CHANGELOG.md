@@ -1,10 +1,14 @@
-## 1.19.0 (December 2, 2024). Tested on Artifactory 7.98.9 with Terraform 1.10.0 and OpenTofu 1.8.6
+## 1.19.0 (December 3, 2024). Tested on Artifactory 7.98.9 with Terraform 1.10.0 and OpenTofu 1.8.6
 
 FEATURES:
 
 **New Resource:**
 
 * `platform_crowd_settings` - Resource to manage Crowd/JIRA authentication provider. PR: [#167](https://github.com/jfrog/terraform-provider-platform/pull/167)
+
+BUG FIXES:
+
+* resource/platform_saml_settings: Fix `Value Conversion Error` for attribute `ldap_group_settings`. Issue: [#168](https://github.com/jfrog/terraform-provider-platform/issues/168) PR: [#171](https://github.com/jfrog/terraform-provider-platform/pull/171)
 
 ## 1.18.2 (November 27, 2024). Tested on Artifactory 7.98.9 with Terraform 1.9.8 and OpenTofu 1.8.6
 

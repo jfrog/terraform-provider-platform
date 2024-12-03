@@ -59,6 +59,27 @@ func TestAccSAMLSettings_full(t *testing.T) {
 
 	updatedConfig := util.ExecuteTemplate(name, temp, updatedTestData)
 
+	temp2 := `
+	resource "platform_saml_settings" "{{ .name }}" {
+		name                         = "{{ .name }}"
+		enable                       = true
+		certificate                  = "{{ .certificate }}"
+		email_attribute              = "{{ .email_attribute }}"
+		group_attribute              = "{{ .group_attribute }}"
+		name_id_attribute            = "{{ .name_id_attribute }}"
+		login_url                    = "http://tempurl.org/login"
+		logout_url                   = "http://tempurl.org/logout"
+		auto_user_creation           = {{ .auto_user_creation }}
+		service_provider_name        = "okta"
+		allow_user_to_access_profile = true
+		auto_redirect                = true
+		sync_groups                  = true
+		verify_audience_restriction  = true
+		use_encrypted_assertion      = false
+	}`
+
+	updatedConfig2 := util.ExecuteTemplate(name, temp2, updatedTestData)
+
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProviders(),
@@ -107,6 +128,27 @@ func TestAccSAMLSettings_full(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "ldap_group_settings.#", "2"),
 					resource.TestCheckResourceAttr(fqrn, "ldap_group_settings.0", "test-group-1"),
 					resource.TestCheckResourceAttr(fqrn, "ldap_group_settings.1", "test-group-2"),
+				),
+			},
+			{
+				Config: updatedConfig2,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", updatedTestData["name"]),
+					resource.TestCheckResourceAttr(fqrn, "enable", "true"),
+					resource.TestCheckResourceAttr(fqrn, "certificate", updatedTestData["certificate"]),
+					resource.TestCheckResourceAttr(fqrn, "email_attribute", updatedTestData["email_attribute"]),
+					resource.TestCheckResourceAttr(fqrn, "group_attribute", updatedTestData["group_attribute"]),
+					resource.TestCheckResourceAttr(fqrn, "name_id_attribute", updatedTestData["name_id_attribute"]),
+					resource.TestCheckResourceAttr(fqrn, "login_url", "http://tempurl.org/login"),
+					resource.TestCheckResourceAttr(fqrn, "logout_url", "http://tempurl.org/logout"),
+					resource.TestCheckResourceAttr(fqrn, "auto_user_creation", updatedTestData["auto_user_creation"]),
+					resource.TestCheckResourceAttr(fqrn, "service_provider_name", "okta"),
+					resource.TestCheckResourceAttr(fqrn, "allow_user_to_access_profile", "true"),
+					resource.TestCheckResourceAttr(fqrn, "auto_redirect", "true"),
+					resource.TestCheckResourceAttr(fqrn, "sync_groups", "true"),
+					resource.TestCheckResourceAttr(fqrn, "verify_audience_restriction", "true"),
+					resource.TestCheckResourceAttr(fqrn, "use_encrypted_assertion", "false"),
+					resource.TestCheckNoResourceAttr(fqrn, "ldap_group_settings"),
 				),
 			},
 			{
