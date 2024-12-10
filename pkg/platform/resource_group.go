@@ -359,13 +359,16 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 			return
 		}
 
-		ms, d := types.SetValueFrom(ctx, types.StringType, membersRes.Members)
-		if d != nil {
-			resp.Diagnostics.Append(d...)
-			return
-		}
+		// only update members attribute if it is set in the configuration
+		if !plan.Members.IsNull() {
+			ms, d := types.SetValueFrom(ctx, types.StringType, membersRes.Members)
+			if d != nil {
+				resp.Diagnostics.Append(d...)
+				return
+			}
 
-		plan.Members = ms
+			plan.Members = ms
+		}
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)

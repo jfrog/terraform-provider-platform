@@ -109,6 +109,85 @@ func TestAccGroup_full(t *testing.T) {
 	})
 }
 
+func TestAccGroup_no_members(t *testing.T) {
+	_, fqrn, groupName := testutil.MkNames("test-group", "platform_group")
+
+	temp := `
+		resource "platform_group" "{{ .groupName }}" {
+			name             = "{{ .groupName }}"
+			description 	 = "Test group"
+			external_id      = "externalID"
+			auto_join        = {{ .autoJoin }}
+			admin_privileges = false
+		}
+
+		resource "artifactory_managed_user" "test-user" {
+			name     = "test-user"
+			password = "Password1!"
+			email    = "test@tempurl.org"
+			groups   = [platform_group.{{ .groupName }}.name]
+		}
+	`
+
+	testData := map[string]string{
+		"groupName": groupName,
+		"autoJoin":  fmt.Sprintf("%t", testutil.RandBool()),
+	}
+
+	config := util.ExecuteTemplate(groupName, temp, testData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() { testAccPreCheck(t) },
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"artifactory": {
+				Source: "jfrog/artifactory",
+			},
+		},
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["groupName"]),
+					resource.TestCheckResourceAttr(fqrn, "description", "Test group"),
+					resource.TestCheckResourceAttr(fqrn, "external_id", "externalID"),
+					resource.TestCheckResourceAttr(fqrn, "auto_join", testData["autoJoin"]),
+					resource.TestCheckResourceAttr(fqrn, "admin_privileges", "false"),
+					resource.TestCheckResourceAttrSet(fqrn, "realm"),
+					resource.TestCheckNoResourceAttr(fqrn, "realm_attributes"),
+					resource.TestCheckNoResourceAttr(fqrn, "members"),
+				),
+				ExpectNonEmptyPlan: true,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PostApplyPostRefresh: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(fqrn, plancheck.ResourceActionUpdate),
+					},
+				},
+			},
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["groupName"]),
+					resource.TestCheckResourceAttr(fqrn, "description", "Test group"),
+					resource.TestCheckResourceAttr(fqrn, "external_id", "externalID"),
+					resource.TestCheckResourceAttr(fqrn, "auto_join", testData["autoJoin"]),
+					resource.TestCheckResourceAttr(fqrn, "admin_privileges", "false"),
+					resource.TestCheckResourceAttrSet(fqrn, "realm"),
+					resource.TestCheckNoResourceAttr(fqrn, "realm_attributes"),
+					resource.TestCheckResourceAttr(fqrn, "members.#", "0"),
+				),
+				ExpectNonEmptyPlan: true,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PostApplyPostRefresh: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(fqrn, plancheck.ResourceActionNoop),
+						plancheck.ExpectResourceAction("artifactory_managed_user.test-user", plancheck.ResourceActionUpdate),
+					},
+				},
+			},
+		},
+	})
+}
+
 func TestAccGroup_auto_join_conflict(t *testing.T) {
 	_, _, groupName := testutil.MkNames("test-group", "platform_group")
 	temp := `

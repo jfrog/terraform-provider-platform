@@ -1,3 +1,9 @@
+## 1.19.1 (December 10, 2024). Tested on Artifactory 7.98.10 with Terraform 1.10.1 and OpenTofu 1.8.7
+
+BUG FIXES:
+
+* resource/platform_group: Fix "Provider produced inconsistent result after apply" error for attribute `members`. Issue: [#176](https://github.com/jfrog/terraform-provider-platform/issues/176) PR: [#177](https://github.com/jfrog/terraform-provider-platform/pull/177)
+
 ## 1.19.0 (December 3, 2024). Tested on Artifactory 7.98.9 with Terraform 1.10.0 and OpenTofu 1.8.6
 
 FEATURES:
