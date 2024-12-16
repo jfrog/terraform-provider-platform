@@ -31,11 +31,12 @@ func TestAccOIDCConfiguration_full(t *testing.T) {
 
 	updatedTemp := `
 	resource "platform_oidc_configuration" "{{ .name }}" {
-		name          = "{{ .name }}"
-		description   = "Test Description"
-		issuer_url    = "{{ .issuerURL }}"
-		provider_type = "{{ .providerType }}"
-		audience      = "{{ .audience }}"
+		name              = "{{ .name }}"
+		description       = "Test Description"
+		issuer_url        = "{{ .issuerURL }}"
+		provider_type     = "{{ .providerType }}"
+		audience          = "{{ .audience }}"
+		use_default_proxy = true
 	}`
 
 	updatedTestData := map[string]string{
@@ -66,6 +67,7 @@ func TestAccOIDCConfiguration_full(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "issuer_url", updatedTestData["issuerURL"]),
 					resource.TestCheckResourceAttr(fqrn, "provider_type", updatedTestData["providerType"]),
 					resource.TestCheckResourceAttr(fqrn, "audience", updatedTestData["audience"]),
+					resource.TestCheckResourceAttr(fqrn, "use_default_proxy", "true"),
 				),
 			},
 			{

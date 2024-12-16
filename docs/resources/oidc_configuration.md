@@ -52,6 +52,7 @@ resource "platform_oidc_configuration" "my-generic-oidc-configuration" {
 - `audience` (String) Informational field that you can use to include details of the audience that uses the OIDC configuration.
 - `description` (String) Description of the OIDC provider
 - `project_key` (String) If set, this Identity Configuration will be available in the scope of the given project (editable by platform admin and project admin). If not set, this Identity Configuration will be global and only editable by platform admin. Once set, the projectKey cannot be changed.
+- `use_default_proxy` (Boolean) This enables and disables the default proxy for OIDC integration. If enabled, the OIDC mechanism will utilize the default proxy for all OIDC requests. If disabled, the OIDC mechanism does not use any proxy for all OIDC requests. Before enabling this functionality you must configure the default proxy.
 
 ## Import
 
