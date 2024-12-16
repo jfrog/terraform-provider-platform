@@ -43,9 +43,10 @@ type oidcConfigurationResource struct {
 func NewOIDCConfigurationResource() resource.Resource {
 	return &oidcConfigurationResource{
 		JFrogResource: util.JFrogResource{
-			TypeName:           "platform_oidc_configuration",
-			CollectionEndpoint: "/access/api/v1/oidc",
-			DocumentEndpoint:   "/access/api/v1/oidc/{name}",
+			TypeName:                "platform_oidc_configuration",
+			ValidArtifactoryVersion: "7.73.1",
+			CollectionEndpoint:      "/access/api/v1/oidc",
+			DocumentEndpoint:        "/access/api/v1/oidc/{name}",
 		},
 	}
 }
