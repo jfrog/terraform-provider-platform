@@ -368,6 +368,7 @@ func (r *SAMLSettingsResource) UpgradeState(ctx context.Context) map[int64]resou
 					VerifyAudienceRestriction: priorStateData.VerifyAudienceRestriction,
 					UseEncryptedAssertion:     priorStateData.UseEncryptedAssertion,
 					AutoUserCreation:          types.BoolValue(!priorStateData.NoAutoUserCreation.ValueBool()),
+					LDAPGroupSettings:         types.SetNull(types.StringType),
 				}
 
 				resp.Diagnostics.Append(resp.State.Set(ctx, upgradedStateData)...)
@@ -376,7 +377,7 @@ func (r *SAMLSettingsResource) UpgradeState(ctx context.Context) map[int64]resou
 		// State upgrade implementation from 1 (prior state version) to 2 (Schema.Version)
 		1: {
 			PriorSchema: &schema.Schema{
-				Attributes: samlSettingsSchemaV0,
+				Attributes: samlSettingsSchemaV1,
 			},
 			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
 				var priorStateData SAMLSettingsResourceModelV1
@@ -384,6 +385,11 @@ func (r *SAMLSettingsResource) UpgradeState(ctx context.Context) map[int64]resou
 				resp.Diagnostics.Append(req.State.Get(ctx, &priorStateData)...)
 				if resp.Diagnostics.HasError() {
 					return
+				}
+
+				autoUserCreation := priorStateData.AutoUserCreation.ValueBool()
+				if !priorStateData.NoAutoUserCreation.IsNull() {
+					autoUserCreation = priorStateData.NoAutoUserCreation.ValueBool()
 				}
 
 				upgradedStateData := SAMLSettingsResourceModelV2{
@@ -401,7 +407,7 @@ func (r *SAMLSettingsResource) UpgradeState(ctx context.Context) map[int64]resou
 					SyncGroups:                priorStateData.SyncGroups,
 					VerifyAudienceRestriction: priorStateData.VerifyAudienceRestriction,
 					UseEncryptedAssertion:     priorStateData.UseEncryptedAssertion,
-					AutoUserCreation:          priorStateData.AutoUserCreation,
+					AutoUserCreation:          types.BoolValue(autoUserCreation),
 					LDAPGroupSettings:         priorStateData.LDAPGroupSettings,
 				}
 
