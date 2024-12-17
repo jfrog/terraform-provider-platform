@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
-	"github.com/jfrog/terraform-provider-platform/pkg/platform"
+	"github.com/jfrog/terraform-provider-platform/v2/pkg/platform"
 	"github.com/jfrog/terraform-provider-shared/client"
 )
 

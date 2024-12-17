@@ -61,7 +61,26 @@ type SAMLSettingsResourceModelV1 struct {
 	LDAPGroupSettings types.Set  `tfsdk:"ldap_group_settings"`
 }
 
-func (r *SAMLSettingsResourceModelV1) toAPIModel(ctx context.Context, apiModel *SAMLSettingsAPIModel) diag.Diagnostics {
+type SAMLSettingsResourceModelV2 struct {
+	Name                      types.String `tfsdk:"name"`
+	Enable                    types.Bool   `tfsdk:"enable"`
+	Certificate               types.String `tfsdk:"certificate"`
+	EmailAttribute            types.String `tfsdk:"email_attribute"`
+	GroupAttribute            types.String `tfsdk:"group_attribute"`
+	NameIDAttribute           types.String `tfsdk:"name_id_attribute"`
+	LoginURL                  types.String `tfsdk:"login_url"`
+	LogoutURL                 types.String `tfsdk:"logout_url"`
+	ServiceProviderName       types.String `tfsdk:"service_provider_name"`
+	AllowUserToAccessProfile  types.Bool   `tfsdk:"allow_user_to_access_profile"`
+	AutoRedirect              types.Bool   `tfsdk:"auto_redirect"`
+	SyncGroups                types.Bool   `tfsdk:"sync_groups"`
+	VerifyAudienceRestriction types.Bool   `tfsdk:"verify_audience_restriction"`
+	UseEncryptedAssertion     types.Bool   `tfsdk:"use_encrypted_assertion"`
+	AutoUserCreation          types.Bool   `tfsdk:"auto_user_creation"`
+	LDAPGroupSettings         types.Set    `tfsdk:"ldap_group_settings"`
+}
+
+func (r *SAMLSettingsResourceModelV2) toAPIModel(ctx context.Context, apiModel *SAMLSettingsAPIModel) diag.Diagnostics {
 	diags := diag.Diagnostics{}
 
 	apiModel.Name = r.Name.ValueString()
@@ -72,13 +91,7 @@ func (r *SAMLSettingsResourceModelV1) toAPIModel(ctx context.Context, apiModel *
 	apiModel.NameIDAttribute = r.NameIDAttribute.ValueString()
 	apiModel.LoginURL = r.LoginURL.ValueString()
 	apiModel.LogoutURL = r.LogoutURL.ValueString()
-
-	if !r.AutoUserCreation.IsNull() {
-		apiModel.AutoUserCreation = r.AutoUserCreation.ValueBool()
-	} else {
-		apiModel.AutoUserCreation = !r.NoAutoUserCreation.ValueBool()
-	}
-
+	apiModel.AutoUserCreation = r.AutoUserCreation.ValueBool()
 	apiModel.ServiceProviderName = r.ServiceProviderName.ValueString()
 	apiModel.AllowUserToAccessProfile = r.AllowUserToAccessProfile.ValueBool()
 	apiModel.AutoRedirect = r.AutoRedirect.ValueBool()
@@ -100,7 +113,7 @@ func (r *SAMLSettingsResourceModelV1) toAPIModel(ctx context.Context, apiModel *
 	return diags
 }
 
-func (r *SAMLSettingsResourceModelV1) fromAPIModel(ctx context.Context, apiModel *SAMLSettingsAPIModel) (ds diag.Diagnostics) {
+func (r *SAMLSettingsResourceModelV2) fromAPIModel(ctx context.Context, apiModel *SAMLSettingsAPIModel) (ds diag.Diagnostics) {
 	r.Name = types.StringValue(apiModel.Name)
 	r.Enable = types.BoolValue(apiModel.Enable)
 	r.Certificate = types.StringValue(apiModel.Certificate)
@@ -119,9 +132,7 @@ func (r *SAMLSettingsResourceModelV1) fromAPIModel(ctx context.Context, apiModel
 
 	r.LoginURL = types.StringValue(apiModel.LoginURL)
 	r.LogoutURL = types.StringValue(apiModel.LogoutURL)
-
 	r.AutoUserCreation = types.BoolValue(apiModel.AutoUserCreation)
-
 	r.ServiceProviderName = types.StringValue(apiModel.ServiceProviderName)
 	r.AllowUserToAccessProfile = types.BoolValue(apiModel.AllowUserToAccessProfile)
 	r.AutoRedirect = types.BoolValue(apiModel.AutoRedirect)
@@ -303,17 +314,32 @@ var samlSettingsSchemaV1 = lo.Assign(
 	},
 )
 
+var samlSettingsSchemaV2 = lo.Assign(
+	lo.OmitByKeys(
+		samlSettingsSchemaV1,
+		[]string{"no_auto_user_creation"},
+	),
+	map[string]schema.Attribute{
+		"auto_user_creation": schema.BoolAttribute{
+			Optional:            true,
+			Computed:            true,
+			Default:             booldefault.StaticBool(true),
+			MarkdownDescription: "When set, authenticated users are automatically created in Artifactory. When not set, for every request from an SSO user, the user is temporarily associated with default groups (if such groups are defined), and the permissions for these groups apply. Without automatic user creation, you must manually create the user inside Artifactory to manage user permissions not attached to their default groups. Default value is `true`.",
+		},
+	},
+)
+
 func (r *SAMLSettingsResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Version:             1,
-		Attributes:          samlSettingsSchemaV1,
+		Version:             2,
+		Attributes:          samlSettingsSchemaV2,
 		MarkdownDescription: "Provides a JFrog [SAML SSO Settings](https://jfrog.com/help/r/jfrog-platform-administration-documentation/saml-sso) resource.\n\n~>Only available for self-hosted instances.",
 	}
 }
 
 func (r *SAMLSettingsResource) UpgradeState(ctx context.Context) map[int64]resource.StateUpgrader {
 	return map[int64]resource.StateUpgrader{
-		// State upgrade implementation from 0 (prior state version) to 1 (Schema.Version)
+		// State upgrade implementation from 0 (prior state version) to 2 (Schema.Version)
 		0: {
 			PriorSchema: &schema.Schema{
 				Attributes: samlSettingsSchemaV0,
@@ -326,12 +352,58 @@ func (r *SAMLSettingsResource) UpgradeState(ctx context.Context) map[int64]resou
 					return
 				}
 
-				upgradedStateData := SAMLSettingsResourceModelV1{
-					SAMLSettingsResourceModelV0: priorStateData,
-					AutoUserCreation:            types.BoolValue(true),
+				upgradedStateData := SAMLSettingsResourceModelV2{
+					Name:                      priorStateData.Name,
+					Enable:                    priorStateData.Enable,
+					Certificate:               priorStateData.Certificate,
+					EmailAttribute:            priorStateData.EmailAttribute,
+					GroupAttribute:            priorStateData.GroupAttribute,
+					NameIDAttribute:           priorStateData.NameIDAttribute,
+					LoginURL:                  priorStateData.LoginURL,
+					LogoutURL:                 priorStateData.LogoutURL,
+					ServiceProviderName:       priorStateData.ServiceProviderName,
+					AllowUserToAccessProfile:  priorStateData.AllowUserToAccessProfile,
+					AutoRedirect:              priorStateData.AutoRedirect,
+					SyncGroups:                priorStateData.SyncGroups,
+					VerifyAudienceRestriction: priorStateData.VerifyAudienceRestriction,
+					UseEncryptedAssertion:     priorStateData.UseEncryptedAssertion,
+					AutoUserCreation:          types.BoolValue(!priorStateData.NoAutoUserCreation.ValueBool()),
 				}
 
-				upgradedStateData.AutoUserCreation = types.BoolValue(!priorStateData.NoAutoUserCreation.ValueBool())
+				resp.Diagnostics.Append(resp.State.Set(ctx, upgradedStateData)...)
+			},
+		},
+		// State upgrade implementation from 1 (prior state version) to 2 (Schema.Version)
+		1: {
+			PriorSchema: &schema.Schema{
+				Attributes: samlSettingsSchemaV0,
+			},
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				var priorStateData SAMLSettingsResourceModelV1
+
+				resp.Diagnostics.Append(req.State.Get(ctx, &priorStateData)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+
+				upgradedStateData := SAMLSettingsResourceModelV2{
+					Name:                      priorStateData.Name,
+					Enable:                    priorStateData.Enable,
+					Certificate:               priorStateData.Certificate,
+					EmailAttribute:            priorStateData.EmailAttribute,
+					GroupAttribute:            priorStateData.GroupAttribute,
+					NameIDAttribute:           priorStateData.NameIDAttribute,
+					LoginURL:                  priorStateData.LoginURL,
+					LogoutURL:                 priorStateData.LogoutURL,
+					ServiceProviderName:       priorStateData.ServiceProviderName,
+					AllowUserToAccessProfile:  priorStateData.AllowUserToAccessProfile,
+					AutoRedirect:              priorStateData.AutoRedirect,
+					SyncGroups:                priorStateData.SyncGroups,
+					VerifyAudienceRestriction: priorStateData.VerifyAudienceRestriction,
+					UseEncryptedAssertion:     priorStateData.UseEncryptedAssertion,
+					AutoUserCreation:          priorStateData.AutoUserCreation,
+					LDAPGroupSettings:         priorStateData.LDAPGroupSettings,
+				}
 
 				resp.Diagnostics.Append(resp.State.Set(ctx, upgradedStateData)...)
 			},
@@ -339,19 +411,10 @@ func (r *SAMLSettingsResource) UpgradeState(ctx context.Context) map[int64]resou
 	}
 }
 
-func (r *SAMLSettingsResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	// Prevent panic if the provider has not been configured.
-	if req.ProviderData == nil {
-		return
-	}
-	m := req.ProviderData.(PlatformProviderMetadata).ProviderMetadata
-	r.ProviderData = &m
-}
-
 func (r *SAMLSettingsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	go util.SendUsageResourceCreate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
-	var plan SAMLSettingsResourceModelV1
+	var plan SAMLSettingsResourceModelV2
 
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -386,7 +449,7 @@ func (r *SAMLSettingsResource) Create(ctx context.Context, req resource.CreateRe
 func (r *SAMLSettingsResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	go util.SendUsageResourceRead(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
-	var state SAMLSettingsResourceModelV1
+	var state SAMLSettingsResourceModelV2
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -430,7 +493,7 @@ func (r *SAMLSettingsResource) Read(ctx context.Context, req resource.ReadReques
 func (r *SAMLSettingsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	go util.SendUsageResourceUpdate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
-	var plan SAMLSettingsResourceModelV1
+	var plan SAMLSettingsResourceModelV2
 
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -466,7 +529,7 @@ func (r *SAMLSettingsResource) Update(ctx context.Context, req resource.UpdateRe
 func (r *SAMLSettingsResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	go util.SendUsageResourceDelete(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
-	var state SAMLSettingsResourceModelV1
+	var state SAMLSettingsResourceModelV2
 
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)

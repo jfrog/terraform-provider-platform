@@ -148,15 +148,6 @@ type oidcConfigurationAPIModel struct {
 	UseDefaultProxy bool   `json:"use_default_proxy"`
 }
 
-func (r *oidcConfigurationResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	// Prevent panic if the provider has not been configured.
-	if req.ProviderData == nil {
-		return
-	}
-	m := req.ProviderData.(PlatformProviderMetadata).ProviderMetadata
-	r.ProviderData = &m
-}
-
 func (r *oidcConfigurationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	go util.SendUsageResourceCreate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 

@@ -33,7 +33,7 @@ const odicIdentityMappingEndpoint = "/access/api/v1/oidc/{provider_name}/identit
 var _ resource.Resource = (*odicIdentityMappingResource)(nil)
 
 type odicIdentityMappingResource struct {
-	ProviderData PlatformProviderMetadata
+	ProviderData util.ProviderMetadata
 	TypeName     string
 }
 
@@ -316,7 +316,7 @@ func (r *odicIdentityMappingResource) Configure(ctx context.Context, req resourc
 	if req.ProviderData == nil {
 		return
 	}
-	r.ProviderData = req.ProviderData.(PlatformProviderMetadata)
+	r.ProviderData = req.ProviderData.(util.ProviderMetadata)
 }
 
 func (r *odicIdentityMappingResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
