@@ -34,7 +34,7 @@ var supportedServerProviderTypes = []string{"DIRECT", "NGINX", "APACHE"}
 var _ resource.Resource = (*reverseProxyResource)(nil)
 
 type reverseProxyResource struct {
-	ProviderData PlatformProviderMetadata
+	ProviderData util.ProviderMetadata
 	TypeName     string
 }
 
@@ -219,7 +219,7 @@ func (r *reverseProxyResource) Configure(ctx context.Context, req resource.Confi
 	if req.ProviderData == nil {
 		return
 	}
-	r.ProviderData = req.ProviderData.(PlatformProviderMetadata)
+	r.ProviderData = req.ProviderData.(util.ProviderMetadata)
 }
 
 func (r *reverseProxyResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

@@ -161,15 +161,6 @@ func (r *CrowdSettingsResource) Schema(ctx context.Context, req resource.SchemaR
 	}
 }
 
-func (r *CrowdSettingsResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	// Prevent panic if the provider has not been configured.
-	if req.ProviderData == nil {
-		return
-	}
-	m := req.ProviderData.(PlatformProviderMetadata).ProviderMetadata
-	r.ProviderData = &m
-}
-
 func (r *CrowdSettingsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	go util.SendUsageResourceCreate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 

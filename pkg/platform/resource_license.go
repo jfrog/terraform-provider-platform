@@ -24,7 +24,7 @@ const (
 var _ resource.Resource = (*licenseResource)(nil)
 
 type licenseResource struct {
-	ProviderData PlatformProviderMetadata
+	ProviderData util.ProviderMetadata
 	TypeName     string
 }
 
@@ -108,7 +108,7 @@ func (r *licenseResource) Configure(ctx context.Context, req resource.ConfigureR
 	if req.ProviderData == nil {
 		return
 	}
-	r.ProviderData = req.ProviderData.(PlatformProviderMetadata)
+	r.ProviderData = req.ProviderData.(util.ProviderMetadata)
 }
 
 func (r *licenseResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

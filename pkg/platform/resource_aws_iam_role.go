@@ -30,7 +30,7 @@ func NewAWSIAMRoleResource() resource.Resource {
 }
 
 type AWSIAMRoleResource struct {
-	ProviderData PlatformProviderMetadata
+	ProviderData util.ProviderMetadata
 	TypeName     string
 }
 
@@ -79,7 +79,7 @@ func (r *AWSIAMRoleResource) Configure(ctx context.Context, req resource.Configu
 	if req.ProviderData == nil {
 		return
 	}
-	r.ProviderData = req.ProviderData.(PlatformProviderMetadata)
+	r.ProviderData = req.ProviderData.(util.ProviderMetadata)
 
 	supported, err := util.CheckVersion(r.ProviderData.ArtifactoryVersion, "7.90.10")
 	if err != nil {

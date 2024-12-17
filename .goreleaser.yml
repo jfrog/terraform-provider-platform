@@ -13,7 +13,7 @@ builds:
   flags:
     - -trimpath
   ldflags:
-    - '-s -w -X github.com/jfrog/terraform-provider-platform/pkg/platform.Version={{.Version}}'
+    - '-s -w -X github.com/jfrog/terraform-provider-platform/v{{.Major}}/pkg/platform.Version={{.Version}}'
   goos:
     - freebsd
     - windows

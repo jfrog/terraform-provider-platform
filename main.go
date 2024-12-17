@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/jfrog/terraform-provider-platform/pkg/platform"
+	"github.com/jfrog/terraform-provider-platform/v2/pkg/platform"
 )
 
 // Run the docs generation tool, check its repository for more information on how it works and how docs

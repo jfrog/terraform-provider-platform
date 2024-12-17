@@ -32,7 +32,7 @@ func NewSCIMGroupResource() resource.Resource {
 }
 
 type SCIMGroupResource struct {
-	ProviderData PlatformProviderMetadata
+	ProviderData util.ProviderMetadata
 	TypeName     string
 }
 
@@ -194,7 +194,7 @@ func (r *SCIMGroupResource) Configure(ctx context.Context, req resource.Configur
 	if req.ProviderData == nil {
 		return
 	}
-	r.ProviderData = req.ProviderData.(PlatformProviderMetadata)
+	r.ProviderData = req.ProviderData.(util.ProviderMetadata)
 }
 
 func (r *SCIMGroupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

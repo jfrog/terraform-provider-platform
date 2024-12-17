@@ -36,7 +36,7 @@ var validActions = []string{
 var _ resource.Resource = (*workersServiceResource)(nil)
 
 type workersServiceResource struct {
-	ProviderData PlatformProviderMetadata
+	ProviderData util.ProviderMetadata
 	TypeName     string
 }
 
@@ -328,7 +328,7 @@ func (r *workersServiceResource) Configure(ctx context.Context, req resource.Con
 	if req.ProviderData == nil {
 		return
 	}
-	r.ProviderData = req.ProviderData.(PlatformProviderMetadata)
+	r.ProviderData = req.ProviderData.(util.ProviderMetadata)
 }
 
 func (r *workersServiceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

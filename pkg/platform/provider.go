@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -17,29 +16,22 @@ import (
 	validator_string "github.com/jfrog/terraform-provider-shared/validator/fw/string"
 )
 
-var Version = "1.0.0"
+var Version = "2.0.0"
 
 // needs to be exported so make file can update this
 var productId = "terraform-provider-platform/" + Version
 
 var _ provider.Provider = (*PlatformProvider)(nil)
 
-type PlatformProviderMetadata struct {
-	util.ProviderMetadata
-	MyJFrogClient *resty.Client
-}
-
 type PlatformProvider struct {
-	Meta PlatformProviderMetadata
+	Meta util.ProviderMetadata
 }
 
 type platformProviderModel struct {
 	Url                  types.String `tfsdk:"url"`
 	AccessToken          types.String `tfsdk:"access_token"`
-	MyJFrogAPIToken      types.String `tfsdk:"myjfrog_api_token"`
 	OIDCProviderName     types.String `tfsdk:"oidc_provider_name"`
 	TFCCredentialTagName types.String `tfsdk:"tfc_credential_tag_name"`
-	CheckLicense         types.Bool   `tfsdk:"check_license"`
 }
 
 func NewProvider() func() provider.Provider {
@@ -73,7 +65,7 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 		return
 	}
 
-	platformClient, err := client.Build(url, productId)
+	restyClient, err := client.Build(url, productId)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error creating Resty client",
@@ -84,7 +76,7 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 
 	oidcProviderName := config.OIDCProviderName.ValueString()
 	if oidcProviderName != "" {
-		oidcAccessToken, err := util.OIDCTokenExchange(ctx, platformClient, oidcProviderName, config.TFCCredentialTagName.ValueString())
+		oidcAccessToken, err := util.OIDCTokenExchange(ctx, restyClient, oidcProviderName, config.TFCCredentialTagName.ValueString())
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Failed OIDC ID token exchange",
@@ -106,19 +98,6 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 		accessToken = config.AccessToken.ValueString()
 	}
 
-	myJFrogAPIToken := util.CheckEnvVars([]string{"JFROG_MYJFROG_API_TOKEN"}, "")
-	if config.MyJFrogAPIToken.ValueString() != "" {
-		myJFrogAPIToken = config.MyJFrogAPIToken.ValueString()
-	}
-
-	if accessToken == "" && myJFrogAPIToken == "" {
-		resp.Diagnostics.AddError(
-			"Missing JFrog Access Token and MyJFrog API token",
-			"Neither Access Token nor MyJFrog API Token were found in environment variables or provider configuration. Provider will not function.",
-		)
-		return
-	}
-
 	if accessToken == "" {
 		resp.Diagnostics.AddWarning(
 			"Missing JFrog Access Token",
@@ -126,16 +105,9 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 		)
 	}
 
-	if myJFrogAPIToken == "" {
-		resp.Diagnostics.AddWarning(
-			"Missing MyJFrog API Token",
-			"MyJFrog API Token was not found in the JFROG_MYJFROG_API_TOKEN environment variable or provider configuration block myjfrog_api_token attribute. MyJFrog functionality will be affected.",
-		)
-	}
-
 	artifactoryVersion := ""
 	if len(accessToken) > 0 {
-		_, err = client.AddAuth(platformClient, "", accessToken)
+		_, err = client.AddAuth(restyClient, "", accessToken)
 		if err != nil {
 			resp.Diagnostics.AddError(
 				"Error adding Auth to Resty client",
@@ -144,7 +116,7 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 			return
 		}
 
-		version, err := util.GetArtifactoryVersion(platformClient)
+		version, err := util.GetArtifactoryVersion(restyClient)
 		if err != nil {
 			resp.Diagnostics.AddWarning(
 				"Error getting Artifactory version",
@@ -155,39 +127,16 @@ func (p *PlatformProvider) Configure(ctx context.Context, req provider.Configure
 		artifactoryVersion = version
 
 		featureUsage := fmt.Sprintf("Terraform/%s", req.TerraformVersion)
-		go util.SendUsage(ctx, platformClient.R(), productId, featureUsage)
-	}
-
-	myJFrogClient, err := client.Build("https://my.jfrog.com", productId)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error creating Resty client for MyJFrog",
-			err.Error(),
-		)
-		return
-	}
-
-	if len(myJFrogAPIToken) > 0 {
-		_, err := client.AddAuth(myJFrogClient, "", myJFrogAPIToken)
-		if err != nil {
-			resp.Diagnostics.AddError(
-				"Error adding Auth to Resty client for MyJFrog",
-				err.Error(),
-			)
-			return
-		}
+		go util.SendUsage(ctx, restyClient.R(), productId, featureUsage)
 	}
 
 	featureUsage := fmt.Sprintf("Terraform/%s", req.TerraformVersion)
-	go util.SendUsage(ctx, platformClient.R(), productId, featureUsage)
+	go util.SendUsage(ctx, restyClient.R(), productId, featureUsage)
 
-	meta := PlatformProviderMetadata{
-		ProviderMetadata: util.ProviderMetadata{
-			Client:             platformClient,
-			ArtifactoryVersion: artifactoryVersion,
-			ProductId:          productId,
-		},
-		MyJFrogClient: myJFrogClient,
+	meta := util.ProviderMetadata{
+		Client:             restyClient,
+		ArtifactoryVersion: artifactoryVersion,
+		ProductId:          productId,
 	}
 
 	p.Meta = meta
@@ -244,15 +193,6 @@ func (p *PlatformProvider) Schema(ctx context.Context, req provider.SchemaReques
 				},
 				MarkdownDescription: "This is a access token that can be given to you by your admin under `Platform Configuration -> User Management -> Access Tokens`. This can also be sourced from the `JFROG_ACCESS_TOKEN` environment variable.",
 			},
-			"myjfrog_api_token": schema.StringAttribute{
-				Optional:  true,
-				Sensitive: true,
-				Validators: []validator.String{
-					stringvalidator.LengthAtLeast(1),
-				},
-				MarkdownDescription: "MyJFrog API token that allows you to make changes to your JFrog account. See [Generate a Token in MyJFrog](https://jfrog.com/help/r/jfrog-hosting-models-documentation/generate-a-token-in-myjfrog) for more details. This can also be sourced from the `JFROG_MYJFROG_API_TOKEN` environment variable.",
-				DeprecationMessage:  "MyJFrog API token is deprecated. Use provider 'jfrog/myjfrog' https://registry.terraform.io/providers/jfrog/myjfrog instead.",
-			},
 			"oidc_provider_name": schema.StringAttribute{
 				Optional: true,
 				Validators: []validator.String{
@@ -266,11 +206,6 @@ func (p *PlatformProvider) Schema(ctx context.Context, req provider.SchemaReques
 					stringvalidator.LengthAtLeast(1),
 				},
 				Description: "Terraform Cloud Workload Identity Token tag name. Use for generating multiple TFC workload identity tokens. When set, the provider will attempt to use env var with this tag name as suffix. **Note:** this is case sensitive, so if set to `JFROG`, then env var `TFC_WORKLOAD_IDENTITY_TOKEN_JFROG` is used instead of `TFC_WORKLOAD_IDENTITY_TOKEN`. See [Generating Multiple Tokens](https://developer.hashicorp.com/terraform/cloud-docs/workspaces/dynamic-provider-credentials/manual-generation#generating-multiple-tokens) on HCP Terraform for more details.",
-			},
-			"check_license": schema.BoolAttribute{
-				Optional:            true,
-				MarkdownDescription: "Toggle for pre-flight checking of Artifactory Pro and Enterprise license. Default to `true`.",
-				DeprecationMessage:  "Remove this attribute from your provider configuration as it is no longer used and the attribute will be removed in the next major version of the provider.",
 			},
 		},
 	}

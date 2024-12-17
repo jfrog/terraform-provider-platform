@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -21,9 +22,8 @@ import (
 )
 
 const (
-	gitHubProviderType        = "GitHub"
-	gitHubProviderURL         = "https://token.actions.githubusercontent.com"
-	odicConfigurationEndpoint = "/access/api/v1/oidc"
+	gitHubProviderType = "GitHub"
+	gitHubProviderURL  = "https://token.actions.githubusercontent.com"
 )
 
 var OIDCConfigurationNameValidators = []validator.String{
@@ -34,24 +34,24 @@ var OIDCConfigurationNameValidators = []validator.String{
 	),
 }
 
-var _ resource.Resource = (*odicConfigurationResource)(nil)
+var _ resource.Resource = (*oidcConfigurationResource)(nil)
 
-type odicConfigurationResource struct {
-	ProviderData PlatformProviderMetadata
-	TypeName     string
+type oidcConfigurationResource struct {
+	util.JFrogResource
 }
 
 func NewOIDCConfigurationResource() resource.Resource {
-	return &odicConfigurationResource{
-		TypeName: "platform_oidc_configuration",
+	return &oidcConfigurationResource{
+		JFrogResource: util.JFrogResource{
+			TypeName:                "platform_oidc_configuration",
+			ValidArtifactoryVersion: "7.73.1",
+			CollectionEndpoint:      "/access/api/v1/oidc",
+			DocumentEndpoint:        "/access/api/v1/oidc/{name}",
+		},
 	}
 }
 
-func (r *odicConfigurationResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = r.TypeName
-}
-
-func (r *odicConfigurationResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *oidcConfigurationResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
@@ -100,13 +100,19 @@ func (r *odicConfigurationResource) Schema(ctx context.Context, req resource.Sch
 				},
 				Description: "If set, this Identity Configuration will be available in the scope of the given project (editable by platform admin and project admin). If not set, this Identity Configuration will be global and only editable by platform admin. Once set, the projectKey cannot be changed.",
 			},
+			"use_default_proxy": schema.BoolAttribute{
+				Optional:            true,
+				Computed:            true,
+				Default:             booldefault.StaticBool(false),
+				MarkdownDescription: "This enables and disables the default proxy for OIDC integration. If enabled, the OIDC mechanism will utilize the default proxy for all OIDC requests. If disabled, the OIDC mechanism does not use any proxy for all OIDC requests. Before enabling this functionality you must configure the default proxy.",
+			},
 		},
 		MarkdownDescription: "Manage OIDC configuration in JFrog platform. See the JFrog [OIDC configuration documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-an-oidc-integration) for more information.",
 	}
 }
 
-func (r odicConfigurationResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
-	var data odicConfigurationResourceModel
+func (r oidcConfigurationResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data oidcConfigurationResourceModel
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
@@ -122,36 +128,30 @@ func (r odicConfigurationResource) ValidateConfig(ctx context.Context, req resou
 	}
 }
 
-type odicConfigurationResourceModel struct {
-	Name         types.String `tfsdk:"name"`
-	Description  types.String `tfsdk:"description"`
-	IssuerURL    types.String `tfsdk:"issuer_url"`
-	ProviderType types.String `tfsdk:"provider_type"`
-	Audience     types.String `tfsdk:"audience"`
-	ProjectKey   types.String `tfsdk:"project_key"`
+type oidcConfigurationResourceModel struct {
+	Name            types.String `tfsdk:"name"`
+	Description     types.String `tfsdk:"description"`
+	IssuerURL       types.String `tfsdk:"issuer_url"`
+	ProviderType    types.String `tfsdk:"provider_type"`
+	Audience        types.String `tfsdk:"audience"`
+	ProjectKey      types.String `tfsdk:"project_key"`
+	UseDefaultProxy types.Bool   `tfsdk:"use_default_proxy"`
 }
 
-type odicConfigurationAPIModel struct {
-	Name         string `json:"name"`
-	Description  string `json:"description,omitempty"`
-	IssuerURL    string `json:"issuer_url"`
-	ProviderType string `json:"provider_type"`
-	Audience     string `json:"audience,omitempty"`
-	ProjectKey   string `json:"project_key,omitempty"`
+type oidcConfigurationAPIModel struct {
+	Name            string `json:"name"`
+	Description     string `json:"description,omitempty"`
+	IssuerURL       string `json:"issuer_url"`
+	ProviderType    string `json:"provider_type"`
+	Audience        string `json:"audience,omitempty"`
+	ProjectKey      string `json:"project_key,omitempty"`
+	UseDefaultProxy bool   `json:"use_default_proxy"`
 }
 
-func (r *odicConfigurationResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	// Prevent panic if the provider has not been configured.
-	if req.ProviderData == nil {
-		return
-	}
-	r.ProviderData = req.ProviderData.(PlatformProviderMetadata)
-}
-
-func (r *odicConfigurationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *oidcConfigurationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	go util.SendUsageResourceCreate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
-	var plan odicConfigurationResourceModel
+	var plan oidcConfigurationResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -163,18 +163,19 @@ func (r *odicConfigurationResource) Create(ctx context.Context, req resource.Cre
 		providerType = "Generic OpenID Connect"
 	}
 
-	odicConfig := odicConfigurationAPIModel{
-		Name:         plan.Name.ValueString(),
-		IssuerURL:    plan.IssuerURL.ValueString(),
-		ProviderType: providerType,
-		Audience:     plan.Audience.ValueString(),
-		Description:  plan.Description.ValueString(),
-		ProjectKey:   plan.ProjectKey.ValueString(),
+	oidcConfig := oidcConfigurationAPIModel{
+		Name:            plan.Name.ValueString(),
+		IssuerURL:       plan.IssuerURL.ValueString(),
+		ProviderType:    providerType,
+		Audience:        plan.Audience.ValueString(),
+		Description:     plan.Description.ValueString(),
+		ProjectKey:      plan.ProjectKey.ValueString(),
+		UseDefaultProxy: plan.UseDefaultProxy.ValueBool(),
 	}
 
 	response, err := r.ProviderData.Client.R().
-		SetBody(&odicConfig).
-		Post(odicConfigurationEndpoint)
+		SetBody(&oidcConfig).
+		Post(r.CollectionEndpoint)
 	if err != nil {
 		utilfw.UnableToCreateResourceError(resp, err.Error())
 		return
@@ -188,22 +189,22 @@ func (r *odicConfigurationResource) Create(ctx context.Context, req resource.Cre
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-func (r *odicConfigurationResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *oidcConfigurationResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	go util.SendUsageResourceRead(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
-	var state odicConfigurationResourceModel
+	var state oidcConfigurationResourceModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	var odicConfig odicConfigurationAPIModel
+	var oidcConfig oidcConfigurationAPIModel
 
 	response, err := r.ProviderData.Client.R().
 		SetPathParam("name", state.Name.ValueString()).
-		SetResult(&odicConfig).
-		Get(odicConfigurationEndpoint + "/{name}")
+		SetResult(&oidcConfig).
+		Get(r.DocumentEndpoint)
 
 	if err != nil {
 		utilfw.UnableToRefreshResourceError(resp, err.Error())
@@ -224,31 +225,33 @@ func (r *odicConfigurationResource) Read(ctx context.Context, req resource.ReadR
 
 	// Convert from the API data model to the Terraform data model
 	// and refresh any attribute values.
-	state.Name = types.StringValue(odicConfig.Name)
+	state.Name = types.StringValue(oidcConfig.Name)
 
-	if len(odicConfig.Description) > 0 {
-		state.Description = types.StringValue(odicConfig.Description)
+	if len(oidcConfig.Description) > 0 {
+		state.Description = types.StringValue(oidcConfig.Description)
 	}
 
-	state.IssuerURL = types.StringValue(odicConfig.IssuerURL)
+	state.IssuerURL = types.StringValue(oidcConfig.IssuerURL)
 
-	if len(odicConfig.Audience) > 0 {
-		state.Audience = types.StringValue(odicConfig.Audience)
+	if len(oidcConfig.Audience) > 0 {
+		state.Audience = types.StringValue(oidcConfig.Audience)
 	}
 
-	if odicConfig.ProviderType == "Generic OpenID Connect" {
+	if oidcConfig.ProviderType == "Generic OpenID Connect" {
 		state.ProviderType = types.StringValue("generic")
 	} else {
-		state.ProviderType = types.StringValue(odicConfig.ProviderType)
+		state.ProviderType = types.StringValue(oidcConfig.ProviderType)
 	}
+
+	state.UseDefaultProxy = types.BoolValue(oidcConfig.UseDefaultProxy)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (r *odicConfigurationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *oidcConfigurationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	go util.SendUsageResourceUpdate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
-	var plan odicConfigurationResourceModel
+	var plan oidcConfigurationResourceModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -260,19 +263,20 @@ func (r *odicConfigurationResource) Update(ctx context.Context, req resource.Upd
 		providerType = "Generic OpenID Connect"
 	}
 
-	odicConfig := odicConfigurationAPIModel{
-		Name:         plan.Name.ValueString(),
-		IssuerURL:    plan.IssuerURL.ValueString(),
-		ProviderType: providerType,
-		Audience:     plan.Audience.ValueString(),
-		Description:  plan.Description.ValueString(),
-		ProjectKey:   plan.ProjectKey.ValueString(),
+	oidcConfig := oidcConfigurationAPIModel{
+		Name:            plan.Name.ValueString(),
+		IssuerURL:       plan.IssuerURL.ValueString(),
+		ProviderType:    providerType,
+		Audience:        plan.Audience.ValueString(),
+		Description:     plan.Description.ValueString(),
+		ProjectKey:      plan.ProjectKey.ValueString(),
+		UseDefaultProxy: plan.UseDefaultProxy.ValueBool(),
 	}
 
 	response, err := r.ProviderData.Client.R().
 		SetPathParam("name", plan.Name.ValueString()).
-		SetBody(&odicConfig).
-		Put(odicConfigurationEndpoint + "/{name}")
+		SetBody(&oidcConfig).
+		Put(r.DocumentEndpoint)
 	if err != nil {
 		utilfw.UnableToUpdateResourceError(resp, err.Error())
 		return
@@ -286,10 +290,10 @@ func (r *odicConfigurationResource) Update(ctx context.Context, req resource.Upd
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
-func (r *odicConfigurationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *oidcConfigurationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	go util.SendUsageResourceDelete(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
-	var state odicConfigurationResourceModel
+	var state oidcConfigurationResourceModel
 
 	diags := req.State.Get(ctx, &state)
 	resp.Diagnostics.Append(diags...)
@@ -299,7 +303,7 @@ func (r *odicConfigurationResource) Delete(ctx context.Context, req resource.Del
 
 	response, err := r.ProviderData.Client.R().
 		SetPathParam("name", state.Name.ValueString()).
-		Delete(odicConfigurationEndpoint + "/{name}")
+		Delete(r.DocumentEndpoint)
 	if err != nil {
 		utilfw.UnableToDeleteResourceError(resp, err.Error())
 		return
@@ -314,7 +318,7 @@ func (r *odicConfigurationResource) Delete(ctx context.Context, req resource.Del
 	// the resource from state if there are no other errors.
 }
 
-func (r *odicConfigurationResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *oidcConfigurationResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	parts := strings.SplitN(req.ID, ":", 2)
 
 	if len(parts) > 0 && parts[0] != "" {

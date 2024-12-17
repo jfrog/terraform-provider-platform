@@ -182,15 +182,6 @@ type groupMembersResponseAPIModel struct {
 	Members []string `json:"members"`
 }
 
-func (r *groupResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	// Prevent panic if the provider has not been configured.
-	if req.ProviderData == nil {
-		return
-	}
-	m := req.ProviderData.(PlatformProviderMetadata).ProviderMetadata
-	r.ProviderData = &m
-}
-
 func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	go util.SendUsageResourceCreate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 

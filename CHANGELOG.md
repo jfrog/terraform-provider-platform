@@ -1,3 +1,17 @@
+## 2.0.0 (December 18, 2024). Tested on Artifactory 7.98.11 with Terraform 1.10.2 and OpenTofu 1.8.7
+
+NOTES:
+
+* provider: Deprecated attributes `check_license` and `myjfrog_api_token` are removed.
+* resource/platform_myjfrog_ip_allowlist: Deprecated resource is removed.
+* resource/platform_saml_settings: Deprecated attribute `no_auto_user_creation` is removed.
+
+IMPROVEMENTS:
+
+* resource/platform_oidc_configuration: Add `use_default_proxy` attribute to support the use of default proxy configuration.
+
+PR: [#181](https://github.com/jfrog/terraform-provider-platform/pull/181)
+
 ## 1.19.1 (December 10, 2024). Tested on Artifactory 7.98.10 with Terraform 1.10.1 and OpenTofu 1.8.7
 
 BUG FIXES:
@@ -113,7 +127,7 @@ FEATURES:
 NOTES:
 
 * provider: Attribute `myjfrog_api_token` is being deprecated. Issue: [#99](https://github.com/jfrog/terraform-provider-platform/issues/99) PR: [#114](https://github.com/jfrog/terraform-provider-platform/pull/114)
-* resource/platform_myjfrog_ip_allowlist is being deprecated and is moved to new [MyJFrog provider](https://registry.terraform.io/providers/jfrog/myjfrog/latest). Use the `myjfrog_ip_allowlist` resource there instead.  Issue: [#99](https://github.com/jfrog/terraform-provider-platform/issues/99 PR: [#113](https://github.com/jfrog/terraform-provider-platform/pull/113)
+* resource/platform_myjfrog_ip_allowlist is being deprecated and is moved to new [MyJFrog provider](https://registry.terraform.io/providers/jfrog/myjfrog/latest). Use the `myjfrog_ip_allowlist` resource there instead. Issue: [#99](https://github.com/jfrog/terraform-provider-platform/issues/99 PR: [#113](https://github.com/jfrog/terraform-provider-platform/pull/113)
 
 ## 1.9.0 (July 19, 2024). Tested on Artifactory 7.84.17 with Terraform 1.9.2 and OpenTofu 1.7.3
 

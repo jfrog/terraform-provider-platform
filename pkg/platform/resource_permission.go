@@ -33,7 +33,7 @@ const PermissionEndpoint = "/access/api/v2/permissions"
 var _ resource.Resource = (*permissionResource)(nil)
 
 type permissionResource struct {
-	ProviderData PlatformProviderMetadata
+	ProviderData util.ProviderMetadata
 	TypeName     string
 }
 
@@ -790,7 +790,7 @@ func (r *permissionResource) Configure(ctx context.Context, req resource.Configu
 	if req.ProviderData == nil {
 		return
 	}
-	r.ProviderData = req.ProviderData.(PlatformProviderMetadata)
+	r.ProviderData = req.ProviderData.(util.ProviderMetadata)
 
 	ok, err := util.CheckVersion(r.ProviderData.ArtifactoryVersion, "7.72.0")
 	if err != nil {
