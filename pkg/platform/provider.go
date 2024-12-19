@@ -163,6 +163,7 @@ func (p *PlatformProvider) Resources(ctx context.Context) []func() resource.Reso
 		NewLicenseResource,
 		NewGlobalRoleResource,
 		NewGroupResource,
+		NewHTTPSSOSettingsResource,
 		NewOIDCConfigurationResource,
 		NewOIDCIdentityMappingResource,
 		NewMyJFrogIPAllowListResource,
