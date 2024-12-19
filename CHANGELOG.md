@@ -1,3 +1,11 @@
+## 2.1.0 (December 20, 2024). Tested on Artifactory 7.98.11 with Terraform 1.10.3 and OpenTofu 1.8.7
+
+FEATURES:
+
+**New Resource:**
+
+* `platform_http_sso_settings` - Resource to manage HTTP SSO settings. PR: [#185](https://github.com/jfrog/terraform-provider-platform/pull/185)
+
 ## 2.0.0 (December 18, 2024). Tested on Artifactory 7.98.11 with Terraform 1.10.2 and OpenTofu 1.8.7
 
 NOTES:

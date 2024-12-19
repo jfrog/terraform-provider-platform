@@ -1,0 +1,1 @@
+terraform import platform_http_sso_settings.my-http-sso-settings my-http-sso-settings
