@@ -43,6 +43,7 @@ func (p *PlatformProvider) Resources(ctx context.Context) []func() resource.Reso
 		NewLicenseResource,
 		NewGlobalRoleResource,
 		NewGroupResource,
+		NewGroupMembersResource,
 		NewHTTPSSOSettingsResource,
 		NewOIDCConfigurationResource,
 		NewOIDCIdentityMappingResource,
