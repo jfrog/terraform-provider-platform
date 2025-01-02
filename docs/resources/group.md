@@ -38,7 +38,8 @@ resource "platform_group" "my-group" {
 - `auto_join` (Boolean) When this parameter is set, any new users defined in the system are automatically assigned to this group.
 - `description` (String) A description for the group.
 - `external_id` (String) New external group ID used to configure the corresponding group in Azure AD.
-- `members` (Set of String) List of users assigned to the group.
+- `members` (Set of String, Deprecated) List of users assigned to the group.
+- `use_group_members_resource` (Boolean) When set to `true`, this resource will ignore the `members` attributes and allow memberships to be managed by `platform_group_members` resource instead. Default value is `true`.
 
 ### Read-Only
 

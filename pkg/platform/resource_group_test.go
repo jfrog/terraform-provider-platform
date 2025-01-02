@@ -17,12 +17,13 @@ func TestAccGroup_full(t *testing.T) {
 
 	temp := `
 		resource "platform_group" "{{ .groupName }}" {
-			name             = "{{ .groupName }}"
-			description 	 = "Test group"
-			external_id      = "externalID"
-			auto_join        = {{ .autoJoin }}
-			admin_privileges = false
-			members 	     = {{ .members }}
+			name                       = "{{ .groupName }}"
+			description 	           = "Test group"
+			external_id                = "externalID"
+			auto_join                  = {{ .autoJoin }}
+			admin_privileges           = false
+			use_group_members_resource = false
+			members                    = {{ .members }}
 		}
 	`
 
@@ -104,6 +105,71 @@ func TestAccGroup_full(t *testing.T) {
 				ImportStateId:                        updated2TestData["groupName"],
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
+				ImportStateVerifyIgnore:              []string{"use_group_members_resource"},
+			},
+		},
+	})
+}
+
+func TestAccGroup_schema_migration(t *testing.T) {
+	_, fqrn, groupName := testutil.MkNames("test-group", "platform_group")
+
+	temp := `
+		resource "platform_group" "{{ .groupName }}" {
+			name             = "{{ .groupName }}"
+			description 	 = "Test group"
+			external_id      = "externalID"
+			auto_join        = "true"
+			admin_privileges = false
+			members          = ["anonymous", "admin"]
+		}
+	`
+
+	testData := map[string]string{
+		"groupName": groupName,
+	}
+
+	config := util.ExecuteTemplate(groupName, temp, testData)
+
+	resource.Test(t, resource.TestCase{
+		Steps: []resource.TestStep{
+			{
+				ExternalProviders: map[string]resource.ExternalProvider{
+					"platform": {
+						Source:            "jfrog/platform",
+						VersionConstraint: "2.1.0",
+					},
+				},
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["groupName"]),
+					resource.TestCheckResourceAttr(fqrn, "description", "Test group"),
+					resource.TestCheckResourceAttr(fqrn, "external_id", "externalID"),
+					resource.TestCheckResourceAttr(fqrn, "auto_join", "true"),
+					resource.TestCheckResourceAttr(fqrn, "admin_privileges", "false"),
+					resource.TestCheckNoResourceAttr(fqrn, "use_group_members_resource"),
+					resource.TestCheckResourceAttrSet(fqrn, "realm"),
+					resource.TestCheckNoResourceAttr(fqrn, "realm_attributes"),
+					resource.TestCheckResourceAttr(fqrn, "members.#", "2"),
+					resource.TestCheckResourceAttr(fqrn, "members.0", "admin"),
+					resource.TestCheckResourceAttr(fqrn, "members.1", "anonymous"),
+				),
+			},
+			{
+				ProtoV6ProviderFactories: testAccProviders(),
+				Config:                   config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["groupName"]),
+					resource.TestCheckResourceAttr(fqrn, "description", "Test group"),
+					resource.TestCheckResourceAttr(fqrn, "external_id", "externalID"),
+					resource.TestCheckResourceAttr(fqrn, "auto_join", "true"),
+					resource.TestCheckResourceAttr(fqrn, "admin_privileges", "false"),
+					resource.TestCheckResourceAttrSet(fqrn, "realm"),
+					resource.TestCheckNoResourceAttr(fqrn, "realm_attributes"),
+					resource.TestCheckResourceAttr(fqrn, "members.#", "2"),
+					resource.TestCheckResourceAttr(fqrn, "members.0", "admin"),
+					resource.TestCheckResourceAttr(fqrn, "members.1", "anonymous"),
+				),
 			},
 		},
 	})
@@ -114,11 +180,12 @@ func TestAccGroup_no_members(t *testing.T) {
 
 	temp := `
 		resource "platform_group" "{{ .groupName }}" {
-			name             = "{{ .groupName }}"
-			description 	 = "Test group"
-			external_id      = "externalID"
-			auto_join        = {{ .autoJoin }}
-			admin_privileges = false
+			name                       = "{{ .groupName }}"
+			description 	           = "Test group"
+			external_id                = "externalID"
+			auto_join                  = {{ .autoJoin }}
+			admin_privileges           = false
+			use_group_members_resource = false
 		}
 
 		resource "artifactory_managed_user" "test-user" {
