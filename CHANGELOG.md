@@ -1,3 +1,15 @@
+## 2.2.0 (January 3, 2025)
+
+FEATURES:
+
+**New Resource:**
+
+* `platform_group_members` - Resource to manage group membership. Issue: [#169](https://github.com/jfrog/terraform-provider-platform/issues/169) PR: [#187](https://github.com/jfrog/terraform-provider-platform/pull/187)
+
+IMPROVEMENTS:
+
+* resource/platform_group: Add `use_group_members_resource` attribute to control if the resource uses `members` attribute or not. Issue: [#169](https://github.com/jfrog/terraform-provider-platform/issues/169) PR: [#187](https://github.com/jfrog/terraform-provider-platform/pull/187)
+
 ## 2.1.0 (December 20, 2024). Tested on Artifactory 7.98.11 with Terraform 1.10.3 and OpenTofu 1.8.7
 
 FEATURES:
