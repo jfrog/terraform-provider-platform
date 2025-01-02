@@ -14,11 +14,11 @@ terraform {
   required_providers {
     artifactory = {
       source  = "registry.terraform.io/jfrog/artifactory"
-      version = "9.9.0"
+      version = "12.7.1"
     }
     platform = {
       source  = "registry.terraform.io/jfrog/platform"
-      version = "1.0.0"
+      version = "2.2.0"
     }
   }
 }
@@ -104,7 +104,7 @@ See the [contribution guide](CONTRIBUTIONS.md).
 
 ## License
 
-Copyright (c) 2024 JFrog.
+Copyright (c) 2025 JFrog.
 
 Apache 2.0 licensed, see [LICENSE][LICENSE] file.
 
