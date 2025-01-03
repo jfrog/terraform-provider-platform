@@ -38,50 +38,75 @@ func NewGroupResource() resource.Resource {
 	}
 }
 
-func (r *groupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = schema.Schema{
-		Attributes: map[string]schema.Attribute{
-			"name": schema.StringAttribute{
-				Required: true,
-				Validators: []validator.String{
-					stringvalidator.LengthBetween(1, 64),
-				},
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
-				MarkdownDescription: "Name of the group.",
+var groupSchemaV0 = schema.Schema{
+	Version: 0,
+	Attributes: map[string]schema.Attribute{
+		"name": schema.StringAttribute{
+			Required: true,
+			Validators: []validator.String{
+				stringvalidator.LengthBetween(1, 64),
 			},
-			"description": schema.StringAttribute{
-				Optional: true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-				MarkdownDescription: "A description for the group.",
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.RequiresReplace(),
 			},
-			"external_id": schema.StringAttribute{
-				Optional: true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-				MarkdownDescription: "New external group ID used to configure the corresponding group in Azure AD.",
+			MarkdownDescription: "Name of the group.",
+		},
+		"description": schema.StringAttribute{
+			Optional: true,
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.UseStateForUnknown(),
 			},
-			"auto_join": schema.BoolAttribute{
-				Optional: true,
-				Computed: true,
-				Default:  booldefault.StaticBool(false),
-				Validators: []validator.Bool{
-					validatorfw.BoolConflict(true, path.Expressions{
-						path.MatchRelative().AtParent().AtName("admin_privileges"),
-					}...),
-				},
-				MarkdownDescription: "When this parameter is set, any new users defined in the system are automatically assigned to this group.",
+			MarkdownDescription: "A description for the group.",
+		},
+		"external_id": schema.StringAttribute{
+			Optional: true,
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.UseStateForUnknown(),
 			},
-			"admin_privileges": schema.BoolAttribute{
-				Optional:            true,
-				Computed:            true,
-				Default:             booldefault.StaticBool(false),
-				MarkdownDescription: "Any users added to this group will automatically be assigned with admin privileges in the system.",
+			MarkdownDescription: "New external group ID used to configure the corresponding group in Azure AD.",
+		},
+		"auto_join": schema.BoolAttribute{
+			Optional: true,
+			Computed: true,
+			Default:  booldefault.StaticBool(false),
+			Validators: []validator.Bool{
+				validatorfw.BoolConflict(true, path.Expressions{
+					path.MatchRelative().AtParent().AtName("admin_privileges"),
+				}...),
 			},
+			MarkdownDescription: "When this parameter is set, any new users defined in the system are automatically assigned to this group.",
+		},
+		"admin_privileges": schema.BoolAttribute{
+			Optional:            true,
+			Computed:            true,
+			Default:             booldefault.StaticBool(false),
+			MarkdownDescription: "Any users added to this group will automatically be assigned with admin privileges in the system.",
+		},
+		"members": schema.SetAttribute{
+			ElementType: types.StringType,
+			Optional:    true,
+			PlanModifiers: []planmodifier.Set{
+				setplanmodifier.UseStateForUnknown(),
+			},
+			MarkdownDescription: "List of users assigned to the group.",
+		},
+		"realm": schema.StringAttribute{
+			Computed:            true,
+			MarkdownDescription: "The realm for the group.",
+		},
+		"realm_attributes": schema.StringAttribute{
+			Computed:            true,
+			MarkdownDescription: "The realm for the group.",
+		},
+	},
+	MarkdownDescription: "Provides a group resource to create and manage groups, and manages membership. A group represents a role and is used with RBAC (Role-Based Access Control) rules. See [JFrog documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/create-and-edit-groups) for more details.",
+}
+
+var groupSchemaV1 = schema.Schema{
+	Version: 1,
+	Attributes: lo.Assign(
+		groupSchemaV0.Attributes,
+		map[string]schema.Attribute{
 			"members": schema.SetAttribute{
 				ElementType: types.StringType,
 				Optional:    true,
@@ -89,21 +114,24 @@ func (r *groupResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 					setplanmodifier.UseStateForUnknown(),
 				},
 				MarkdownDescription: "List of users assigned to the group.",
+				DeprecationMessage:  "Replaced by `platform_group_members` resource. This should not be used in combination with `platform_group_members` resource. Use `use_group_members_resource` attribute to control which resource manages group membership.",
 			},
-			"realm": schema.StringAttribute{
+			"use_group_members_resource": schema.BoolAttribute{
+				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: "The realm for the group.",
-			},
-			"realm_attributes": schema.StringAttribute{
-				Computed:            true,
-				MarkdownDescription: "The realm for the group.",
+				Default:             booldefault.StaticBool(true),
+				MarkdownDescription: "When set to `true`, this resource will ignore the `members` attributes and allow memberships to be managed by `platform_group_members` resource instead. Default value is `true`.",
 			},
 		},
-		MarkdownDescription: "Provides a group resource to create and manage groups, and manages membership. A group represents a role and is used with RBAC (Role-Based Access Control) rules. See [JFrog documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/create-and-edit-groups) for more details.",
-	}
+	),
+	MarkdownDescription: groupSchemaV0.MarkdownDescription,
 }
 
-type groupResourceModel struct {
+func (r *groupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = groupSchemaV1
+}
+
+type groupResourceModelV0 struct {
 	Name            types.String `tfsdk:"name"`
 	Description     types.String `tfsdk:"description"`
 	ExternalId      types.String `tfsdk:"external_id"`
@@ -114,12 +142,20 @@ type groupResourceModel struct {
 	RealmAttributes types.String `tfsdk:"realm_attributes"`
 }
 
-func (r *groupResourceModel) toAPIModel(ctx context.Context, apiModel *groupAPIModel) (ds diag.Diagnostics) {
+type groupResourceModelV1 struct {
+	groupResourceModelV0
+	UseGroupMembersResource types.Bool `tfsdk:"use_group_members_resource"`
+}
+
+func (r *groupResourceModelV1) toAPIModel(ctx context.Context, apiModel *groupAPIModel) (ds diag.Diagnostics) {
 
 	var members []string
-	ds.Append(r.Members.ElementsAs(ctx, &members, false)...)
-	if ds.HasError() {
-		return
+
+	if !r.UseGroupMembersResource.ValueBool() {
+		ds.Append(r.Members.ElementsAs(ctx, &members, false)...)
+		if ds.HasError() {
+			return
+		}
 	}
 
 	*apiModel = groupAPIModel{
@@ -134,7 +170,7 @@ func (r *groupResourceModel) toAPIModel(ctx context.Context, apiModel *groupAPIM
 	return nil
 }
 
-func (r *groupResourceModel) fromAPIModel(ctx context.Context, apiModel groupAPIModel, ignoreMembers bool) diag.Diagnostics {
+func (r *groupResourceModelV1) fromAPIModel(ctx context.Context, apiModel groupAPIModel, ignoreMembers bool) diag.Diagnostics {
 	diags := diag.Diagnostics{}
 
 	r.Name = types.StringValue(apiModel.Name)
@@ -145,21 +181,47 @@ func (r *groupResourceModel) fromAPIModel(ctx context.Context, apiModel groupAPI
 	r.Realm = types.StringPointerValue(apiModel.Realm)
 	r.RealmAttributes = types.StringPointerValue(apiModel.RealmAttributes)
 
-	if r.Members.IsUnknown() {
-		r.Members = types.SetNull(types.StringType)
-	}
-
-	if !ignoreMembers && len(apiModel.Members) > 0 {
-		members, d := types.SetValueFrom(ctx, types.StringType, apiModel.Members)
-		if d != nil {
-			diags.Append(d...)
-			return diags
+	if !r.UseGroupMembersResource.ValueBool() {
+		if r.Members.IsUnknown() {
+			r.Members = types.SetNull(types.StringType)
 		}
 
-		r.Members = members
+		if !ignoreMembers && len(apiModel.Members) > 0 {
+			members, d := types.SetValueFrom(ctx, types.StringType, apiModel.Members)
+			if d != nil {
+				diags.Append(d...)
+				return diags
+			}
+
+			r.Members = members
+		}
 	}
 
 	return diags
+}
+
+func (r *groupResource) UpgradeState(ctx context.Context) map[int64]resource.StateUpgrader {
+	return map[int64]resource.StateUpgrader{
+		// State upgrade implementation from 0 (prior state version) to 1 (Schema.Version)
+		0: {
+			PriorSchema: &groupSchemaV0,
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
+				var priorStateData groupResourceModelV0
+
+				resp.Diagnostics.Append(req.State.Get(ctx, &priorStateData)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
+
+				upgradedStateData := groupResourceModelV1{
+					groupResourceModelV0:    priorStateData,
+					UseGroupMembersResource: types.BoolValue(false),
+				}
+
+				resp.Diagnostics.Append(resp.State.Set(ctx, upgradedStateData)...)
+			},
+		},
+	}
 }
 
 type groupAPIModel struct {
@@ -185,7 +247,7 @@ type groupMembersResponseAPIModel struct {
 func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	go util.SendUsageResourceCreate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
-	var plan *groupResourceModel
+	var plan *groupResourceModelV1
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -226,7 +288,7 @@ func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, 
 func (r *groupResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	go util.SendUsageResourceRead(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
-	var state *groupResourceModel
+	var state *groupResourceModelV1
 	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
@@ -272,8 +334,8 @@ func (r *groupResource) Read(ctx context.Context, req resource.ReadRequest, resp
 func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	go util.SendUsageResourceUpdate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
-	var plan groupResourceModel
-	var state groupResourceModel
+	var plan groupResourceModelV1
+	var state groupResourceModelV1
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -368,7 +430,7 @@ func (r *groupResource) Update(ctx context.Context, req resource.UpdateRequest, 
 func (r *groupResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	go util.SendUsageResourceDelete(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
-	var state groupResourceModel
+	var state groupResourceModelV1
 
 	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)

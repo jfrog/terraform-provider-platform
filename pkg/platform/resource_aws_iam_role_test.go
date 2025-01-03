@@ -17,7 +17,7 @@ func TestAccAWSIAMRole_full(t *testing.T) {
 
 	id, _, _ := testutil.MkNames("test-user-upgrade-", "artifactory_managed_user")
 	username := fmt.Sprintf("dummy_user%d", id)
-	email := fmt.Sprintf(username + "@test.com")
+	email := username + "@test.com"
 
 	temp := `
 	resource "artifactory_managed_user" "{{ .username }}" {
