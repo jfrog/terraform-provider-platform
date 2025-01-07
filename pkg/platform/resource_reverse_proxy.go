@@ -350,9 +350,13 @@ func (r reverseProxyResource) ValidateConfig(ctx context.Context, req resource.V
 		return
 	}
 
+	if config.InternalHostname.IsUnknown() || config.PublicServerName.IsUnknown() || config.SslKeyPath.IsUnknown() || config.SslCertificatePath.IsUnknown() {
+		return
+	}
+
 	switch serverProvider := config.ServerProvider.ValueString(); serverProvider {
 	case "NGINX", "APACHE":
-		if config.InternalHostname.IsNull() || config.InternalHostname.IsUnknown() {
+		if config.InternalHostname.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("internal_hostname"),
 				"Missing Attribute Configuration",
@@ -360,7 +364,7 @@ func (r reverseProxyResource) ValidateConfig(ctx context.Context, req resource.V
 			)
 		}
 
-		if config.PublicServerName.IsNull() || config.PublicServerName.IsUnknown() {
+		if config.PublicServerName.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("public_server_name"),
 				"Missing Attribute Configuration",
@@ -370,7 +374,7 @@ func (r reverseProxyResource) ValidateConfig(ctx context.Context, req resource.V
 	}
 
 	if config.UseHttps.ValueBool() {
-		if config.SslKeyPath.IsNull() || config.SslKeyPath.IsUnknown() {
+		if config.SslKeyPath.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("ssl_key_path"),
 				"Missing Attribute Configuration",
@@ -378,7 +382,7 @@ func (r reverseProxyResource) ValidateConfig(ctx context.Context, req resource.V
 			)
 		}
 
-		if config.SslCertificatePath.IsNull() || config.SslCertificatePath.IsUnknown() {
+		if config.SslCertificatePath.IsNull() {
 			resp.Diagnostics.AddAttributeError(
 				path.Root("ssl_certificate_path"),
 				"Missing Attribute Configuration",
