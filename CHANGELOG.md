@@ -1,4 +1,4 @@
-## 2.2.1 (January 8, 2025)
+## 2.2.1 (January 8, 2025). Tested on Artifactory 7.98.13 with Terraform 1.10.3 and OpenTofu 1.8.8
 
 BUG FIXES:
 
