@@ -57,7 +57,6 @@ func TestAccReverseProxy_full(t *testing.T) {
 	updatedConfig := util.ExecuteTemplate(reverseProxyName, updatedTemp, updatedTestData)
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProviders(),
 		Steps: []resource.TestStep{
 			{
@@ -128,7 +127,6 @@ func testAccReverseProxy_missing_internal_hostname(t *testing.T, serverProvider 
 	config := util.ExecuteTemplate(reverseProxyName, temp, testData)
 
 	return t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProviders(),
 		Steps: []resource.TestStep{
 			{
@@ -158,7 +156,6 @@ func testAccReverseProxy_missing_public_server_name(t *testing.T, serverProvider
 	config := util.ExecuteTemplate(reverseProxyName, temp, testData)
 
 	return t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProviders(),
 		Steps: []resource.TestStep{
 			{
@@ -201,7 +198,6 @@ func testAccReverseProxy_missing_ssl_key_path(t *testing.T, serverProvider strin
 	config := util.ExecuteTemplate(reverseProxyName, temp, testData)
 
 	return t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProviders(),
 		Steps: []resource.TestStep{
 			{
@@ -235,7 +231,6 @@ func testAccReverseProxy_missing_ssl_certificate_path(t *testing.T, serverProvid
 	config := util.ExecuteTemplate(reverseProxyName, temp, testData)
 
 	return t, resource.TestCase{
-		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProviders(),
 		Steps: []resource.TestStep{
 			{
