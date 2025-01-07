@@ -1,3 +1,9 @@
+## 2.2.1 (January 8, 2025)
+
+BUG FIXES:
+
+* resource/platform_reverse_proxy: Fix validation for optional attributes not working for variables. Issue: [#186](https://github.com/jfrog/terraform-provider-platform/issues/186) PR: [#188](https://github.com/jfrog/terraform-provider-platform/pull/188)
+
 ## 2.2.0 (January 3, 2025). Tested on Artifactory 7.98.12 with Terraform 1.10.3 and OpenTofu 1.8.8
 
 FEATURES:
