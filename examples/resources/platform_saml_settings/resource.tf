@@ -7,7 +7,7 @@ resource "platform_saml_settings" "my-okta-saml-settings" {
   name_id_attribute            = "id"
   login_url                    = "http://tempurl.org/saml"
   logout_url                   = "https://myaccount.okta.com"
-  no_auto_user_creation        = false
+  auto_user_creation           = true
   service_provider_name        = "okta"
   allow_user_to_access_profile = true
   auto_redirect                = true
