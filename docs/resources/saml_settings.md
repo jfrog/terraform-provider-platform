@@ -25,7 +25,7 @@ resource "platform_saml_settings" "my-okta-saml-settings" {
   name_id_attribute            = "id"
   login_url                    = "http://tempurl.org/saml"
   logout_url                   = "https://myaccount.okta.com"
-  no_auto_user_creation        = false
+  auto_user_creation           = true
   service_provider_name        = "okta"
   allow_user_to_access_profile = true
   auto_redirect                = true
@@ -51,7 +51,7 @@ resource "platform_saml_settings" "my-okta-saml-settings" {
 - `allow_user_to_access_profile` (Boolean) When set, auto created users will have access to their profile page and will be able to perform actions such as generating an API key. Default value is `false`.
 - `auto_redirect` (Boolean) When set, clicking on the login link will direct users to the configured SAML login URL. Default value is `false`.
 - `auto_user_creation` (Boolean) When set, authenticated users are automatically created in Artifactory. When not set, for every request from an SSO user, the user is temporarily associated with default groups (if such groups are defined), and the permissions for these groups apply. Without automatic user creation, you must manually create the user inside Artifactory to manage user permissions not attached to their default groups. Default value is `true`.
-- `email_attribute` (String) If `no_auto_user_creation` is diabled or an internal user exists, the system will set the user's email to the value in this attribute that is returned by the SAML login XML response.
+- `email_attribute` (String) If `auto_user_creation` is enabled or an internal user exists, the system will set the user's email to the value in this attribute that is returned by the SAML login XML response.
 - `enable` (Boolean) When set, SAML integration is enabled and users may be authenticated via a SAML server. Default value is `true`.
 - `group_attribute` (String) The group attribute in the SAML login XML response. Note that the system will search for a case-sensitive match to an existing group..
 - `ldap_group_settings` (Set of String) List of LDAP group setting names. Only support in Artifactory 7.98 or later. See [Enabling Synchronization of LDAP Groups for SAML SSO](https://jfrog.com/help/r/jfrog-platform-administration-documentation/enabling-synchronization-of-ldap-groups-for-saml-sso) for more details.

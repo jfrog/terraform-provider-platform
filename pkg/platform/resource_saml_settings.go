@@ -205,7 +205,7 @@ var samlSettingsSchemaV0 = map[string]schema.Attribute{
 		Validators: []validator.String{
 			stringvalidator.LengthAtLeast(1),
 		},
-		MarkdownDescription: "If `no_auto_user_creation` is diabled or an internal user exists, the system will set the user's email to the value in this attribute that is returned by the SAML login XML response.",
+		MarkdownDescription: "If `auto_user_creation` is enabled or an internal user exists, the system will set the user's email to the value in this attribute that is returned by the SAML login XML response.",
 	},
 	"group_attribute": schema.StringAttribute{
 		Optional: true,
