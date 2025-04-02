@@ -51,6 +51,8 @@ resource "platform_oidc_configuration" "my-generic-oidc-configuration" {
 
 - `audience` (String) Informational field that you can use to include details of the audience that uses the OIDC configuration.
 - `description` (String) Description of the OIDC provider
+- `enable_permissive_configuration` (Boolean) Only settable when `provider_type` is GitHub. When set, Allows authentication without any restrictions. For security best practices, it is recommended to add restrictions to limit access and enforce stricter controls. Use with caution, as this may grant broader access.
+- `organization` (String) This field is mandatory, when `provider_type` is GitHub. Informational field that you can use to include details of the organization that uses the OIDC configuration.
 - `project_key` (String) If set, this Identity Configuration will be available in the scope of the given project (editable by platform admin and project admin). If not set, this Identity Configuration will be global and only editable by platform admin. Once set, the projectKey cannot be changed.
 - `use_default_proxy` (Boolean) This enables and disables the default proxy for OIDC integration. If enabled, the OIDC mechanism will utilize the default proxy for all OIDC requests. If disabled, the OIDC mechanism does not use any proxy for all OIDC requests. Before enabling this functionality you must configure the default proxy.
 
