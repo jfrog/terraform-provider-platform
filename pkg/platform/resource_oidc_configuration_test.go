@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/jfrog/terraform-provider-artifactory/v12/pkg/acctest"
 	"github.com/jfrog/terraform-provider-shared/testutil"
 	"github.com/jfrog/terraform-provider-shared/util"
 )
@@ -47,6 +48,10 @@ func TestAccOIDCConfiguration_full(t *testing.T) {
 	}
 	updatedConfig := util.ExecuteTemplate(configName, updatedTemp, updatedTestData)
 
+	var onOrAfterVersion71100 = func() (bool, error) {
+		return acctest.CompareArtifactoryVersions(t, "7.110.0")
+	}
+
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProviders(),
@@ -60,7 +65,8 @@ func TestAccOIDCConfiguration_full(t *testing.T) {
 				),
 			},
 			{
-				Config: updatedConfig,
+				SkipFunc: onOrAfterVersion71100,
+				Config:   updatedConfig,
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", updatedTestData["name"]),
 					resource.TestCheckResourceAttr(fqrn, "description", "Test Description"),
@@ -236,6 +242,10 @@ func TestAccOIDCConfiguration_invalid_provider_type_issuer_url(t *testing.T) {
 		"audience":     "test-audience",
 	}
 
+	var onOrAfterVersion71100 = func() (bool, error) {
+		return acctest.CompareArtifactoryVersions(t, "7.110.0")
+	}
+
 	config := util.ExecuteTemplate(configName, temp, testData)
 
 	resource.Test(t, resource.TestCase{
@@ -243,6 +253,7 @@ func TestAccOIDCConfiguration_invalid_provider_type_issuer_url(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProviders(),
 		Steps: []resource.TestStep{
 			{
+				SkipFunc:    onOrAfterVersion71100,
 				Config:      config,
 				ExpectError: regexp.MustCompile(`.*must start with https:\/\/token\.actions\.githubusercontent\.com[^\/].*`),
 			},
@@ -250,7 +261,7 @@ func TestAccOIDCConfiguration_invalid_provider_type_issuer_url(t *testing.T) {
 	})
 }
 
-func TestAccOIDCConfiguration_custom_provider_type_issuer_url(t *testing.T) {
+func TestAccOIDCConfiguration_custom_provider_type_issuer_url_with_org(t *testing.T) {
 	_, fqrn, configName := testutil.MkNames("test-oidc-configuration", "platform_oidc_configuration")
 
 	temp := `
@@ -260,6 +271,41 @@ func TestAccOIDCConfiguration_custom_provider_type_issuer_url(t *testing.T) {
 		issuer_url    = "{{ .issuerURL }}"
 		provider_type = "{{ .providerType }}"
 		audience      = "{{ .audience }}"
+		organization      = "{{ .organization }}"
+	}`
+
+	testData := map[string]string{
+		"name":         configName,
+		"issuerURL":    "https://token.actions.githubusercontent.com/jfrog",
+		"providerType": "GitHub",
+		"audience":     "test-audience",
+		"organization": "test-organization",
+	}
+
+	config := util.ExecuteTemplate(configName, temp, testData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check:  resource.TestCheckResourceAttr(fqrn, "organization", testData["organization"])},
+		},
+	})
+}
+
+func TestAccOIDCConfiguration_custom_provider_type_enable_premissive_configuration(t *testing.T) {
+	_, fqrn, configName := testutil.MkNames("test-oidc-configuration", "platform_oidc_configuration")
+
+	temp := `
+	resource "platform_oidc_configuration" "{{ .name }}" {
+		name          = "{{ .name }}"
+		description   = "Test description"
+		issuer_url    = "{{ .issuerURL }}"
+		provider_type = "{{ .providerType }}"
+		audience      = "{{ .audience }}"
+		enable_permissive_configuration = true
 	}`
 
 	testData := map[string]string{
@@ -277,7 +323,7 @@ func TestAccOIDCConfiguration_custom_provider_type_issuer_url(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: config,
-				Check:  resource.TestCheckResourceAttr(fqrn, "issuer_url", testData["issuerURL"])},
+				Check:  resource.TestCheckResourceAttr(fqrn, "enable_permissive_configuration", "true")},
 		},
 	})
 }

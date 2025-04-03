@@ -1,3 +1,9 @@
+## 2.2.2 (April 2, 2025). Tested on Artifactory 7.104.14 with Terraform 1.11.3 and OpenTofu 1.9.0
+
+BUG FIXES:
+
+* resource/platform_oidc_configuration: Added the `organization` attribute to include details of the organization that uses the OIDC configuration (only for the GitHub provider). Issue: [#213](https://github.com/jfrog/terraform-provider-platform/issues/213) PR: [#215](https://github.com/jfrog/terraform-provider-platform/pull/215)
+
 ## 2.2.1 (January 8, 2025). Tested on Artifactory 7.98.13 with Terraform 1.10.3 and OpenTofu 1.8.8
 
 BUG FIXES:

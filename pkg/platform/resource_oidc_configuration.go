@@ -22,8 +22,9 @@ import (
 )
 
 const (
-	gitHubProviderType = "GitHub"
-	gitHubProviderURL  = "https://token.actions.githubusercontent.com"
+	AccessAPIArtifactoryVersion = "7.110.0"
+	gitHubProviderType          = "GitHub"
+	gitHubProviderURL           = "https://token.actions.githubusercontent.com"
 )
 
 var OIDCConfigurationNameValidators = []validator.String{
@@ -38,6 +39,7 @@ var _ resource.Resource = (*oidcConfigurationResource)(nil)
 
 type oidcConfigurationResource struct {
 	util.JFrogResource
+	ProviderData util.ProviderMetadata
 }
 
 func NewOIDCConfigurationResource() resource.Resource {
@@ -90,6 +92,14 @@ func (r *oidcConfigurationResource) Schema(ctx context.Context, req resource.Sch
 				},
 				Description: "Informational field that you can use to include details of the audience that uses the OIDC configuration.",
 			},
+			"organization": schema.StringAttribute{
+				// Only required when provider_type is set to GitHub
+				Optional: true,
+				Validators: []validator.String{
+					stringvalidator.LengthAtLeast(1),
+				},
+				Description: fmt.Sprintf("This field is mandatory, when `provider_type` is %s. Informational field that you can use to include details of the organization that uses the OIDC configuration.", gitHubProviderType),
+			},
 			"project_key": schema.StringAttribute{
 				Optional: true,
 				Validators: []validator.String{
@@ -106,9 +116,21 @@ func (r *oidcConfigurationResource) Schema(ctx context.Context, req resource.Sch
 				Default:             booldefault.StaticBool(false),
 				MarkdownDescription: "This enables and disables the default proxy for OIDC integration. If enabled, the OIDC mechanism will utilize the default proxy for all OIDC requests. If disabled, the OIDC mechanism does not use any proxy for all OIDC requests. Before enabling this functionality you must configure the default proxy.",
 			},
+			"enable_permissive_configuration": schema.BoolAttribute{
+				Optional:            true,
+				MarkdownDescription: fmt.Sprintf("Only settable when `provider_type` is %s. When set, Allows authentication without any restrictions. For security best practices, it is recommended to add restrictions to limit access and enforce stricter controls. Use with caution, as this may grant broader access.", gitHubProviderType),
+			},
 		},
 		MarkdownDescription: "Manage OIDC configuration in JFrog platform. See the JFrog [OIDC configuration documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-an-oidc-integration) for more information.",
 	}
+}
+
+func (r *oidcConfigurationResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	// Prevent panic if the provider has not been configured.
+	if req.ProviderData == nil {
+		return
+	}
+	r.ProviderData = req.ProviderData.(util.ProviderMetadata)
 }
 
 func (r oidcConfigurationResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
@@ -126,26 +148,45 @@ func (r oidcConfigurationResource) ValidateConfig(ctx context.Context, req resou
 			fmt.Sprintf("issuer_url must start with %s when provider_type is set to '%s'.", gitHubProviderURL, gitHubProviderType),
 		)
 	}
+
+	enablePermissiveConfiguration := data.EnablePermissiveConfiguration.ValueBool()
+
+	// 7.110.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
+	if data.ProviderType.ValueString() == gitHubProviderType {
+		if ok, err := util.CheckVersion(r.ProviderData.ArtifactoryVersion, AccessAPIArtifactoryVersion); err == nil && ok {
+			if !enablePermissiveConfiguration && data.Organization.IsNull() {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("organization"),
+					"Missing Attribute Configuration",
+					fmt.Sprintf("organization must be configured when provider_type is set to '%s'.", gitHubProviderType),
+				)
+			}
+		}
+	}
 }
 
 type oidcConfigurationResourceModel struct {
-	Name            types.String `tfsdk:"name"`
-	Description     types.String `tfsdk:"description"`
-	IssuerURL       types.String `tfsdk:"issuer_url"`
-	ProviderType    types.String `tfsdk:"provider_type"`
-	Audience        types.String `tfsdk:"audience"`
-	ProjectKey      types.String `tfsdk:"project_key"`
-	UseDefaultProxy types.Bool   `tfsdk:"use_default_proxy"`
+	Name                          types.String `tfsdk:"name"`
+	Description                   types.String `tfsdk:"description"`
+	IssuerURL                     types.String `tfsdk:"issuer_url"`
+	ProviderType                  types.String `tfsdk:"provider_type"`
+	Audience                      types.String `tfsdk:"audience"`
+	Organization                  types.String `tfsdk:"organization"`
+	ProjectKey                    types.String `tfsdk:"project_key"`
+	UseDefaultProxy               types.Bool   `tfsdk:"use_default_proxy"`
+	EnablePermissiveConfiguration types.Bool   `tfsdk:"enable_permissive_configuration"`
 }
 
 type oidcConfigurationAPIModel struct {
-	Name            string `json:"name"`
-	Description     string `json:"description,omitempty"`
-	IssuerURL       string `json:"issuer_url"`
-	ProviderType    string `json:"provider_type"`
-	Audience        string `json:"audience,omitempty"`
-	ProjectKey      string `json:"project_key,omitempty"`
-	UseDefaultProxy bool   `json:"use_default_proxy"`
+	Name                          string `json:"name"`
+	Description                   string `json:"description,omitempty"`
+	IssuerURL                     string `json:"issuer_url"`
+	ProviderType                  string `json:"provider_type"`
+	Audience                      string `json:"audience,omitempty"`
+	Organization                  string `json:"organization"`
+	ProjectKey                    string `json:"project_key,omitempty"`
+	UseDefaultProxy               bool   `json:"use_default_proxy"`
+	EnablePermissiveConfiguration bool   `json:"enable_permissive_configuration,omitempty"`
 }
 
 func (r *oidcConfigurationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -171,6 +212,23 @@ func (r *oidcConfigurationResource) Create(ctx context.Context, req resource.Cre
 		Description:     plan.Description.ValueString(),
 		ProjectKey:      plan.ProjectKey.ValueString(),
 		UseDefaultProxy: plan.UseDefaultProxy.ValueBool(),
+	}
+
+	// 7.110.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
+	if providerType == gitHubProviderType {
+		if ok, err := util.CheckVersion(r.ProviderData.ArtifactoryVersion, AccessAPIArtifactoryVersion); err == nil && ok {
+			oidcGithubConfig := oidcConfigurationAPIModel{
+				Organization:                  plan.Organization.ValueString(),
+				EnablePermissiveConfiguration: plan.EnablePermissiveConfiguration.ValueBool(),
+			}
+
+			oidcConfig.Organization = oidcGithubConfig.Organization
+			if plan.EnablePermissiveConfiguration.IsNull() {
+				// leave empty
+			} else {
+				oidcConfig.EnablePermissiveConfiguration = oidcGithubConfig.EnablePermissiveConfiguration
+			}
+		}
 	}
 
 	response, err := r.ProviderData.Client.R().
@@ -237,6 +295,20 @@ func (r *oidcConfigurationResource) Read(ctx context.Context, req resource.ReadR
 		state.Audience = types.StringValue(oidcConfig.Audience)
 	}
 
+	// 7.110.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
+	if oidcConfig.ProviderType == gitHubProviderType {
+		if ok, err := util.CheckVersion(r.ProviderData.ArtifactoryVersion, AccessAPIArtifactoryVersion); err == nil && ok {
+			if len(oidcConfig.Organization) > 0 {
+				state.Organization = types.StringValue(oidcConfig.Organization)
+			}
+			if state.EnablePermissiveConfiguration.IsNull() {
+				// leave empty
+			} else {
+				state.EnablePermissiveConfiguration = types.BoolValue(oidcConfig.EnablePermissiveConfiguration)
+			}
+		}
+	}
+
 	if oidcConfig.ProviderType == "Generic OpenID Connect" {
 		state.ProviderType = types.StringValue("generic")
 	} else {
@@ -271,6 +343,23 @@ func (r *oidcConfigurationResource) Update(ctx context.Context, req resource.Upd
 		Description:     plan.Description.ValueString(),
 		ProjectKey:      plan.ProjectKey.ValueString(),
 		UseDefaultProxy: plan.UseDefaultProxy.ValueBool(),
+	}
+
+	// 7.110.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
+	if providerType == gitHubProviderType {
+		if ok, err := util.CheckVersion(r.ProviderData.ArtifactoryVersion, AccessAPIArtifactoryVersion); err == nil && ok {
+			oidcGithubConfig := oidcConfigurationAPIModel{
+				Organization:                  plan.Organization.ValueString(),
+				EnablePermissiveConfiguration: plan.EnablePermissiveConfiguration.ValueBool(),
+			}
+			oidcConfig.Organization = oidcGithubConfig.Organization
+
+			if plan.EnablePermissiveConfiguration.IsNull() {
+				// leave empty
+			} else {
+				oidcConfig.EnablePermissiveConfiguration = oidcGithubConfig.EnablePermissiveConfiguration
+			}
+		}
 	}
 
 	response, err := r.ProviderData.Client.R().
