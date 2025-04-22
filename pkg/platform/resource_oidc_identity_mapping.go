@@ -147,7 +147,7 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 						Computed: true,
 						Default:  int64default.StaticInt64(60),
 						Validators: []validator.Int64{
-							int64validator.Between(60, 86400),
+							int64validator.AtLeast(1),
 						},
 						MarkdownDescription: "Token expiry time in seconds. Default value is 60.",
 					},
