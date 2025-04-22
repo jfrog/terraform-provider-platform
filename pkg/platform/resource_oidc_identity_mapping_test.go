@@ -672,6 +672,64 @@ func TestAccOIDCIdentityMapping_invalid_name(t *testing.T) {
 	}
 }
 
+func TestAccOIDCIdentityMapping_invalid_expiry(t *testing.T) {
+	invalidExpiry := "1200000000"
+	t.Run(invalidExpiry, func(t *testing.T) {
+		_, _, configName := testutil.MkNames("test-oidc-configuration", "platform_oidc_configuration")
+		_, _, identityMappingName := testutil.MkNames("test-oidc-identity-mapping", "platform_oidc_identity_mapping")
+
+		temp := `
+		resource "platform_oidc_configuration" "{{ .configName }}" {
+			name          = "{{ .configName }}"
+			description   = "Test description"
+			issuer_url    = "{{ .issuerURL }}"
+			provider_type = "{{ .providerType }}"
+			audience      = "{{ .audience }}"
+		}
+
+		resource "platform_oidc_identity_mapping" "{{ .identityMappingName }}" {
+			name          = "test_expiry"
+			description   = "Test description"
+			provider_name = platform_oidc_configuration.{{ .configName }}.name
+			priority      = {{ .priority }}
+			claims_json   = jsonencode({
+				sub = "test-subscriber",
+				updated_at = 1490198843
+			})
+			token_spec = {
+				username   = "{{ .username }}"
+				scope      = "applied-permissions/user"
+				audience   = "*@*"
+				expires_in = {{ .invalidExpiry }}
+			}
+		}`
+
+		testData := map[string]string{
+			"configName":          configName,
+			"identityMappingName": identityMappingName,
+			"issuerURL":           "https://tempurl.org",
+			"providerType":        "generic",
+			"invalidExpiry":       invalidExpiry,
+			"audience":            "test-audience",
+			"priority":            fmt.Sprintf("%d", testutil.RandomInt()),
+			"username":            fmt.Sprintf("test-user-%d", testutil.RandomInt()),
+		}
+
+		config := util.ExecuteTemplate(identityMappingName, temp, testData)
+
+		resource.Test(t, resource.TestCase{
+			PreCheck:                 func() { testAccPreCheck(t) },
+			ProtoV6ProviderFactories: testAccProviders(),
+			Steps: []resource.TestStep{
+				{
+					Config:      config,
+					ExpectError: regexp.MustCompile(`.*Invalid expiry.*`),
+				},
+			},
+		})
+	})
+}
+
 func TestAccOIDCIdentityMapping_invalid_provider_name(t *testing.T) {
 	for _, invalidName := range []string{"Test", "test!@", "1test"} {
 		t.Run(invalidName, func(t *testing.T) {

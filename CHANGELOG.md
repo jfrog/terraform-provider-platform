@@ -1,3 +1,9 @@
+## 2.2.3 (April 22, 2025). Tested on Artifactory 7.104.15 with Terraform 1.11.4 and OpenTofu 1.9.0
+
+BUG FIXES:
+
+* resource/platform_oidc_identity_mapping: Support Token expiry longer than 86400s for OIDC Identity mappings. Issue: [#216](https://github.com/jfrog/terraform-provider-platform/issues/216) PR: [#221](https://github.com/jfrog/terraform-provider-platform/pull/221)
+
 ## 2.2.2 (April 2, 2025). Tested on Artifactory 7.104.14 with Terraform 1.11.3 and OpenTofu 1.9.0
 
 BUG FIXES:
