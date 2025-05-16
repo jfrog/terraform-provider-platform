@@ -53,7 +53,7 @@ func getTestResty(t *testing.T) *resty.Client {
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	restyClient.SetRetryCount(5)
 	var accessToken string
 	if accessToken, ok = os.LookupEnv("JFROG_ACCESS_TOKEN"); !ok {
 		t.Fatal("JFROG_ACCESS_TOKEN must be set for acceptance tests")
