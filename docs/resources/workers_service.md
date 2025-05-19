@@ -56,7 +56,7 @@ EOT
 
 ### Required
 
-- `action` (String) The worker action with which the worker is associated. Valid values: BEFORE_DOWNLOAD, AFTER_DOWNLOAD, BEFORE_UPLOAD, AFTER_CREATE, AFTER_BUILD_INFO_SAVE, AFTER_MOVE
+- `action` (String) The worker action with which the worker is associated. Valid values: BEFORE_DOWNLOAD, AFTER_DOWNLOAD, BEFORE_UPLOAD, AFTER_CREATE, AFTER_BUILD_INFO_SAVE, AFTER_MOVE, BEFORE_PROPERTY_CREATE, BEFORE_PROPERTY_DELETE, AFTER_PROPERTY_CREATE, AFTER_PROPERTY_DELETE
 - `enabled` (Boolean) Whether to enable the worker immediately after creation.
 - `filter_criteria` (Attributes) Defines the repositories to be used or excluded. (see [below for nested schema](#nestedatt--filter_criteria))
 - `key` (String) The unique ID of the worker.

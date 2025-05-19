@@ -31,6 +31,10 @@ var validActions = []string{
 	"AFTER_CREATE",
 	"AFTER_BUILD_INFO_SAVE",
 	"AFTER_MOVE",
+	"BEFORE_PROPERTY_CREATE",
+	"BEFORE_PROPERTY_DELETE",
+	"AFTER_PROPERTY_CREATE",
+	"AFTER_PROPERTY_DELETE",
 }
 
 var _ resource.Resource = (*workersServiceResource)(nil)
