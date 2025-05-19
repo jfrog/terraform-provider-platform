@@ -1,3 +1,9 @@
+## 2.2.4 (May 17, 2025). Tested on Artifactory 7.111.7 with Terraform 1.12.0 and OpenTofu 1.9.1
+
+IMPROVEMENTS:
+
+* resource/platform_workers_service: Added support for actions `BEFORE_PROPERTY_CREATE`, `BEFORE_PROPERTY_DELETE`, `AFTER_PROPERTY_CREATE`, `AFTER_PROPERTY_DELETE` [#214](https://github.com/jfrog/terraform-provider-platform/issues/214) PR: [#231](https://github.com/jfrog/terraform-provider-platform/pull/229)
+
 ## 2.2.3 (April 22, 2025). Tested on Artifactory 7.104.15 with Terraform 1.11.4 and OpenTofu 1.9.0
 
 BUG FIXES:
