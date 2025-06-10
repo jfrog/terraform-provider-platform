@@ -475,20 +475,19 @@ func TestAccPermission_empty_users_state_migration(t *testing.T) {
 	migratedConfig := util.ExecuteTemplate(permissionName, migratedTemp, testData)
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		CheckDestroy: testAccCheckPermissionDestroy(fqrn),
+		PreCheck: func() { testAccPreCheck(t) },
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"artifactory": {
+				Source: "jfrog/artifactory",
+			},
+			"platform": {
+				Source:            "jfrog/platform",
+				VersionConstraint: "1.7.2",
+			},
+		},
 		Steps: []resource.TestStep{
 			{
 				Config: config,
-				ExternalProviders: map[string]resource.ExternalProvider{
-					"artifactory": {
-						Source: "jfrog/artifactory",
-					},
-					"platform": {
-						Source:            "jfrog/platform",
-						VersionConstraint: "1.7.2",
-					},
-				},
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
 					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.#", "0"),
@@ -504,14 +503,21 @@ func TestAccPermission_empty_users_state_migration(t *testing.T) {
 				),
 				ExpectNonEmptyPlan: true,
 			},
+		},
+	})
+
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() { testAccPreCheck(t) },
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"artifactory": {
+				Source: "jfrog/artifactory",
+			},
+		},
+		CheckDestroy:             testAccCheckPermissionDestroy(fqrn),
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
 			{
-				Config:                   migratedConfig,
-				ProtoV6ProviderFactories: testAccProviders(),
-				ExternalProviders: map[string]resource.ExternalProvider{
-					"artifactory": {
-						Source: "jfrog/artifactory",
-					},
-				},
+				Config: migratedConfig,
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
 					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.#", "0"),
@@ -564,20 +570,19 @@ func TestAccPermission_no_users_state_migration(t *testing.T) {
 	config := util.ExecuteTemplate(permissionName, temp, testData)
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		CheckDestroy: testAccCheckPermissionDestroy(fqrn),
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"artifactory": {
+				Source: "jfrog/artifactory",
+			},
+			"platform": {
+				Source:            "jfrog/platform",
+				VersionConstraint: "1.7.2",
+			},
+		},
+		PreCheck: func() { testAccPreCheck(t) },
 		Steps: []resource.TestStep{
 			{
 				Config: config,
-				ExternalProviders: map[string]resource.ExternalProvider{
-					"artifactory": {
-						Source: "jfrog/artifactory",
-					},
-					"platform": {
-						Source:            "jfrog/platform",
-						VersionConstraint: "1.7.2",
-					},
-				},
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
 					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.#", "0"),
@@ -585,14 +590,20 @@ func TestAccPermission_no_users_state_migration(t *testing.T) {
 				),
 				ExpectNonEmptyPlan: true,
 			},
+		},
+	})
+	resource.Test(t, resource.TestCase{
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"artifactory": {
+				Source: "jfrog/artifactory",
+			},
+		},
+		PreCheck:                 func() { testAccPreCheck(t) },
+		CheckDestroy:             testAccCheckPermissionDestroy(fqrn),
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
 			{
-				Config:                   config,
-				ProtoV6ProviderFactories: testAccProviders(),
-				ExternalProviders: map[string]resource.ExternalProvider{
-					"artifactory": {
-						Source: "jfrog/artifactory",
-					},
-				},
+				Config: config,
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
 					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.#", "0"),
@@ -773,20 +784,19 @@ func TestAccPermission_empty_groups_state_migration(t *testing.T) {
 	migratedConfig := util.ExecuteTemplate(permissionName, migratedTemp, testData)
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		CheckDestroy: testAccCheckPermissionDestroy(fqrn),
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"artifactory": {
+				Source: "jfrog/artifactory",
+			},
+			"platform": {
+				Source:            "jfrog/platform",
+				VersionConstraint: "1.7.2",
+			},
+		},
+		PreCheck: func() { testAccPreCheck(t) },
 		Steps: []resource.TestStep{
 			{
 				Config: config,
-				ExternalProviders: map[string]resource.ExternalProvider{
-					"artifactory": {
-						Source: "jfrog/artifactory",
-					},
-					"platform": {
-						Source:            "jfrog/platform",
-						VersionConstraint: "1.7.2",
-					},
-				},
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
 					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.#", "1"),
@@ -802,14 +812,21 @@ func TestAccPermission_empty_groups_state_migration(t *testing.T) {
 				),
 				ExpectNonEmptyPlan: true,
 			},
+		},
+	})
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProviders(),
+		CheckDestroy:             testAccCheckPermissionDestroy(fqrn),
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"artifactory": {
+				Source: "jfrog/artifactory",
+			},
+		},
+		Steps: []resource.TestStep{
 			{
-				Config:                   migratedConfig,
-				ProtoV6ProviderFactories: testAccProviders(),
-				ExternalProviders: map[string]resource.ExternalProvider{
-					"artifactory": {
-						Source: "jfrog/artifactory",
-					},
-				},
+				Config: migratedConfig,
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
 					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.#", "1"),
@@ -864,20 +881,19 @@ func TestAccPermission_no_groups_state_migration(t *testing.T) {
 	config := util.ExecuteTemplate(permissionName, temp, testData)
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		CheckDestroy: testAccCheckPermissionDestroy(fqrn),
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"artifactory": {
+				Source: "jfrog/artifactory",
+			},
+			"platform": {
+				Source:            "jfrog/platform",
+				VersionConstraint: "1.7.2",
+			},
+		},
+		PreCheck: func() { testAccPreCheck(t) },
 		Steps: []resource.TestStep{
 			{
 				Config: config,
-				ExternalProviders: map[string]resource.ExternalProvider{
-					"artifactory": {
-						Source: "jfrog/artifactory",
-					},
-					"platform": {
-						Source:            "jfrog/platform",
-						VersionConstraint: "1.7.2",
-					},
-				},
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
 					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.#", "1"),
@@ -885,14 +901,20 @@ func TestAccPermission_no_groups_state_migration(t *testing.T) {
 				),
 				ExpectNonEmptyPlan: true,
 			},
+		},
+	})
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProviders(),
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"artifactory": {
+				Source: "jfrog/artifactory",
+			},
+		},
+		PreCheck:     func() { testAccPreCheck(t) },
+		CheckDestroy: testAccCheckPermissionDestroy(fqrn),
+		Steps: []resource.TestStep{
 			{
-				Config:                   config,
-				ProtoV6ProviderFactories: testAccProviders(),
-				ExternalProviders: map[string]resource.ExternalProvider{
-					"artifactory": {
-						Source: "jfrog/artifactory",
-					},
-				},
+				Config: config,
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
 					resource.TestCheckResourceAttr(fqrn, "artifact.actions.users.#", "1"),
