@@ -2,8 +2,8 @@ package platform
 
 import (
 	"context"
-
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/jfrog/terraform-provider-shared/util"
@@ -34,6 +34,19 @@ func (p *PlatformProvider) DataSources(ctx context.Context) []func() datasource.
 	return []func() datasource.DataSource{
 		// NewDataSource,
 	}
+}
+
+func (p *PlatformProvider) GetResourceIdentitySchemas(ctx context.Context) (map[string]interface{}, diag.Diagnostics) {
+	return map[string]interface{}{
+		"platform_group": map[string]string{
+			"type_name": "platform_group",
+			"id_attr":   "name",
+		},
+		"platform_permission": map[string]string{
+			"type_name": "platform_permission",
+			"id_attr":   "name",
+		},
+	}, nil
 }
 
 func (p *PlatformProvider) Resources(ctx context.Context) []func() resource.Resource {

@@ -228,17 +228,16 @@ func TestAccSAMLSettings_schema_migrate_from_v1_to_v2(t *testing.T) {
 	configV2 := util.ExecuteTemplate(name, tempV2, testDataV2)
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		CheckDestroy: testAccSamlSettingsDestroy(fqrn),
+		PreCheck: func() { testAccPreCheck(t) },
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"platform": {
+				Source:            "jfrog/platform",
+				VersionConstraint: "1.19.0",
+			},
+		},
 		Steps: []resource.TestStep{
 			{
 				Config: configV1,
-				ExternalProviders: map[string]resource.ExternalProvider{
-					"platform": {
-						Source:            "jfrog/platform",
-						VersionConstraint: "1.19.0",
-					},
-				},
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", testDataV1["name"]),
 					resource.TestCheckResourceAttr(fqrn, "enable", "true"),
@@ -259,9 +258,15 @@ func TestAccSAMLSettings_schema_migrate_from_v1_to_v2(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "ldap_group_settings.0", "test-group-1"),
 				),
 			},
+		},
+	})
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		CheckDestroy:             testAccSamlSettingsDestroy(fqrn),
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
 			{
-				Config:                   configV2,
-				ProtoV6ProviderFactories: testAccProviders(),
+				Config: configV2,
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", testDataV2["name"]),
 					resource.TestCheckResourceAttr(fqrn, "enable", "true"),

@@ -131,15 +131,16 @@ func TestAccGroup_schema_migration(t *testing.T) {
 
 	config := util.ExecuteTemplate(groupName, temp, testData)
 
+	// Step 1: Create with old provider
 	resource.Test(t, resource.TestCase{
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"platform": {
+				Source:            "jfrog/platform",
+				VersionConstraint: "2.1.0",
+			},
+		},
 		Steps: []resource.TestStep{
 			{
-				ExternalProviders: map[string]resource.ExternalProvider{
-					"platform": {
-						Source:            "jfrog/platform",
-						VersionConstraint: "2.1.0",
-					},
-				},
 				Config: config,
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", testData["groupName"]),
@@ -155,9 +156,15 @@ func TestAccGroup_schema_migration(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "members.1", "anonymous"),
 				),
 			},
+		},
+	})
+
+	// Step 2: Upgrade with local provider
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
 			{
-				ProtoV6ProviderFactories: testAccProviders(),
-				Config:                   config,
+				Config: config,
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", testData["groupName"]),
 					resource.TestCheckResourceAttr(fqrn, "description", "Test group"),
