@@ -10,6 +10,11 @@ GORELEASER_ARCH=${TARGET_ARCH}_$(shell go env GOAMD64)
 LINUX_GORELEASER_ARCH:=${LINUX_GORELEASER_ARCH}_$(shell go env GOAMD64)
 endif
 
+ifeq ($(GO_ARCH), arm64)
+GORELEASER_ARCH=${TARGET_ARCH}_$(shell go env GOARM64)
+LINUX_GORELEASER_ARCH:=${LINUX_GORELEASER_ARCH}_$(shell go env GOARM64)
+endif
+
 PKG_NAME=pkg/${PRODUCT}
 # if this path ever changes, you need to also update the 'ldflags' value in .goreleaser.yml
 PKG_VERSION_PATH=github.com/jfrog/terraform-provider-${PRODUCT}/${PKG_NAME}

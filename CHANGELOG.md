@@ -1,3 +1,9 @@
+## 2.2.5 (June 16, 2025). Tested on Artifactory 7.111.8 with Terraform 1.12.0 and OpenTofu 1.9.1
+
+IMPROVEMENTS:
+
+* GNUmakefile : Enhanced ARM64 Build Process with Dynamic GOARM64 Detection. PR: [245](https://github.com/jfrog/terraform-provider-platform/pull/245)
+
 ## 2.2.4 (May 17, 2025). Tested on Artifactory 7.111.7 with Terraform 1.12.0 and OpenTofu 1.9.1
 
 IMPROVEMENTS:
