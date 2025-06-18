@@ -1,3 +1,9 @@
+## 2.2.5 (Jun 18, 2025).
+
+BUG FIXES:
+
+* Satisfy provider protocol requirements for Terraform >= v1.12.1 [#1271](https://github.com/jfrog/terraform-provider-artifactory/issues/1271) [#238](https://github.com/jfrog/terraform-provider-platform/issues/238) PR: [#248](https://github.com/jfrog/terraform-provider-platform/pull/247)
+
 ## 2.2.4 (May 17, 2025). Tested on Artifactory 7.111.7 with Terraform 1.12.0 and OpenTofu 1.9.1
 
 IMPROVEMENTS:
