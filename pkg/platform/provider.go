@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov5"
+	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/jfrog/terraform-provider-shared/util"
 )
 
@@ -77,5 +78,17 @@ func (s *PlatformProvider) GetResourceIdentitySchemas(ctx context.Context, req *
 func (s *PlatformProvider) UpgradeResourceIdentity(ctx context.Context, req *tfprotov5.UpgradeResourceIdentityRequest) (*tfprotov5.UpgradeResourceIdentityResponse, error) {
 	s.logger.Trace("[UpgradeResourceIdentity][Request]\n%s\n", dump(*req))
 	resp := &tfprotov5.UpgradeResourceIdentityResponse{}
+	return resp, nil
+}
+
+func (s *PlatformProvider) GetResourceIdentitySchemasV6(ctx context.Context, req *tfprotov6.GetResourceIdentitySchemasRequest) (*tfprotov6.GetResourceIdentitySchemasResponse, error) {
+	s.logger.Trace("[GetResourceIdentitySchemasV6][Request]\n%s\n", dump(*req))
+	resp := &tfprotov6.GetResourceIdentitySchemasResponse{}
+	return resp, nil
+}
+
+func (s *PlatformProvider) UpgradeResourceIdentityV6(ctx context.Context, req *tfprotov6.UpgradeResourceIdentityRequest) (*tfprotov6.UpgradeResourceIdentityResponse, error) {
+	s.logger.Trace("[UpgradeResourceIdentityV6][Request]\n%s\n", dump(*req))
+	resp := &tfprotov6.UpgradeResourceIdentityResponse{}
 	return resp, nil
 }

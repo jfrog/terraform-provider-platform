@@ -23,7 +23,7 @@ require (
 	github.com/bmatcuk/doublestar/v4 v4.8.1 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.7 // indirect
-	github.com/hashicorp/terraform-plugin-mux v0.19.0 // indirect
+	github.com/hashicorp/terraform-plugin-mux v0.20.0 // indirect
 	github.com/reugn/go-quartz v0.14.0 // indirect
 	github.com/sethvargo/go-password v0.3.1 // indirect
 	go.abhg.dev/goldmark/frontmatter v0.2.0 // indirect
