@@ -22,9 +22,9 @@ import (
 )
 
 const (
-	AccessAPIArtifactoryVersion = "7.110.0"
-	gitHubProviderType          = "GitHub"
-	gitHubProviderURL           = "https://token.actions.githubusercontent.com"
+	AccessVersion      = "7.138.0"
+	gitHubProviderType = "GitHub"
+	gitHubProviderURL  = "https://token.actions.githubusercontent.com"
 )
 
 var OIDCConfigurationNameValidators = []validator.String{
@@ -151,9 +151,9 @@ func (r oidcConfigurationResource) ValidateConfig(ctx context.Context, req resou
 
 	enablePermissiveConfiguration := data.EnablePermissiveConfiguration.ValueBool()
 
-	// 7.110.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
+	// Access version 7.138.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
 	if data.ProviderType.ValueString() == gitHubProviderType {
-		if ok, err := util.CheckVersion(r.ProviderData.ArtifactoryVersion, AccessAPIArtifactoryVersion); err == nil && ok {
+		if ok, err := util.CheckVersion(r.ProviderData.AccessVersion, AccessVersion); err == nil && ok {
 			if !enablePermissiveConfiguration && data.Organization.IsNull() {
 				resp.Diagnostics.AddAttributeError(
 					path.Root("organization"),
@@ -214,9 +214,9 @@ func (r *oidcConfigurationResource) Create(ctx context.Context, req resource.Cre
 		UseDefaultProxy: plan.UseDefaultProxy.ValueBool(),
 	}
 
-	// 7.110.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
+	// Access version 7.138.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
 	if providerType == gitHubProviderType {
-		if ok, err := util.CheckVersion(r.ProviderData.ArtifactoryVersion, AccessAPIArtifactoryVersion); err == nil && ok {
+		if ok, err := util.CheckVersion(r.ProviderData.AccessVersion, AccessVersion); err == nil && ok {
 			oidcGithubConfig := oidcConfigurationAPIModel{
 				Organization:                  plan.Organization.ValueString(),
 				EnablePermissiveConfiguration: plan.EnablePermissiveConfiguration.ValueBool(),
@@ -295,9 +295,9 @@ func (r *oidcConfigurationResource) Read(ctx context.Context, req resource.ReadR
 		state.Audience = types.StringValue(oidcConfig.Audience)
 	}
 
-	// 7.110.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
+	// Access version 7.138.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
 	if oidcConfig.ProviderType == gitHubProviderType {
-		if ok, err := util.CheckVersion(r.ProviderData.ArtifactoryVersion, AccessAPIArtifactoryVersion); err == nil && ok {
+		if ok, err := util.CheckVersion(r.ProviderData.AccessVersion, AccessVersion); err == nil && ok {
 			if len(oidcConfig.Organization) > 0 {
 				state.Organization = types.StringValue(oidcConfig.Organization)
 			}
@@ -345,9 +345,9 @@ func (r *oidcConfigurationResource) Update(ctx context.Context, req resource.Upd
 		UseDefaultProxy: plan.UseDefaultProxy.ValueBool(),
 	}
 
-	// 7.110.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
+	// Access version 7.138.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
 	if providerType == gitHubProviderType {
-		if ok, err := util.CheckVersion(r.ProviderData.ArtifactoryVersion, AccessAPIArtifactoryVersion); err == nil && ok {
+		if ok, err := util.CheckVersion(r.ProviderData.AccessVersion, AccessVersion); err == nil && ok {
 			oidcGithubConfig := oidcConfigurationAPIModel{
 				Organization:                  plan.Organization.ValueString(),
 				EnablePermissiveConfiguration: plan.EnablePermissiveConfiguration.ValueBool(),
