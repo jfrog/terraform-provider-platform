@@ -48,8 +48,8 @@ func TestAccOIDCConfiguration_full(t *testing.T) {
 	}
 	updatedConfig := util.ExecuteTemplate(configName, updatedTemp, updatedTestData)
 
-	var onOrAfterVersion71100 = func() (bool, error) {
-		return acctest.CompareArtifactoryVersions(t, "7.110.0")
+	var onOrAfterVersion71380 = func() (bool, error) {
+		return acctest.CompareAcessVersions(t, "7.138.0")
 	}
 
 	resource.Test(t, resource.TestCase{
@@ -65,7 +65,7 @@ func TestAccOIDCConfiguration_full(t *testing.T) {
 				),
 			},
 			{
-				SkipFunc: onOrAfterVersion71100,
+				SkipFunc: onOrAfterVersion71380,
 				Config:   updatedConfig,
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr(fqrn, "name", updatedTestData["name"]),
@@ -242,8 +242,8 @@ func TestAccOIDCConfiguration_invalid_provider_type_issuer_url(t *testing.T) {
 		"audience":     "test-audience",
 	}
 
-	var onOrAfterVersion71100 = func() (bool, error) {
-		return acctest.CompareArtifactoryVersions(t, "7.110.0")
+	var onOrAfterVersion71380 = func() (bool, error) {
+		return acctest.CompareAcessVersions(t, "7.138.0")
 	}
 
 	config := util.ExecuteTemplate(configName, temp, testData)
@@ -253,7 +253,7 @@ func TestAccOIDCConfiguration_invalid_provider_type_issuer_url(t *testing.T) {
 		ProtoV6ProviderFactories: testAccProviders(),
 		Steps: []resource.TestStep{
 			{
-				SkipFunc:    onOrAfterVersion71100,
+				SkipFunc:    onOrAfterVersion71380,
 				Config:      config,
 				ExpectError: regexp.MustCompile(`.*must start with https:\/\/token\.actions\.githubusercontent\.com[^\/].*`),
 			},
