@@ -1,4 +1,4 @@
-## 2.2.5 (Jun 19, 2025).
+## 2.2.5 (Jun 19, 2025). Tested on Artifactory 7.111.10 with Terraform 1.12.2 and OpenTofu 1.9.1
 
 IMPORTANT NOTE: Platform provider v2.2.5 requires Terraform version v1.12.x or above, due to the "Store resource identities in state" feature introduced in v1.12.x [#36464](https://github.com/hashicorp/terraform/pull/36464)
 
