@@ -15,7 +15,7 @@ require (
 	github.com/hashicorp/terraform-plugin-go v0.27.0
 	github.com/hashicorp/terraform-plugin-testing v1.12.0
 	github.com/jfrog/terraform-provider-shared v1.29.0
-	github.com/samber/lo v1.50.0
+	github.com/samber/lo v1.51.0
 )
 
 require (
