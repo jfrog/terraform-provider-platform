@@ -1,3 +1,11 @@
+## 2.2.5 (Jun 19, 2025).
+
+IMPORTANT NOTE: Platform provider v2.2.5 requires Terraform version v1.12.x or above, due to the "Store resource identities in state" feature introduced in v1.12.x [#36464](https://github.com/hashicorp/terraform/pull/36464)
+
+BUG FIXES:
+
+* Satisfy provider protocol requirements for Terraform >= v1.12.1 [#1271](https://github.com/jfrog/terraform-provider-artifactory/issues/1271) [#238](https://github.com/jfrog/terraform-provider-platform/issues/238) PR: [#251](https://github.com/jfrog/terraform-provider-platform/pull/251)
+
 ## 2.2.4 (May 17, 2025). Tested on Artifactory 7.111.7 with Terraform 1.12.0 and OpenTofu 1.9.1
 
 IMPROVEMENTS:
