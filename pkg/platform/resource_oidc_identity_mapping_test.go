@@ -723,7 +723,7 @@ func TestAccOIDCIdentityMapping_invalid_expiry(t *testing.T) {
 			Steps: []resource.TestStep{
 				{
 					Config:      config,
-					ExpectError: regexp.MustCompile(`.*Invalid expiry.*`),
+					ExpectError: regexp.MustCompile(`.*Invalid\s+expiry.*`),
 				},
 			},
 		})

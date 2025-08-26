@@ -327,3 +327,166 @@ func TestAccOIDCConfiguration_custom_provider_type_enable_premissive_configurati
 		},
 	})
 }
+
+func TestAccOIDCConfiguration_github_enterprise(t *testing.T) {
+	_, fqrn, configName := testutil.MkNames("test-oidc-ge-configuration", "platform_oidc_configuration")
+
+	temp := `
+resource "platform_oidc_configuration" "{{ .name }}" {
+  name          = "{{ .name }}"
+  issuer_url    = "{{ .issuerURL }}"
+  provider_type = "{{ .providerType }}"
+  organization  = "{{ .organization }}"
+}`
+
+	testData := map[string]string{
+		"name":         configName,
+		"issuerURL":    "https://token.actions.githubusercontent.com/jfrog",
+		"providerType": "GitHubEnterprise",
+		"organization": "test-org-ge",
+	}
+
+	config := util.ExecuteTemplate(configName, temp, testData)
+
+	updatedTemp := `
+resource "platform_oidc_configuration" "{{ .name }}" {
+  name              = "{{ .name }}"
+  description       = "GitHub Enterprise OIDC"
+  issuer_url        = "{{ .issuerURL }}"
+  provider_type     = "{{ .providerType }}"
+  audience          = "{{ .audience }}"
+  organization      = "{{ .organization }}"
+  use_default_proxy = true
+  enable_permissive_configuration = true
+}`
+
+	updatedTestData := map[string]string{
+		"name":         configName,
+		"issuerURL":    "https://token.actions.githubusercontent.com/jfrog",
+		"providerType": "GitHubEnterprise",
+		"audience":     "ge-audience",
+		"organization": "test-org-ge",
+	}
+	updatedConfig := util.ExecuteTemplate(configName, updatedTemp, updatedTestData)
+
+	var onOrAfterVersion71440 = func() (bool, error) {
+		return acctest.CompareAcessVersions(t, "7.144.0")
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				SkipFunc: onOrAfterVersion71440,
+				Config:   config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
+					resource.TestCheckResourceAttr(fqrn, "issuer_url", testData["issuerURL"]),
+					resource.TestCheckResourceAttr(fqrn, "provider_type", testData["providerType"]),
+					resource.TestCheckResourceAttr(fqrn, "organization", testData["organization"]),
+				),
+			},
+			{
+				SkipFunc: onOrAfterVersion71440,
+				Config:   updatedConfig,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", updatedTestData["name"]),
+					resource.TestCheckResourceAttr(fqrn, "description", "GitHub Enterprise OIDC"),
+					resource.TestCheckResourceAttr(fqrn, "issuer_url", updatedTestData["issuerURL"]),
+					resource.TestCheckResourceAttr(fqrn, "provider_type", updatedTestData["providerType"]),
+					resource.TestCheckResourceAttr(fqrn, "audience", updatedTestData["audience"]),
+					resource.TestCheckResourceAttr(fqrn, "organization", updatedTestData["organization"]),
+					resource.TestCheckResourceAttr(fqrn, "use_default_proxy", "true"),
+					resource.TestCheckResourceAttr(fqrn, "enable_permissive_configuration", "true"),
+				),
+			},
+			{
+				SkipFunc:                             onOrAfterVersion71440,
+				ResourceName:                         fqrn,
+				ImportState:                          true,
+				ImportStateId:                        configName,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "name",
+			},
+		},
+	})
+}
+
+func TestAccOIDCConfiguration_azure(t *testing.T) {
+	_, fqrn, configName := testutil.MkNames("test-oidc-azure-configuration", "platform_oidc_configuration")
+
+	temp := `
+resource "platform_oidc_configuration" "{{ .name }}" {
+  name          = "{{ .name }}"
+  issuer_url    = "{{ .issuerURL }}"
+  provider_type = "{{ .providerType }}"
+}`
+
+	testData := map[string]string{
+		"name":         configName,
+		"issuerURL":    "https://sts.windows.net/your-tenant-id/",
+		"providerType": "Azure",
+	}
+
+	config := util.ExecuteTemplate(configName, temp, testData)
+
+	updatedTemp := `
+resource "platform_oidc_configuration" "{{ .name }}" {
+  name              = "{{ .name }}"
+  description       = "Azure OIDC"
+  issuer_url        = "{{ .issuerURL }}"
+  provider_type     = "{{ .providerType }}"
+  audience          = "{{ .audience }}"
+  use_default_proxy = true
+}`
+
+	updatedTestData := map[string]string{
+		"name":         configName,
+		"issuerURL":    "https://sts.windows.net/your-tenant-id/",
+		"providerType": "Azure",
+		"audience":     "azure-audience",
+	}
+	updatedConfig := util.ExecuteTemplate(configName, updatedTemp, updatedTestData)
+
+	var onOrAfterVersion7731 = func() (bool, error) {
+		skiptest, err := acctest.CompareArtifactoryVersions(t, "7.73.1")
+		return !skiptest, err
+	}
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				SkipFunc: onOrAfterVersion7731,
+				Config:   config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
+					resource.TestCheckResourceAttr(fqrn, "issuer_url", testData["issuerURL"]),
+					resource.TestCheckResourceAttr(fqrn, "provider_type", testData["providerType"]),
+				),
+			},
+			{
+				SkipFunc: onOrAfterVersion7731,
+				Config:   updatedConfig,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", updatedTestData["name"]),
+					resource.TestCheckResourceAttr(fqrn, "description", "Azure OIDC"),
+					resource.TestCheckResourceAttr(fqrn, "issuer_url", updatedTestData["issuerURL"]),
+					resource.TestCheckResourceAttr(fqrn, "provider_type", updatedTestData["providerType"]),
+					resource.TestCheckResourceAttr(fqrn, "audience", updatedTestData["audience"]),
+					resource.TestCheckResourceAttr(fqrn, "use_default_proxy", "true"),
+				),
+			},
+			{
+				SkipFunc:                             onOrAfterVersion7731,
+				ResourceName:                         fqrn,
+				ImportState:                          true,
+				ImportStateId:                        configName,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "name",
+			},
+		},
+	})
+}
