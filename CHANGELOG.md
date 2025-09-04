@@ -1,8 +1,9 @@
-## 2.2.6 (Aug 28, 2025). Tested on Artifactory 7.117.15 with Terraform 1.13.1 and OpenTofu 1.10.6
+## 2.2.6 (Sept 10, 2025). Tested on Artifactory 7.117.15 with Terraform 1.13.1 and OpenTofu 1.10.6
 
 IMPROVEMENTS:
 
 * resource/platform_oidc_configuration: Added support for Github Enterprise in OIDC integration  [#267](https://github.com/jfrog/terraform-provider-platform/issues/267) PR: [#268](https://github.com/jfrog/terraform-provider-platform/pull/268)
+* resource/platform_group_members: Added support for importing existing group members using `terraform import`. [#222](https://github.com/jfrog/terraform-provider-platform/issues/222) PR: [#269](https://github.com/jfrog/terraform-provider-platform/pull/269)
 
 ## 2.2.5 (Jun 19, 2025). Tested on Artifactory 7.111.10 with Terraform 1.12.2 and OpenTofu 1.9.1
 

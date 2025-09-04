@@ -1,0 +1,1 @@
+terraform import platform_group_members.my-group my-group

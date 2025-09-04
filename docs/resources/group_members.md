@@ -36,3 +36,11 @@ resource "platform_group_members" "my-group-members" {
 
 - `members` (Set of String) List of users assigned to the group.
 - `name` (String) Name of the group.
+
+## Import
+
+Import is supported using the following syntax:
+
+```shell
+terraform import platform_group_members.my-group my-group
+```

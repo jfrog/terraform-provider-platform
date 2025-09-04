@@ -137,6 +137,13 @@ func TestAccGroupMembers_full(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "members.0", "anonymous"),
 				),
 			},
+			{
+				ResourceName:                         fqrn,
+				ImportState:                          true,
+				ImportStateId:                        testData["groupName"],
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "name",
+			},
 		},
 	})
 }
