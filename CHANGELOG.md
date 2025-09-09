@@ -1,3 +1,9 @@
+## 2.2.6 (Aug 28, 2025). Tested on Artifactory 7.117.15 with Terraform 1.13.1 and OpenTofu 1.10.6
+
+IMPROVEMENTS:
+
+* resource/platform_oidc_configuration: Added support for Github Enterprise in OIDC integration  [#267](https://github.com/jfrog/terraform-provider-platform/issues/267) PR: [#268](https://github.com/jfrog/terraform-provider-platform/pull/268)
+
 ## 2.2.5 (Jun 19, 2025). Tested on Artifactory 7.111.10 with Terraform 1.12.2 and OpenTofu 1.9.1
 
 IMPORTANT NOTE: Platform provider v2.2.5 requires Terraform version v1.12.x or above, due to the "Store resource identities in state" feature introduced in v1.12.x [#36464](https://github.com/hashicorp/terraform/pull/36464)
