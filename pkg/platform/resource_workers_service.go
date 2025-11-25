@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -35,6 +36,7 @@ var validActions = []string{
 	"BEFORE_PROPERTY_DELETE",
 	"AFTER_PROPERTY_CREATE",
 	"AFTER_PROPERTY_DELETE",
+	"SCHEDULED_EVENT",
 }
 
 var _ resource.Resource = (*workersServiceResource)(nil)
@@ -87,7 +89,15 @@ func (r *workersServiceResource) Schema(ctx context.Context, req resource.Schema
 				Description: "Defines the repositories to be used or excluded.",
 				Attributes: map[string]schema.Attribute{
 					"artifact_filter_criteria": schema.SingleNestedAttribute{
-						Required: true,
+						Optional: true,
+						Validators: []validator.Object{
+							objectvalidator.ExactlyOneOf(
+								// self (required workaround for now)
+								path.MatchRelative(),
+								// sibling
+								path.MatchRelative().AtParent().AtName("schedule"),
+							),
+						},
 						Attributes: map[string]schema.Attribute{
 							"repo_keys": schema.SetAttribute{
 								ElementType: types.StringType,
@@ -103,6 +113,19 @@ func (r *workersServiceResource) Schema(ctx context.Context, req resource.Schema
 								ElementType: types.StringType,
 								Optional:    true,
 								Description: "Define patterns to for all repository paths for repositories to be excluded in the repoKeys. Defines those repositories that do not trigger the worker.",
+							},
+						},
+					},
+					"schedule": schema.SingleNestedAttribute{
+						Optional: true,
+						Attributes: map[string]schema.Attribute{
+							"cron": schema.StringAttribute{
+								Required:    true,
+								Description: "Defines the Cron expression to schedule the worker.",
+							},
+							"timezone": schema.StringAttribute{
+								Optional:    true,
+								Description: "Define which timezone the schedule applies to if provided.",
 							},
 						},
 					},
@@ -142,12 +165,18 @@ type workersServiceResourceModel struct {
 
 type filterCriteriaResourceModel struct {
 	ArtifactFilterCriteria types.Object `tfsdk:"artifact_filter_criteria"`
+	Schedule               types.Object `tfsdk:"schedule"`
 }
 
 type artifactFilterCriteriaResourceModel struct {
 	RepoKeys        types.Set `tfsdk:"repo_keys"`
 	IncludePatterns types.Set `tfsdk:"include_patterns"`
 	ExcludePatterns types.Set `tfsdk:"exclude_patterns"`
+}
+
+type scheduleResourceModel struct {
+	Cron     types.String `tfsdk:"cron"`
+	Timezone types.String `tfsdk:"timezone"`
 }
 
 func (r *workersServiceResourceModel) toAPIModel(ctx context.Context, apiModel *WorkersServiceAPIModel, secretKeysToBeRemoved []string) (ds diag.Diagnostics) {
@@ -157,20 +186,43 @@ func (r *workersServiceResourceModel) toAPIModel(ctx context.Context, apiModel *
 		return
 	}
 
-	var artifactFilterCriteria artifactFilterCriteriaResourceModel
-	ds.Append(filterCriteria.ArtifactFilterCriteria.As(ctx, &artifactFilterCriteria, basetypes.ObjectAsOptions{})...)
-	if ds.HasError() {
-		return
+	var artifactFilterCriteriaObject *artifactFilterCriteriaAPIModel
+	if !filterCriteria.ArtifactFilterCriteria.IsNull() {
+		var artifactFilterCriteria artifactFilterCriteriaResourceModel
+		ds.Append(filterCriteria.ArtifactFilterCriteria.As(ctx, &artifactFilterCriteria, basetypes.ObjectAsOptions{})...)
+		if ds.HasError() {
+			return
+		}
+
+		var repoKeys []string
+		artifactFilterCriteria.RepoKeys.ElementsAs(ctx, &repoKeys, false)
+
+		var includePatterns []string
+		artifactFilterCriteria.IncludePatterns.ElementsAs(ctx, &includePatterns, false)
+
+		var excludePatterns []string
+		artifactFilterCriteria.ExcludePatterns.ElementsAs(ctx, &excludePatterns, false)
+
+		artifactFilterCriteriaObject = &artifactFilterCriteriaAPIModel{
+			RepoKeys:        repoKeys,
+			IncludePatterns: includePatterns,
+			ExcludePatterns: excludePatterns,
+		}
 	}
 
-	var repoKeys []string
-	artifactFilterCriteria.RepoKeys.ElementsAs(ctx, &repoKeys, false)
+	var scheduleObject *scheduleAPIModel
+	if !filterCriteria.Schedule.IsNull() && !filterCriteria.Schedule.IsUnknown() {
+		var schedule scheduleResourceModel
+		ds.Append(filterCriteria.Schedule.As(ctx, &schedule, basetypes.ObjectAsOptions{})...)
+		if ds.HasError() {
+			return
+		}
 
-	var includePatterns []string
-	artifactFilterCriteria.IncludePatterns.ElementsAs(ctx, &includePatterns, false)
-
-	var excludePatterns []string
-	artifactFilterCriteria.ExcludePatterns.ElementsAs(ctx, &excludePatterns, false)
+		scheduleObject = &scheduleAPIModel{
+			Cron:     schedule.Cron.ValueString(),
+			Timezone: schedule.Timezone.ValueString(),
+		}
+	}
 
 	secrets := lo.Map[attr.Value](
 		r.Secrets.Elements(),
@@ -199,11 +251,8 @@ func (r *workersServiceResourceModel) toAPIModel(ctx context.Context, apiModel *
 		SourceCode:  r.SourceCode.ValueString(),
 		Action:      r.Action.ValueString(),
 		FilterCriteria: filterCriteriaAPIModel{
-			ArtifactFilterCriteria: artifactFilterCriteriaAPIModel{
-				RepoKeys:        repoKeys,
-				IncludePatterns: includePatterns,
-				ExcludePatterns: excludePatterns,
-			},
+			ArtifactFilterCriteria: artifactFilterCriteriaObject,
+			Schedule:               scheduleObject,
 		},
 		Enabled: r.Enabled.ValueBool(),
 		Secrets: secrets,
@@ -216,6 +265,9 @@ var filterCriteriaResourceModelAttributeTypes map[string]attr.Type = map[string]
 	"artifact_filter_criteria": types.ObjectType{
 		AttrTypes: artifactFilterCriteriaResourceModelAttributeTypes,
 	},
+	"schedule": types.ObjectType{
+		AttrTypes: scheduleResourceModelAttributeTypes,
+	},
 }
 
 var artifactFilterCriteriaResourceModelAttributeTypes map[string]attr.Type = map[string]attr.Type{
@@ -224,68 +276,101 @@ var artifactFilterCriteriaResourceModelAttributeTypes map[string]attr.Type = map
 	"exclude_patterns": types.SetType{ElemType: types.StringType},
 }
 
+var scheduleResourceModelAttributeTypes map[string]attr.Type = map[string]attr.Type{
+	"cron":     types.StringType,
+	"timezone": types.StringType,
+}
+
 func (r *workersServiceResourceModel) fromAPIModel(ctx context.Context, apiModel *WorkersServiceAPIModel) (ds diag.Diagnostics) {
 	r.Key = types.StringValue(apiModel.Key)
 	r.Description = types.StringValue(apiModel.Description)
 	r.SourceCode = types.StringValue(apiModel.SourceCode)
 	r.Action = types.StringValue(apiModel.Action)
 
-	repoKeys, d := types.SetValueFrom(
-		ctx,
-		types.StringType,
-		apiModel.FilterCriteria.ArtifactFilterCriteria.RepoKeys,
-	)
-	if d != nil {
-		ds = append(ds, d...)
-	}
-	if ds.HasError() {
-		return
-	}
-	includePatterns, d := types.SetValueFrom(
-		ctx,
-		types.StringType,
-		apiModel.FilterCriteria.ArtifactFilterCriteria.IncludePatterns,
-	)
-	if d != nil {
-		ds = append(ds, d...)
-	}
-	if ds.HasError() {
-		return
-	}
-	excludePatterns, d := types.SetValueFrom(
-		ctx,
-		types.StringType,
-		apiModel.FilterCriteria.ArtifactFilterCriteria.ExcludePatterns,
-	)
-	if d != nil {
-		ds = append(ds, d...)
-	}
-	if ds.HasError() {
-		return
+	artifactFilterCriteriaObject := types.ObjectNull(artifactFilterCriteriaResourceModelAttributeTypes)
+	if apiModel.FilterCriteria.ArtifactFilterCriteria != nil {
+		repoKeys, d := types.SetValueFrom(
+			ctx,
+			types.StringType,
+			apiModel.FilterCriteria.ArtifactFilterCriteria.RepoKeys,
+		)
+		if d != nil {
+			ds = append(ds, d...)
+		}
+		if ds.HasError() {
+			return
+		}
+		includePatterns, d := types.SetValueFrom(
+			ctx,
+			types.StringType,
+			apiModel.FilterCriteria.ArtifactFilterCriteria.IncludePatterns,
+		)
+		if d != nil {
+			ds = append(ds, d...)
+		}
+		if ds.HasError() {
+			return
+		}
+		excludePatterns, d := types.SetValueFrom(
+			ctx,
+			types.StringType,
+			apiModel.FilterCriteria.ArtifactFilterCriteria.ExcludePatterns,
+		)
+		if d != nil {
+			ds = append(ds, d...)
+		}
+		if ds.HasError() {
+			return
+		}
+
+		artifactFilterCriteriaValue := artifactFilterCriteriaResourceModel{
+			RepoKeys:        repoKeys,
+			IncludePatterns: includePatterns,
+			ExcludePatterns: excludePatterns,
+		}
+
+		atrifactFilterCriteria, d := types.ObjectValueFrom(
+			ctx,
+			artifactFilterCriteriaResourceModelAttributeTypes,
+			artifactFilterCriteriaValue,
+		)
+		if d != nil {
+			ds = append(ds, d...)
+		}
+		if ds.HasError() {
+			return
+		}
+
+		artifactFilterCriteriaObject = atrifactFilterCriteria
 	}
 
-	artifactFilterCriteriaValue := artifactFilterCriteriaResourceModel{
-		RepoKeys:        repoKeys,
-		IncludePatterns: includePatterns,
-		ExcludePatterns: excludePatterns,
-	}
+	scheduleObject := types.ObjectNull(scheduleResourceModelAttributeTypes)
+	if apiModel.FilterCriteria.Schedule != nil {
+		scheduleValue := scheduleResourceModel{
+			Cron:     types.StringValue(apiModel.FilterCriteria.Schedule.Cron),
+			Timezone: types.StringValue(apiModel.FilterCriteria.Schedule.Timezone),
+		}
 
-	atrifactFilterCriteria, d := types.ObjectValueFrom(
-		ctx,
-		artifactFilterCriteriaResourceModelAttributeTypes,
-		artifactFilterCriteriaValue,
-	)
-	if d != nil {
-		ds = append(ds, d...)
-	}
-	if ds.HasError() {
-		return
+		schedule, d := types.ObjectValueFrom(
+			ctx,
+			scheduleResourceModelAttributeTypes,
+			scheduleValue,
+		)
+		if d != nil {
+			ds = append(ds, d...)
+		}
+		if ds.HasError() {
+			return
+		}
+
+		scheduleObject = schedule
 	}
 
 	filterCriteria, d := types.ObjectValue(
 		filterCriteriaResourceModelAttributeTypes,
 		map[string]attr.Value{
-			"artifact_filter_criteria": atrifactFilterCriteria,
+			"artifact_filter_criteria": artifactFilterCriteriaObject,
+			"schedule":                 scheduleObject,
 		},
 	)
 	if d != nil {
@@ -312,13 +397,19 @@ type WorkersServiceAPIModel struct {
 }
 
 type filterCriteriaAPIModel struct {
-	ArtifactFilterCriteria artifactFilterCriteriaAPIModel `json:"artifactFilterCriteria"`
+	ArtifactFilterCriteria *artifactFilterCriteriaAPIModel `json:"artifactFilterCriteria,omitempty"`
+	Schedule               *scheduleAPIModel               `json:"schedule,omitempty"`
 }
 
 type artifactFilterCriteriaAPIModel struct {
 	RepoKeys        []string `json:"repoKeys"`
 	IncludePatterns []string `json:"includePatterns,omitempty"`
 	ExcludePatterns []string `json:"excludePatterns,omitempty"`
+}
+
+type scheduleAPIModel struct {
+	Cron     string `json:"cron"`
+	Timezone string `json:"timezone,omitempty"`
 }
 
 type secretAPIModel struct {
