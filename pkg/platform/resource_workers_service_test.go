@@ -690,3 +690,94 @@ func TestAccWorkersService_AfterPropertyDelete(t *testing.T) {
 		},
 	})
 }
+
+const testSchedule = "export default async (context: PlatformContext, data: AfterPropertyDeleteRequest): Promise<AfterPropertyDeleteResponse> => { console.log(await context.clients.platformHttp.get('/artifactory/api/system/ping')); console.log(await axios.get('https://my.external.resource')); return { status: 'SCHEDULE', message: 'proceed', } }"
+
+func TestAccWorkersService_Schedule(t *testing.T) {
+	jfrogURL := os.Getenv("JFROG_URL")
+	if !strings.HasSuffix(jfrogURL, "jfrog.io") {
+		t.Skipf("JFROG_URL '%s' is not a cloud instance. Workers Service is only available on cloud.", jfrogURL)
+	}
+
+	_, fqrn, workersServiceName := testutil.MkNames("test-workers-service-", "platform_workers_service")
+
+	temp := `
+	resource "platform_workers_service" "{{ .key }}" {
+		key         = "{{ .key }}"
+		enabled     = {{ .enabled }}
+		description = "{{ .description }}"
+		source_code = "{{ .sourceCode }}"
+		action      = "{{ .action }}"
+
+		filter_criteria = {
+			schedule = {
+				cron     = "{{ .cron }}"
+				timezone = "{{ .timezone }}"
+			}
+		}
+
+		secrets = [
+			{
+				key   = "{{ .secretKey }}"
+				value = "{{ .secretValue }}"
+			},
+			{
+				key   = "{{ .secretKey2 }}"
+				value = "{{ .secretValue2 }}"
+			}
+		]
+	}`
+	testData := map[string]string{
+		"key":          workersServiceName,
+		"enabled":      "true",
+		"description":  "Description",
+		"sourceCode":   testSchedule,
+		"action":       "SCHEDULED_EVENT",
+		"cron":         "*/2 * * * *",
+		"timezone":     "UTC",
+		"secretKey":    "test-secret-key",
+		"secretValue":  "test-secret-value",
+		"secretKey2":   "test-secret-key-2",
+		"secretValue2": "test-secret-value-2",
+	}
+
+	config := util.ExecuteTemplate(workersServiceName, temp, testData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"artifactory": {
+				Source:            "registry.terraform.io/jfrog/artifactory",
+				VersionConstraint: "9.9.0",
+			},
+		},
+		CheckDestroy: testAccCheckWorkersServiceDestroy(fqrn),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "key", workersServiceName),
+					resource.TestCheckResourceAttr(fqrn, "enabled", testData["enabled"]),
+					resource.TestCheckResourceAttr(fqrn, "description", testData["description"]),
+					resource.TestCheckResourceAttr(fqrn, "source_code", testData["sourceCode"]),
+					resource.TestCheckResourceAttr(fqrn, "filter_criteria.schedule.cron", "*/2 * * * *"),
+					resource.TestCheckResourceAttr(fqrn, "filter_criteria.schedule.timezone", "UTC"),
+					resource.TestCheckResourceAttr(fqrn, "secrets.#", "2"),
+					resource.TestCheckResourceAttr(fqrn, "secrets.0.key", testData["secretKey"]),
+					resource.TestCheckResourceAttr(fqrn, "secrets.0.value", testData["secretValue"]),
+					resource.TestCheckResourceAttr(fqrn, "secrets.1.key", testData["secretKey2"]),
+					resource.TestCheckResourceAttr(fqrn, "secrets.1.value", testData["secretValue2"]),
+				),
+			},
+			{
+				ResourceName:                         fqrn,
+				ImportState:                          true,
+				ImportStateId:                        workersServiceName,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "key",
+				ImportStateVerifyIgnore:              []string{"secrets"}, // `secrets.value` attribute is not being sent via API, can't be imported
+			},
+		},
+	})
+}
