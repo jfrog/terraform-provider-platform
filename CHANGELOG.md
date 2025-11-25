@@ -1,3 +1,10 @@
+## 2.2.7 (Sept 9, 2025). Tested on Artifactory 7.117.19 with Terraform 1.14.0 and OpenTofu 1.10.6
+
+IMPROVEMENTS:
+
+* resource/platform_workers_service: Added support for `SCHEDULED_EVENT` action type [#197](https://github.com/jfrog/terraform-provider-platform/issues/197) PR: [#281](https://github.com/jfrog/terraform-provider-platform/pull/281)
+
+
 ## 2.2.6 (Sept 9, 2025). Tested on Artifactory 7.117.15 with Terraform 1.13.1 and OpenTofu 1.10.6
 
 IMPROVEMENTS:
