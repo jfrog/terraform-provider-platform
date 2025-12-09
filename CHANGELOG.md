@@ -1,6 +1,10 @@
-## 2.2.6 (Sept 9, 2025). Tested on Artifactory 7.117.15 with Terraform 1.13.1 and OpenTofu 1.10.6
+## 2.2.7 (Dec 9, 2025).
 
 IMPROVEMENTS:
+
+* resource/platform_permission: Added validation to ensure that when a permission resource type (artifact, build, release_bundle, destination, or pipeline_source) is specified, the `targets` field must contain at least one target. Empty targets arrays are now rejected with a clear error message. Issue: [#119](https://github.com/jfrog/terraform-provider-platform/issues/199) PR: [#282](https://github.com/jfrog/terraform-provider-platform/pull/282)
+
+## 2.2.6 (Sept 9, 2025). Tested on Artifactory 7.117.15 with Terraform 1.13.1 and OpenTofu 1.10.6
 
 * resource/platform_oidc_configuration: Added support for Github Enterprise in OIDC integration  [#267](https://github.com/jfrog/terraform-provider-platform/issues/267) PR: [#268](https://github.com/jfrog/terraform-provider-platform/pull/268)
 
