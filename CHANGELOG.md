@@ -1,4 +1,4 @@
-## 2.2.7 (Dec 9, 2025).
+## 2.2.7 (Dec 9, 2025). Tested on Artifactory 7.125.8 with Terraform 1.14.1 and OpenTofu 1.10.8
 
 IMPROVEMENTS:
 
