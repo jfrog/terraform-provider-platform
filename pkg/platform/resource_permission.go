@@ -413,6 +413,70 @@ func (r permissionResource) ConfigValidators(ctx context.Context) []resource.Con
 	}
 }
 
+func (r *permissionResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config permissionResourceModel
+
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Check each resource type to ensure targets is not empty when resource is specified
+	resourceTypes := map[string]struct {
+		resource types.Object
+		path     path.Path
+	}{
+		"artifact": {
+			resource: config.Artifact,
+			path:     path.Root("artifact").AtName("targets"),
+		},
+		"build": {
+			resource: config.Build,
+			path:     path.Root("build").AtName("targets"),
+		},
+		"release_bundle": {
+			resource: config.ReleaseBundle,
+			path:     path.Root("release_bundle").AtName("targets"),
+		},
+		"destination": {
+			resource: config.Destination,
+			path:     path.Root("destination").AtName("targets"),
+		},
+		"pipeline_source": {
+			resource: config.PipelineSource,
+			path:     path.Root("pipeline_source").AtName("targets"),
+		},
+	}
+
+	for resourceType, resourceData := range resourceTypes {
+		// Skip if resource is null or unknown
+		if resourceData.resource.IsNull() || resourceData.resource.IsUnknown() {
+			continue
+		}
+
+		// Extract the resource model to check targets
+		var resourceModel permissionActionsTargetsResourceModel
+		diags := resourceData.resource.As(ctx, &resourceModel, basetypes.ObjectAsOptions{})
+		if diags.HasError() {
+			// If we can't parse, skip validation (might be unknown values)
+			continue
+		}
+
+		// Check if targets is null, unknown, or empty
+		if resourceModel.Targets.IsNull() || resourceModel.Targets.IsUnknown() {
+			continue
+		}
+
+		if len(resourceModel.Targets.Elements()) == 0 {
+			resp.Diagnostics.AddAttributeError(
+				resourceData.path,
+				"Empty Targets Configuration",
+				fmt.Sprintf("When %s resource is specified, targets must contain at least one target. Empty targets are not allowed.", resourceType),
+			)
+		}
+	}
+}
+
 type permissionResourceModel struct {
 	Name           types.String `tfsdk:"name"`
 	Artifact       types.Object `tfsdk:"artifact"`

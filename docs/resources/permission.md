@@ -32,15 +32,15 @@ resource "platform_permission" "my-permission" {
         include_patterns = ["**"]
       },
       {
-        name = "ANY LOCAL"
+        name = "ALL-LOCAL"
         include_patterns = ["**", "*.js"]
       },
       {
-        name = "ANY REMOTE"
+        name = "ALL-REMOTE"
         include_patterns = ["**", "*.js"]
       },
       {
-        name = "ANY DISTRIBUTION"
+        name = "ALL-DISTRIBUTION"
         include_patterns = ["**", "*.js"]
       }
     ]
@@ -139,7 +139,7 @@ resource "platform_permission" "my-permission" {
 
 Required:
 
-- `targets` (Attributes Set) (see [below for nested schema](#nestedatt--artifact--targets))
+- `targets` (Attributes Set) (see [below for nested schema](#nestedatt--artifact--targets)) **Note:** When `artifact` is specified, `targets` must contain at least one target. Empty targets are not allowed.
 
 Optional:
 
@@ -201,7 +201,7 @@ Required:
 
 Required:
 
-- `targets` (Attributes Set) (see [below for nested schema](#nestedatt--build--targets))
+- `targets` (Attributes Set) (see [below for nested schema](#nestedatt--build--targets)) **Note:** When `build` is specified, `targets` must contain exactly one target. Multiple targets are not allowed.
 
 Optional:
 
@@ -263,7 +263,7 @@ Required:
 
 Required:
 
-- `targets` (Attributes Set) (see [below for nested schema](#nestedatt--destination--targets))
+- `targets` (Attributes Set) (see [below for nested schema](#nestedatt--destination--targets)) **Note:** When `destination` is specified, `targets` must contain at least one target. Empty targets are not allowed.
 
 Optional:
 
@@ -319,7 +319,7 @@ Required:
 
 Required:
 
-- `targets` (Attributes Set) (see [below for nested schema](#nestedatt--pipeline_source--targets))
+- `targets` (Attributes Set) (see [below for nested schema](#nestedatt--pipeline_source--targets)) **Note:** When `pipeline_source` is specified, `targets` must contain at least one target. Empty targets are not allowed.
 
 Optional:
 
@@ -375,7 +375,7 @@ Required:
 
 Required:
 
-- `targets` (Attributes Set) (see [below for nested schema](#nestedatt--release_bundle--targets))
+- `targets` (Attributes Set) (see [below for nested schema](#nestedatt--release_bundle--targets)) **Note:** When `release_bundle` is specified, `targets` must contain at least one target. Empty targets are not allowed.
 
 Optional:
 

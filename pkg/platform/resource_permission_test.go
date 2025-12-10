@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -1046,6 +1047,222 @@ func TestAccPermission_name_change(t *testing.T) {
 						plancheck.ExpectResourceAction(fqrn, plancheck.ResourceActionDestroyBeforeCreate),
 					},
 				},
+			},
+		},
+	})
+}
+
+func TestAccPermission_empty_targets_validation(t *testing.T) {
+	_, _, permissionName := testutil.MkNames("test-permission", "platform_permission")
+	_, _, userName := testutil.MkNames("test-user", "artifactory_managed_user")
+
+	resourceTypes := []string{"artifact", "build", "release_bundle", "destination", "pipeline_source"}
+
+	for _, resourceType := range resourceTypes {
+		t.Run(resourceType, func(t *testing.T) {
+			temp := `
+			resource "artifactory_managed_user" "{{ .userName }}" {
+				name = "{{ .userName }}"
+				email = "{{ .userName }}@tempurl.org"
+				password = "Password!123"
+			}
+
+			resource "platform_permission" "{{ .name }}" {
+				name = "{{ .name }}"
+
+				{{ .resourceType }} = {
+					actions = {
+						users = [
+							{
+								name = artifactory_managed_user.{{ .userName }}.name
+								permissions = ["READ"]
+							}
+						]
+					}
+
+					targets = []
+				}
+			}`
+
+			testData := map[string]string{
+				"name":         permissionName,
+				"userName":     userName,
+				"resourceType": resourceType,
+			}
+
+			config := util.ExecuteTemplate(permissionName, temp, testData)
+
+			resource.Test(t, resource.TestCase{
+				PreCheck:                 func() { testAccPreCheck(t) },
+				ProtoV6ProviderFactories: testAccProviders(),
+				ExternalProviders: map[string]resource.ExternalProvider{
+					"artifactory": {
+						Source: "jfrog/artifactory",
+					},
+				},
+				Steps: []resource.TestStep{
+					{
+						Config:      config,
+						ExpectError: regexp.MustCompile(fmt.Sprintf(`(?s).*When %s resource is specified, targets must contain at least one.*target.*Empty targets are not allowed.*`, resourceType)),
+					},
+				},
+			})
+		})
+	}
+}
+
+func TestAccPermission_no_resource_types_validation(t *testing.T) {
+	_, _, permissionName := testutil.MkNames("test-permission", "platform_permission")
+
+	temp := `
+	resource "platform_permission" "{{ .name }}" {
+		name = "{{ .name }}"
+	}`
+
+	testData := map[string]string{
+		"name": permissionName,
+	}
+
+	config := util.ExecuteTemplate(permissionName, temp, testData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				Config:      config,
+				ExpectError: regexp.MustCompile(`(?s).*At least one of.*must be configured.*\[.*artifact.*build.*release_bundle.*destination.*pipeline_source.*\]`),
+			},
+		},
+	})
+}
+
+func TestAccPermission_invalid_permission_value(t *testing.T) {
+	_, _, permissionName := testutil.MkNames("test-permission", "platform_permission")
+	_, _, userName := testutil.MkNames("test-user", "artifactory_managed_user")
+	_, _, repoName := testutil.MkNames("test-local-repo", "artifactory_local_generic_repository")
+
+	invalidPermissions := []string{"INVALID", "WRITE_DELETE", "READ_WRITE", ""}
+
+	for _, invalidPerm := range invalidPermissions {
+		t.Run(invalidPerm, func(t *testing.T) {
+			temp := `
+			resource "artifactory_managed_user" "{{ .userName }}" {
+				name = "{{ .userName }}"
+				email = "{{ .userName }}@tempurl.org"
+				password = "Password!123"
+			}
+
+			resource "artifactory_local_generic_repository" "{{ .repoName }}" {
+				key = "{{ .repoName }}"
+			}
+
+			resource "platform_permission" "{{ .name }}" {
+				name = "{{ .name }}"
+
+				artifact = {
+					actions = {
+						users = [
+							{
+								name = artifactory_managed_user.{{ .userName }}.name
+								permissions = ["{{ .invalidPerm }}"]
+							}
+						]
+					}
+
+					targets = [
+						{
+							name = artifactory_local_generic_repository.{{ .repoName }}.key
+							include_patterns = ["**"]
+						}
+					]
+				}
+			}`
+
+			testData := map[string]string{
+				"name":        permissionName,
+				"userName":    userName,
+				"repoName":    repoName,
+				"invalidPerm": invalidPerm,
+			}
+
+			config := util.ExecuteTemplate(permissionName, temp, testData)
+
+			resource.Test(t, resource.TestCase{
+				PreCheck:                 func() { testAccPreCheck(t) },
+				ProtoV6ProviderFactories: testAccProviders(),
+				ExternalProviders: map[string]resource.ExternalProvider{
+					"artifactory": {
+						Source: "jfrog/artifactory",
+					},
+				},
+				Steps: []resource.TestStep{
+					{
+						Config:      config,
+						ExpectError: regexp.MustCompile(`(?s).*value must be one of.*WRITE.*MANAGE.*SCAN.*DELETE.*READ.*ANNOTATE.*EXECUTE.*`),
+					},
+				},
+			})
+		})
+	}
+}
+
+func TestAccPermission_build_multiple_targets_validation(t *testing.T) {
+	_, _, permissionName := testutil.MkNames("test-permission", "platform_permission")
+	_, _, userName := testutil.MkNames("test-user", "artifactory_managed_user")
+
+	temp := `
+	resource "artifactory_managed_user" "{{ .userName }}" {
+		name = "{{ .userName }}"
+		email = "{{ .userName }}@tempurl.org"
+		password = "Password!123"
+	}
+
+	resource "platform_permission" "{{ .name }}" {
+		name = "{{ .name }}"
+
+		build = {
+			actions = {
+				users = [
+					{
+						name = artifactory_managed_user.{{ .userName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+		targets = [
+			{
+				name = "artifactory-build-info"
+				include_patterns = ["**"]
+			},
+			{
+				name = "artifactory-build-info"
+				include_patterns = ["apache/**"]
+			}
+		]
+		}
+	}`
+
+	testData := map[string]string{
+		"name":     permissionName,
+		"userName": userName,
+	}
+
+	config := util.ExecuteTemplate(permissionName, temp, testData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"artifactory": {
+				Source: "jfrog/artifactory",
+			},
+		},
+		Steps: []resource.TestStep{
+			{
+				Config:      config,
+				ExpectError: regexp.MustCompile(`.*Attribute.*targets.*must contain at most.*1.*elements.*`),
 			},
 		},
 	})
