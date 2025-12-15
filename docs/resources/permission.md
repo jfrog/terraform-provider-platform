@@ -212,7 +212,7 @@ Optional:
 
 Required:
 
-- `name` (String) Only `artifactory-build-info` is allowed for name. Specify build name as part of the `include_patterns` or `exclude_patterns`.
+- `name` (String) Specify build info repository name. Any custom build info repository name is allowed (e.g. `artifactory-build-info` or a custom repository). Specify build name as part of the `include_patterns` or `exclude_patterns`.
 
 Optional:
 

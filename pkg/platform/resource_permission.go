@@ -97,7 +97,7 @@ var targetAttributeSchema = func(isBuild bool, targetsDescription, nameDescripti
 	nameValidators := []validator.String{}
 
 	if isBuild {
-		nameValidators = append(nameValidators, stringvalidator.OneOf([]string{"artifactory-build-info"}...))
+		nameValidators = append(nameValidators, stringvalidator.LengthBetween(1, 255))
 	}
 
 	attr := schema.SetNestedAttribute{
@@ -198,7 +198,7 @@ var schemaAttributes = map[string]schema.Attribute{
 			"targets": targetAttributeSchema(
 				true,
 				"When `build` is specified, `targets` must contain exactly one target. Multiple targets are not allowed.",
-				"Only `artifactory-build-info` is allowed for name. Specify build name as part of the `include_patterns` or `exclude_patterns`.",
+				"Specify build info repository name. Any custom build info repository name is allowed (e.g. `artifactory-build-info` or a custom repository). Specify build name as part of the `include_patterns` or `exclude_patterns`.",
 				"Use Ant-style wildcard patterns to specify **existing and future** build names (i.e. artifact paths) in the build info repository (without a leading slash) that will be included in this permission target. Ant-style path expressions are supported (*, **, ?). For example, an `apache/**` pattern will include the \"apache\" build info in the permission.",
 				"Use Ant-style wildcard patterns to specify **existing and future** build names (i.e. artifact paths) in the build info repository (without a leading slash) that will be excluded from this permission target. Ant-style path expressions are supported (*, **, ?). For example, an `apache/**` pattern will exclude the \"apache\" build info from the permission.",
 			),

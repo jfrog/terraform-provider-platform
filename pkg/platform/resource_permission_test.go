@@ -1268,6 +1268,95 @@ func TestAccPermission_build_multiple_targets_validation(t *testing.T) {
 	})
 }
 
+func TestAccPermission_build_custom_repository(t *testing.T) {
+	_, fqrn, permissionName := testutil.MkNames("test-permission", "platform_permission")
+	_, _, userName := testutil.MkNames("test-user", "artifactory_managed_user")
+
+	temp := `
+	resource "artifactory_managed_user" "{{ .userName }}" {
+		name = "{{ .userName }}"
+		email = "{{ .userName }}@tempurl.org"
+		password = "Password!123"
+	}
+
+	resource "platform_permission" "{{ .name }}" {
+		name = "{{ .name }}"
+
+		build = {
+			actions = {
+				users = [
+					{
+						name = artifactory_managed_user.{{ .userName }}.name
+						permissions = ["READ"]
+					}
+				]
+			}
+
+			targets = [
+				{
+					name = "{{ .buildRepoName }}"
+					include_patterns = ["**"]
+				}
+			]
+		}
+	}`
+
+	testData := map[string]string{
+		"name":          permissionName,
+		"userName":      userName,
+		"buildRepoName": "custom-build-info",
+	}
+
+	config := util.ExecuteTemplate(permissionName, temp, testData)
+
+	updatedTestData := map[string]string{
+		"name":          permissionName,
+		"userName":      userName,
+		"buildRepoName": "another-custom-build-info",
+	}
+	updatedConfig := util.ExecuteTemplate(permissionName, temp, updatedTestData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"artifactory": {
+				Source: "jfrog/artifactory",
+			},
+		},
+		// CheckDestroy: testAccCheckPermissionDestroy(fqrn),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
+					resource.TestCheckResourceAttr(fqrn, "build.targets.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "build.targets.0.name", testData["buildRepoName"]),
+					resource.TestCheckResourceAttr(fqrn, "build.targets.0.include_patterns.#", "1"),
+					resource.TestCheckTypeSetElemAttr(fqrn, "build.targets.0.include_patterns.*", "**"),
+				),
+			},
+			{
+				Config: updatedConfig,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", updatedTestData["name"]),
+					resource.TestCheckResourceAttr(fqrn, "build.targets.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "build.targets.0.name", updatedTestData["buildRepoName"]),
+					resource.TestCheckResourceAttr(fqrn, "build.targets.0.include_patterns.#", "1"),
+					resource.TestCheckTypeSetElemAttr(fqrn, "build.targets.0.include_patterns.*", "**"),
+				),
+			},
+			{
+				ResourceName:                         fqrn,
+				ImportState:                          true,
+				ImportStateId:                        permissionName,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "name",
+			},
+		},
+	})
+}
+
 func testAccCheckPermissionDestroy(id string) func(*terraform.State) error {
 	return func(s *terraform.State) error {
 		client := TestProvider.(*platform.PlatformProvider).Meta.Client
