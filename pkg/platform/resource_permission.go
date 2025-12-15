@@ -93,14 +93,16 @@ var actionsAttributeSchema = func(description string) schema.SingleNestedAttribu
 	}
 }
 
-var targetAttributeSchema = func(isBuild bool, nameDescription, includeDescription, excludeDescription string) schema.SetNestedAttribute {
+var targetAttributeSchema = func(isBuild bool, targetsDescription, nameDescription, includeDescription, excludeDescription string) schema.SetNestedAttribute {
 	nameValidators := []validator.String{}
+
 	if isBuild {
 		nameValidators = append(nameValidators, stringvalidator.OneOf([]string{"artifactory-build-info"}...))
 	}
 
 	attr := schema.SetNestedAttribute{
-		Required: true,
+		Required:            true,
+		MarkdownDescription: targetsDescription,
 		NestedObject: schema.NestedAttributeObject{
 			Attributes: map[string]schema.Attribute{
 				"name": schema.StringAttribute{
@@ -171,6 +173,7 @@ var schemaAttributes = map[string]schema.Attribute{
 			),
 			"targets": targetAttributeSchema(
 				false,
+				"When `artifact` is specified, `targets` must contain at least one target. Empty targets are not allowed.",
 				"Specify repository key as name. Use `ANY LOCAL`, `ANY REMOTE`, or `ANY DISTRIBUTION` for any repository type.",
 				"Simple comma separated wildcard patterns for **existing and future** repository artifact paths (with no leading slash). Ant-style path expressions are supported (*, **, ?). For example: `org/apache/**`",
 				"Simple comma separated wildcard patterns for **existing and future** repository artifact paths (with no leading slash). Ant-style path expressions are supported (*, **, ?). For example: `org/apache/**`",
@@ -194,6 +197,7 @@ var schemaAttributes = map[string]schema.Attribute{
 			),
 			"targets": targetAttributeSchema(
 				true,
+				"When `build` is specified, `targets` must contain exactly one target. Multiple targets are not allowed.",
 				"Only `artifactory-build-info` is allowed for name. Specify build name as part of the `include_patterns` or `exclude_patterns`.",
 				"Use Ant-style wildcard patterns to specify **existing and future** build names (i.e. artifact paths) in the build info repository (without a leading slash) that will be included in this permission target. Ant-style path expressions are supported (*, **, ?). For example, an `apache/**` pattern will include the \"apache\" build info in the permission.",
 				"Use Ant-style wildcard patterns to specify **existing and future** build names (i.e. artifact paths) in the build info repository (without a leading slash) that will be excluded from this permission target. Ant-style path expressions are supported (*, **, ?). For example, an `apache/**` pattern will exclude the \"apache\" build info from the permission.",
@@ -218,6 +222,7 @@ var schemaAttributes = map[string]schema.Attribute{
 			),
 			"targets": targetAttributeSchema(
 				false,
+				"When `release_bundle` is specified, `targets` must contain at least one target. Empty targets are not allowed.",
 				"Specify release bundle repository key as name.",
 				"Simple wildcard patterns for **existing and future** Release Bundle names. Ant-style path expressions are supported (*, **, ?). For example: `product_*/**`",
 				"Simple wildcard patterns for **existing and future** Release Bundle names. Ant-style path expressions are supported (*, **, ?). For example: `product_*/**`",
@@ -238,6 +243,7 @@ var schemaAttributes = map[string]schema.Attribute{
 			),
 			"targets": targetAttributeSchema(
 				false,
+				"When `destination` is specified, `targets` must contain at least one target. Empty targets are not allowed.",
 				"Specify destination name as name. Use `*` to include all destinations.",
 				"Simple wildcard patterns for existing and future JPD or city names. Ant-style path expressions are supported (*, **, ?). For example: `site_*` or `New*`",
 				"Simple wildcard patterns for existing and future JPD or city names. Ant-style path expressions are supported (*, **, ?). For example: `site_*` or `New*`",
@@ -258,6 +264,7 @@ var schemaAttributes = map[string]schema.Attribute{
 			),
 			"targets": targetAttributeSchema(
 				false,
+				"When `pipeline_source` is specified, `targets` must contain at least one target. Empty targets are not allowed.",
 				"Specify pipeline source name as name. Use `*` to include all pipeline sources.",
 				"Use Ant-style wildcard patterns to specify the full repository name of the **existing and future** pipeline sources that will be included in this permission. The pattern should have the following format: `{FULL_REPOSITORY_NAME_PATTERN}/**`. Ant-style path expressions are supported (*, **, ?). For example, the pattern `*/*test*/**` will include all repositories that contain the word \"test\" regardless of the repository owner.",
 				"Use Ant-style wildcard patterns to specify the full repository name of the **existing and future** pipeline sources that will be excluded from this permission. The pattern should have the following format: `{FULL_REPOSITORY_NAME_PATTERN}/**`. Ant-style path expressions are supported (*, **, ?). For example, the pattern `*/*test*/**` will exclude all repositories that contain the word \"test\" regardless of the repository owner.",
