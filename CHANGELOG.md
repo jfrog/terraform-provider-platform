@@ -1,8 +1,10 @@
-## 2.2.7 (Dec 9, 2025). Tested on Artifactory 7.125.8 with Terraform 1.14.1 and OpenTofu 1.10.8
+## 2.2.7 (Dec 15, 2025). Tested on Artifactory 7.125.8 with Terraform 1.14.2 and OpenTofu 1.11.1
 
 IMPROVEMENTS:
 
 * resource/platform_permission: Added validation to ensure that when a permission resource type (artifact, build, release_bundle, destination, or pipeline_source) is specified, the `targets` field must contain at least one target. Empty targets arrays are now rejected with a clear error message. Issue: [#119](https://github.com/jfrog/terraform-provider-platform/issues/199) PR: [#282](https://github.com/jfrog/terraform-provider-platform/pull/282)
+
+* resource/platform_permission: Allow custom build info repository names in `build.targets.name` attribute. Previously, only `artifactory-build-info` was accepted. Users can now specify any custom build info repository name. [#201](https://github.com/jfrog/terraform-provider-platform/issues/201) PR: [#283](https://github.com/jfrog/terraform-provider-platform/pull/283)
 
 ## 2.2.6 (Sept 9, 2025). Tested on Artifactory 7.117.15 with Terraform 1.13.1 and OpenTofu 1.10.6
 

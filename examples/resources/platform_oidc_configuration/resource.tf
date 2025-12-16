@@ -3,14 +3,7 @@ resource "platform_oidc_configuration" "my-github-oidc-configuration" {
   description   = "My GitHub OIDC configuration"
   issuer_url    = "https://token.actions.githubusercontent.com"
   provider_type = "GitHub"
-  audience      = "jfrog-github"
-}
-
-resource "platform_oidc_configuration" "my-github-enterprise-oidc-configuration" {
-  name          = "my-github-enterprise-oidc-configuration"
-  description   = "My GitHub OIDC configuration"
-  issuer_url    = "https://my-github.githubusercontent.com"
-  provider_type = "GitHubEnterprise"
+  organization  = "jfrog"
   audience      = "jfrog-github"
 }
 
@@ -18,7 +11,8 @@ resource "platform_oidc_configuration" "my-github-oidc-enterprise-configuration"
   name          = "my-github-oidc-enterprise-configuration"
   description   = "My GitHub OIDC enterprise configuration"
   issuer_url    = "https://token.actions.githubusercontent.com/jfrog"
-  provider_type = "GitHub"
+  provider_type = "GitHubEnterprise"
+  organization  = "jfrog"
   audience      = "jfrog-github"
 }
 
@@ -28,4 +22,14 @@ resource "platform_oidc_configuration" "my-generic-oidc-configuration" {
   issuer_url    = "https://tempurl.org"
   provider_type = "generic"
   audience      = "jfrog-generic"
+}
+
+
+resource "platform_oidc_configuration" "my-azure-oidc-configuration" {
+  name              = "{{ .name }}"
+  description       = "My Azure OIDC configuration"
+  issuer_url        = "https://sts.windows.net/your-tenant-id/"
+  provider_type     = "Azure"
+  audience          = "azure-audience"
+  use_default_proxy = true
 }
