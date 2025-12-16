@@ -7,7 +7,7 @@ go 1.25.5
 
 require (
 	github.com/go-resty/resty/v2 v2.17.1
-	github.com/hashicorp/terraform-plugin-docs v0.21.0
+	github.com/hashicorp/terraform-plugin-docs v0.24.0
 	github.com/hashicorp/terraform-plugin-framework v1.17.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.19.0
 	github.com/hashicorp/terraform-plugin-go v0.29.0
@@ -18,10 +18,10 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.2.1 // indirect
-	github.com/bmatcuk/doublestar/v4 v4.8.1 // indirect
+	github.com/bmatcuk/doublestar/v4 v4.9.1 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
-	github.com/hashicorp/terraform-plugin-mux v0.20.0 // indirect
+	github.com/hashicorp/terraform-plugin-mux v0.21.0 // indirect
 	github.com/reugn/go-quartz v0.15.2 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/sethvargo/go-password v0.3.1 // indirect
@@ -69,7 +69,7 @@ require (
 	github.com/hashicorp/yamux v0.1.2 // indirect
 	github.com/huandu/xstrings v1.3.3 // indirect
 	github.com/imdario/mergo v0.3.15 // indirect
-	github.com/jfrog/terraform-provider-artifactory/v12 v12.9.6
+	github.com/jfrog/terraform-provider-artifactory/v12 v12.11.1
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.9 // indirect
