@@ -442,6 +442,35 @@ func (r *permissionResource) ValidateConfig(ctx context.Context, req resource.Va
 		return
 	}
 
+	// Validate API permissions by making a lightweight API call
+	// This ensures permission errors are caught during plan phase, not just during apply
+	if r.ProviderData.Client != nil {
+		var jfrogErrors util.JFrogErrors
+		response, err := r.ProviderData.Client.R().
+			SetError(&jfrogErrors).
+			Get(PermissionEndpoint)
+
+		if err != nil {
+			// Network errors are not permission issues, skip validation
+			tflog.Debug(ctx, "Skipping permission validation due to network error", map[string]interface{}{
+				"error": err.Error(),
+			})
+		} else if response.StatusCode() == http.StatusForbidden {
+			resp.Diagnostics.AddError(
+				"Insufficient Permissions",
+				"The current user does not have permission to manage platform permissions. "+
+					"Please ensure the user has the necessary permissions (e.g., 'Administer the Platform' role or appropriate permission management privileges). "+
+					"Error: "+jfrogErrors.String(),
+			)
+			return
+		} else if response.IsError() && response.StatusCode() != http.StatusOK {
+			tflog.Debug(ctx, "Permission validation returned non-200 status", map[string]interface{}{
+				"status_code": response.StatusCode(),
+				"error":       jfrogErrors.String(),
+			})
+		}
+	}
+
 	// Check each resource type to ensure targets is not empty when resource is specified
 	resourceTypes := map[string]struct {
 		resource types.Object
