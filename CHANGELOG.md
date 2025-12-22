@@ -1,3 +1,10 @@
+## 2.2.8 (Dec 22, 2025).
+
+
+IMPROVEMENTS:
+
+* resource/platform_permission: Added permission validation during plan phase. Permission errors are now detected during `terraform plan` instead of only during `terraform apply`, providing earlier feedback and better user experience. The validation makes a lightweight API call to check if the user has sufficient permissions to manage platform permissions. Issue: [#208](https://github.com/jfrog/terraform-provider-platform/issues/208) PR: [#285](https://github.com/jfrog/terraform-provider-platform/pull/285)
+
 ## 2.2.7 (Dec 16, 2025). Tested on Artifactory 7.125.8 with Terraform 1.14.2 and OpenTofu 1.11.1
 
 IMPROVEMENTS:
