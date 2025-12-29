@@ -118,6 +118,18 @@ func (r *workersServiceResource) Schema(ctx context.Context, req resource.Schema
 								Optional:    true,
 								Description: "Define patterns to for all repository paths for repositories to be excluded in the repoKeys. Defines those repositories that do not trigger the worker.",
 							},
+							"any_local": schema.BoolAttribute{
+								Optional:            true,
+								MarkdownDescription: "Whether to trigger the worker on any existing local repository.",
+							},
+							"any_remote": schema.BoolAttribute{
+								Optional:            true,
+								MarkdownDescription: "Whether to trigger the worker on any existing remote repository.",
+							},
+							"any_federated": schema.BoolAttribute{
+								Optional:            true,
+								MarkdownDescription: "Whether to trigger the worker on any existing federated repository.",
+							},
 						},
 					},
 				},
@@ -159,9 +171,12 @@ type filterCriteriaResourceModel struct {
 }
 
 type artifactFilterCriteriaResourceModel struct {
-	RepoKeys        types.Set `tfsdk:"repo_keys"`
-	IncludePatterns types.Set `tfsdk:"include_patterns"`
-	ExcludePatterns types.Set `tfsdk:"exclude_patterns"`
+	RepoKeys        types.Set  `tfsdk:"repo_keys"`
+	IncludePatterns types.Set  `tfsdk:"include_patterns"`
+	ExcludePatterns types.Set  `tfsdk:"exclude_patterns"`
+	AnyLocal        types.Bool `tfsdk:"any_local"`
+	AnyRemote       types.Bool `tfsdk:"any_remote"`
+	AnyFederated    types.Bool `tfsdk:"any_federated"`
 }
 
 func (r *workersServiceResourceModel) toAPIModel(ctx context.Context, apiModel *WorkersServiceAPIModel, secretKeysToBeRemoved []string) (ds diag.Diagnostics) {
@@ -185,6 +200,13 @@ func (r *workersServiceResourceModel) toAPIModel(ctx context.Context, apiModel *
 
 	var excludePatterns []string
 	artifactFilterCriteria.ExcludePatterns.ElementsAs(ctx, &excludePatterns, false)
+
+	var anyLocal *bool
+	anyLocal = artifactFilterCriteria.AnyLocal.ValueBoolPointer()
+	var anyRemote *bool
+	anyRemote = artifactFilterCriteria.AnyRemote.ValueBoolPointer()
+	var anyFederated *bool
+	anyFederated = artifactFilterCriteria.AnyFederated.ValueBoolPointer()
 
 	secrets := lo.Map[attr.Value](
 		r.Secrets.Elements(),
@@ -217,6 +239,9 @@ func (r *workersServiceResourceModel) toAPIModel(ctx context.Context, apiModel *
 				RepoKeys:        repoKeys,
 				IncludePatterns: includePatterns,
 				ExcludePatterns: excludePatterns,
+				AnyLocal:        anyLocal,
+				AnyRemote:       anyRemote,
+				AnyFederated:    anyFederated,
 			},
 		},
 		Enabled: r.Enabled.ValueBool(),
@@ -236,6 +261,9 @@ var artifactFilterCriteriaResourceModelAttributeTypes map[string]attr.Type = map
 	"repo_keys":        types.SetType{ElemType: types.StringType},
 	"include_patterns": types.SetType{ElemType: types.StringType},
 	"exclude_patterns": types.SetType{ElemType: types.StringType},
+	"any_local":        types.BoolType,
+	"any_remote":       types.BoolType,
+	"any_federated":    types.BoolType,
 }
 
 func (r *workersServiceResourceModel) fromAPIModel(ctx context.Context, apiModel *WorkersServiceAPIModel) (ds diag.Diagnostics) {
@@ -282,6 +310,9 @@ func (r *workersServiceResourceModel) fromAPIModel(ctx context.Context, apiModel
 		RepoKeys:        repoKeys,
 		IncludePatterns: includePatterns,
 		ExcludePatterns: excludePatterns,
+		AnyLocal:        types.BoolPointerValue(apiModel.FilterCriteria.ArtifactFilterCriteria.AnyLocal),
+		AnyRemote:       types.BoolPointerValue(apiModel.FilterCriteria.ArtifactFilterCriteria.AnyRemote),
+		AnyFederated:    types.BoolPointerValue(apiModel.FilterCriteria.ArtifactFilterCriteria.AnyFederated),
 	}
 
 	atrifactFilterCriteria, d := types.ObjectValueFrom(
@@ -333,6 +364,9 @@ type artifactFilterCriteriaAPIModel struct {
 	RepoKeys        []string `json:"repoKeys"`
 	IncludePatterns []string `json:"includePatterns,omitempty"`
 	ExcludePatterns []string `json:"excludePatterns,omitempty"`
+	AnyLocal        *bool    `json:"anyLocal,omitempty"`
+	AnyRemote       *bool    `json:"anyRemote,omitempty"`
+	AnyFederated    *bool    `json:"anyFederated,omitempty"`
 }
 
 type secretAPIModel struct {
