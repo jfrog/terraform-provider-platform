@@ -11,7 +11,16 @@ description: |-
 
 Provides a JFrog [SAML SSO Settings](https://jfrog.com/help/r/jfrog-platform-administration-documentation/saml-sso) resource.
 
-~>Only available for self-hosted instances.
+~>This resource supports both JFrog SaaS and Self-Hosted instances. For SaaS instances, the `enable` parameter must currently be activated via a manual API call after the Terraform apply is complete.
+
+### Activate SAML on SaaS
+To enable the configuration on a SaaS instance, send a PATCH request to the Access API:
+
+```bash
+curl -X PATCH -u <ADMIN_USER>:<ACCESS_TOKEN> \
+  https://<your-domain>.jfrog.io/access/api/v1/saml/general_settings \
+  -H "Content-Type: application/json" \
+  -d '{ "enable": true }'
 
 ## Example Usage
 
