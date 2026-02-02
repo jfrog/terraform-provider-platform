@@ -43,7 +43,7 @@ Terraform Provider for JFrog Platform, providing resources to manage platform-le
 
 9. **platform_saml_settings**
    - Configures SAML SSO settings
-   - Self-hosted instances only
+   - This resource supports both JFrog SaaS and Self-Hosted instances. For SaaS instances, the `enable` parameter must currently be activated via a manual API call after the Terraform apply is complete.
 
 10. **platform_http_sso_settings**
     - Configures HTTP-based SSO
