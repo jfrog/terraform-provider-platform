@@ -4,14 +4,14 @@ page_title: "platform_saml_settings Resource - terraform-provider-platform"
 subcategory: "Authentication Providers Configuration"
 description: |-
   Provides a JFrog SAML SSO Settings https://jfrog.com/help/r/jfrog-platform-administration-documentation/saml-sso resource.
-  ~>Only available for self-hosted instances.
+  ~>This resource supports both JFrog SaaS and Self-Hosted instances. For SaaS instances, the `enable` parameter must currently be activated via a manual API call after the Terraform apply is complete.
 ---
 
 # platform_saml_settings (Resource)
 
 Provides a JFrog [SAML SSO Settings](https://jfrog.com/help/r/jfrog-platform-administration-documentation/saml-sso) resource.
 
-~>Only available for self-hosted instances.
+~>This resource supports both JFrog SaaS and Self-Hosted instances. For SaaS instances, the `enable` parameter must currently be activated via a manual API call after the Terraform apply is complete.
 
 ## Example Usage
 
