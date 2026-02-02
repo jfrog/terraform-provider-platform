@@ -1,4 +1,4 @@
-## 2.2.8 (Jan 13, 2025). Tested on Artifactory 7.133.6 with Terraform 1.14.4 and OpenTofu 1.11.4
+## 2.2.8 (Feb 11, 2026).
 
 FEATURES:
 
@@ -8,6 +8,9 @@ FEATURES:
 
 * `platform_lifecycle_stage` - Resource to manage individual lifecycle stages with their configuration and metadata. Supports global and project-scoped stages.
 
+IMPROVEMENTS:
+
+* resource/platform_saml_settings: Updated documentation to clarify that the resource supports both JFrog SaaS and Self-Hosted instances. For SaaS instances, the `enable` parameter must be activated via a manual API call after Terraform apply.
 
 ## 2.2.7 (Dec 16, 2025). Tested on Artifactory 7.125.8 with Terraform 1.14.2 and OpenTofu 1.11.1
 

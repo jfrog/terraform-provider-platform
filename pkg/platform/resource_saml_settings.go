@@ -347,7 +347,7 @@ func (r *SAMLSettingsResource) Schema(ctx context.Context, req resource.SchemaRe
 	resp.Schema = schema.Schema{
 		Version:             2,
 		Attributes:          samlSettingsSchemaV2,
-		MarkdownDescription: "Provides a JFrog [SAML SSO Settings](https://jfrog.com/help/r/jfrog-platform-administration-documentation/saml-sso) resource.\n\n~>Only available for self-hosted instances.",
+		MarkdownDescription: "Provides a JFrog [SAML SSO Settings](https://jfrog.com/help/r/jfrog-platform-administration-documentation/saml-sso) resource.\n\n~>This resource supports both JFrog SaaS and Self-Hosted instances. For SaaS instances, the `enable` parameter must currently be activated via a manual API call after the Terraform apply is complete.",
 	}
 }
 
