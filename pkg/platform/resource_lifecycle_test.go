@@ -60,6 +60,8 @@ func TestAccLifecycle_full(t *testing.T) {
 			name        = "{{ .fullStage1Name }}"
 			project_key = project.{{ .projectName }}.key
 			category    = "promote"
+			depends_on  = [project.{{ .projectName }}]
+			detach_on_destroy = true
 		}
 
 		resource "platform_lifecycle_stage" "{{ .stage2Name }}" {
@@ -67,6 +69,7 @@ func TestAccLifecycle_full(t *testing.T) {
 			project_key = project.{{ .projectName }}.key
 			category    = "promote"
 			depends_on  = [platform_lifecycle_stage.{{ .stage1Name }}]
+			detach_on_destroy = true
 		}
 	`
 
@@ -90,6 +93,7 @@ func TestAccLifecycle_full(t *testing.T) {
 				platform_lifecycle_stage.{{ .stage1Name }}.name,
 				platform_lifecycle_stage.{{ .stage2Name }}.name
 			]
+			depends_on     = [platform_lifecycle_stage.{{ .stage1Name }}, platform_lifecycle_stage.{{ .stage2Name }}]
 		}
 	`
 
@@ -115,23 +119,14 @@ func TestAccLifecycle_full(t *testing.T) {
 				platform_lifecycle_stage.{{ .stage2Name }}.name,
 				platform_lifecycle_stage.{{ .stage1Name }}.name
 			]
+			depends_on     = [platform_lifecycle_stage.{{ .stage1Name }}, platform_lifecycle_stage.{{ .stage2Name }}]
 		}
 	`
 
 	updatedConfig := projectConfig + "\n" + stagesConfig + "\n" + util.ExecuteTemplate(projectKey, updatedLifecycleTemp, lifecycleData)
 
-	// Teardown: clear promote_stages so stage destroy can succeed (no API clear in resource Delete)
-	lifecycleEmptyTemp := `
-		resource "platform_lifecycle" "{{ .resourceName }}" {
-			project_key    = project.{{ .projectName }}.key
-			promote_stages = []
-		}
-	`
-	teardownConfig := projectConfig + "\n" + stagesConfig + "\n" + util.ExecuteTemplate(projectKey, lifecycleEmptyTemp, lifecycleData)
-
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		CheckDestroy: checkDestroyNoOp,
+		PreCheck: func() { testAccPreCheck(t) },
 		ExternalProviders: map[string]resource.ExternalProvider{
 			"project": {
 				Source: "jfrog/project",
@@ -166,10 +161,6 @@ func TestAccLifecycle_full(t *testing.T) {
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "project_key",
 			},
-			{
-				Config: teardownConfig,
-				Check:  resource.TestCheckResourceAttr(fqrn, "promote_stages.#", "0"),
-			},
 		},
 	})
 }
@@ -202,9 +193,11 @@ func TestAccLifecycle_single_stage(t *testing.T) {
 
 	stagesTemp := `
 		resource "platform_lifecycle_stage" "{{ .stageName }}" {
-			name        = "{{ .fullStageName }}"
-			project_key = project.{{ .projectName }}.key
-			category    = "promote"
+			name               = "{{ .fullStageName }}"
+			project_key        = project.{{ .projectName }}.key
+			category           = "promote"
+			depends_on         = [project.{{ .projectName }}]
+			detach_on_destroy  = true
 		}
 	`
 
@@ -225,6 +218,7 @@ func TestAccLifecycle_single_stage(t *testing.T) {
 			promote_stages = [
 				platform_lifecycle_stage.{{ .stageName }}.name
 			]
+			depends_on     = [platform_lifecycle_stage.{{ .stageName }}]
 		}
 	`
 
@@ -239,15 +233,6 @@ func TestAccLifecycle_single_stage(t *testing.T) {
 	lifecycleConfig := util.ExecuteTemplate(projectKey, lifecycleTemp, lifecycleData)
 
 	config := projectConfig + "\n" + stagesConfig + "\n" + lifecycleConfig
-
-	// Teardown: clear promote_stages so stage destroy can succeed
-	lifecycleEmptyTemp := `
-		resource "platform_lifecycle" "{{ .resourceName }}" {
-			project_key    = project.{{ .projectName }}.key
-			promote_stages = []
-		}
-	`
-	teardownConfig := projectConfig + "\n" + stagesConfig + "\n" + util.ExecuteTemplate(projectKey, lifecycleEmptyTemp, lifecycleData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -268,10 +253,6 @@ func TestAccLifecycle_single_stage(t *testing.T) {
 					resource.TestCheckResourceAttrSet(fqrn, "release_stage"),
 					resource.TestCheckResourceAttrSet(fqrn, "categories.#"),
 				),
-			},
-			{
-				Config: teardownConfig,
-				Check:  resource.TestCheckResourceAttr(fqrn, "promote_stages.#", "0"),
 			},
 		},
 	})
@@ -308,23 +289,27 @@ func TestAccLifecycle_update_stages(t *testing.T) {
 
 	stagesTemp := `
 		resource "platform_lifecycle_stage" "{{ .stage1Name }}" {
-			name        = "{{ .fullStage1Name }}"
-			project_key = project.{{ .projectName }}.key
-			category    = "promote"
+			name               = "{{ .fullStage1Name }}"
+			project_key        = project.{{ .projectName }}.key
+			category           = "promote"
+			depends_on         = [project.{{ .projectName }}]
+			detach_on_destroy  = true
 		}
 
 		resource "platform_lifecycle_stage" "{{ .stage2Name }}" {
-			name        = "{{ .fullStage2Name }}"
-			project_key = project.{{ .projectName }}.key
-			category    = "promote"
-			depends_on  = [platform_lifecycle_stage.{{ .stage1Name }}]
+			name               = "{{ .fullStage2Name }}"
+			project_key        = project.{{ .projectName }}.key
+			category           = "promote"
+			depends_on         = [platform_lifecycle_stage.{{ .stage1Name }}]
+			detach_on_destroy  = true
 		}
 
 		resource "platform_lifecycle_stage" "{{ .stage3Name }}" {
-			name        = "{{ .fullStage3Name }}"
-			project_key = project.{{ .projectName }}.key
-			category    = "promote"
-			depends_on  = [platform_lifecycle_stage.{{ .stage2Name }}]
+			name               = "{{ .fullStage3Name }}"
+			project_key        = project.{{ .projectName }}.key
+			category           = "promote"
+			depends_on         = [platform_lifecycle_stage.{{ .stage2Name }}]
+			detach_on_destroy  = true
 		}
 	`
 
@@ -350,6 +335,7 @@ func TestAccLifecycle_update_stages(t *testing.T) {
 				platform_lifecycle_stage.{{ .stage1Name }}.name,
 				platform_lifecycle_stage.{{ .stage2Name }}.name
 			]
+			depends_on     = [platform_lifecycle_stage.{{ .stage1Name }}, platform_lifecycle_stage.{{ .stage2Name }}]
 		}
 	`
 
@@ -376,6 +362,7 @@ func TestAccLifecycle_update_stages(t *testing.T) {
 				platform_lifecycle_stage.{{ .stage2Name }}.name,
 				platform_lifecycle_stage.{{ .stage3Name }}.name
 			]
+			depends_on     = [platform_lifecycle_stage.{{ .stage1Name }}, platform_lifecycle_stage.{{ .stage2Name }}, platform_lifecycle_stage.{{ .stage3Name }}]
 		}
 	`
 
@@ -389,19 +376,11 @@ func TestAccLifecycle_update_stages(t *testing.T) {
 				platform_lifecycle_stage.{{ .stage3Name }}.name,
 				platform_lifecycle_stage.{{ .stage1Name }}.name
 			]
+			depends_on     = [platform_lifecycle_stage.{{ .stage1Name }}, platform_lifecycle_stage.{{ .stage3Name }}]
 		}
 	`
 
 	updatedConfig2 := projectConfig + "\n" + stagesConfig + "\n" + util.ExecuteTemplate(projectKey, lifecycleTemp3, lifecycleData)
-
-	// Teardown: clear promote_stages so stage destroy can succeed
-	lifecycleEmptyTemp := `
-		resource "platform_lifecycle" "{{ .resourceName }}" {
-			project_key    = project.{{ .projectName }}.key
-			promote_stages = []
-		}
-	`
-	teardownConfig := projectConfig + "\n" + stagesConfig + "\n" + util.ExecuteTemplate(projectKey, lifecycleEmptyTemp, lifecycleData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -438,10 +417,6 @@ func TestAccLifecycle_update_stages(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "promote_stages.1", fullStage1Name),
 				),
 			},
-			{
-				Config: teardownConfig,
-				Check:  resource.TestCheckResourceAttr(fqrn, "promote_stages.#", "0"),
-			},
 		},
 	})
 }
@@ -471,6 +446,7 @@ func TestAccLifecycle_empty_stages(t *testing.T) {
 		resource "platform_lifecycle" "{{ .resourceName }}" {
 			project_key    = project.{{ .projectName }}.key
 			promote_stages = []
+			depends_on     = [project.{{ .projectName }}]
 		}
 	`
 
@@ -531,9 +507,11 @@ func TestAccLifecycle_update_empty_stages(t *testing.T) {
 
 	stagesTemp := `
 		resource "platform_lifecycle_stage" "{{ .stageName }}" {
-			name        = "{{ .fullStageName }}"
-			project_key = project.{{ .projectName }}.key
-			category    = "promote"
+			name               = "{{ .fullStageName }}"
+			project_key        = project.{{ .projectName }}.key
+			category           = "promote"
+			depends_on         = [project.{{ .projectName }}]
+			detach_on_destroy  = true
 		}
 	`
 
@@ -543,6 +521,7 @@ func TestAccLifecycle_update_empty_stages(t *testing.T) {
 			promote_stages = [
 				platform_lifecycle_stage.{{ .stageName }}.name
 			]
+			depends_on     = [platform_lifecycle_stage.{{ .stageName }}]
 		}
 	`
 
@@ -550,6 +529,7 @@ func TestAccLifecycle_update_empty_stages(t *testing.T) {
 		resource "platform_lifecycle" "{{ .resourceName }}" {
 			project_key    = project.{{ .projectName }}.key
 			promote_stages = []
+			depends_on     = [platform_lifecycle_stage.{{ .stageName }}]
 		}
 	`
 
@@ -565,7 +545,6 @@ func TestAccLifecycle_update_empty_stages(t *testing.T) {
 	stagesConfig := util.ExecuteTemplate(projectKey, stagesTemp, testData)
 	config := projectConfig + "\n" + stagesConfig + "\n" + util.ExecuteTemplate(projectKey, lifecycleTemp1, testData)
 	updatedConfig := projectConfig + "\n" + stagesConfig + "\n" + util.ExecuteTemplate(projectKey, lifecycleTemp2, testData)
-	// Last step (updatedConfig) already has promote_stages = [], so teardown/destroy can succeed
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -619,33 +598,39 @@ func TestAccLifecycle_many_stages(t *testing.T) {
 	// Create 5 stages in order so project environments stay deterministic (API ordering requirement)
 	stagesTemp := `
 		resource "platform_lifecycle_stage" "s1" {
-			name        = "{{ .projectKey }}-s1"
-			project_key = project.{{ .projectName }}.key
-			category    = "promote"
+			name               = "{{ .projectKey }}-s1"
+			project_key        = project.{{ .projectName }}.key
+			category           = "promote"
+			depends_on         = [project.{{ .projectName }}]
+			detach_on_destroy  = true
 		}
 		resource "platform_lifecycle_stage" "s2" {
-			name        = "{{ .projectKey }}-s2"
-			project_key = project.{{ .projectName }}.key
-			category    = "promote"
-			depends_on  = [platform_lifecycle_stage.s1]
+			name               = "{{ .projectKey }}-s2"
+			project_key        = project.{{ .projectName }}.key
+			category           = "promote"
+			depends_on         = [platform_lifecycle_stage.s1]
+			detach_on_destroy  = true
 		}
 		resource "platform_lifecycle_stage" "s3" {
-			name        = "{{ .projectKey }}-s3"
-			project_key = project.{{ .projectName }}.key
-			category    = "promote"
-			depends_on  = [platform_lifecycle_stage.s2]
+			name               = "{{ .projectKey }}-s3"
+			project_key        = project.{{ .projectName }}.key
+			category           = "promote"
+			depends_on         = [platform_lifecycle_stage.s2]
+			detach_on_destroy  = true
 		}
 		resource "platform_lifecycle_stage" "s4" {
-			name        = "{{ .projectKey }}-s4"
-			project_key = project.{{ .projectName }}.key
-			category    = "promote"
-			depends_on  = [platform_lifecycle_stage.s3]
+			name               = "{{ .projectKey }}-s4"
+			project_key        = project.{{ .projectName }}.key
+			category           = "promote"
+			depends_on         = [platform_lifecycle_stage.s3]
+			detach_on_destroy  = true
 		}
 		resource "platform_lifecycle_stage" "s5" {
-			name        = "{{ .projectKey }}-s5"
-			project_key = project.{{ .projectName }}.key
-			category    = "promote"
-			depends_on  = [platform_lifecycle_stage.s4]
+			name               = "{{ .projectKey }}-s5"
+			project_key        = project.{{ .projectName }}.key
+			category           = "promote"
+			depends_on         = [platform_lifecycle_stage.s4]
+			detach_on_destroy  = true
 		}
 	`
 
@@ -659,6 +644,7 @@ func TestAccLifecycle_many_stages(t *testing.T) {
 				platform_lifecycle_stage.s4.name,
 				platform_lifecycle_stage.s5.name
 			]
+			depends_on     = [platform_lifecycle_stage.s1, platform_lifecycle_stage.s2, platform_lifecycle_stage.s3, platform_lifecycle_stage.s4, platform_lifecycle_stage.s5]
 		}
 	`
 
@@ -671,15 +657,6 @@ func TestAccLifecycle_many_stages(t *testing.T) {
 	projectConfig := util.ExecuteTemplate(projectKey, projectTemp, testData)
 	stagesConfig := util.ExecuteTemplate(projectKey, stagesTemp, testData)
 	config := projectConfig + "\n" + stagesConfig + "\n" + util.ExecuteTemplate(projectKey, lifecycleTemp, testData)
-
-	// Teardown: clear promote_stages so stage destroy can succeed
-	lifecycleEmptyTemp := `
-		resource "platform_lifecycle" "{{ .resourceName }}" {
-			project_key    = project.{{ .projectName }}.key
-			promote_stages = []
-		}
-	`
-	teardownConfig := projectConfig + "\n" + stagesConfig + "\n" + util.ExecuteTemplate(projectKey, lifecycleEmptyTemp, testData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:     func() { testAccPreCheck(t) },
@@ -699,10 +676,6 @@ func TestAccLifecycle_many_stages(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "promote_stages.4", fmt.Sprintf("%s-s5", projectKey)),
 				),
 			},
-			{
-				Config: teardownConfig,
-				Check:  resource.TestCheckResourceAttr(fqrn, "promote_stages.#", "0"),
-			},
 		},
 	})
 }
@@ -714,12 +687,15 @@ func TestAccLifecycle_global_lifecycle(t *testing.T) {
 
 	stagesTemp := `
 		resource "platform_lifecycle_stage" "{{ .stageName1 }}" {
-			name     = "{{ .stageName1 }}"
-			category = "promote"
+			name               = "{{ .stageName1 }}"
+			category           = "promote"
+			detach_on_destroy  = true
 		}
 		resource "platform_lifecycle_stage" "{{ .stageName2 }}" {
-			name     = "{{ .stageName2 }}"
-			category = "promote"
+			name               = "{{ .stageName2 }}"
+			category           = "promote"
+			depends_on         = [platform_lifecycle_stage.{{ .stageName1 }}]
+			detach_on_destroy  = true
 		}
 	`
 
@@ -729,6 +705,7 @@ func TestAccLifecycle_global_lifecycle(t *testing.T) {
 				platform_lifecycle_stage.{{ .stageName1 }}.name,
 				platform_lifecycle_stage.{{ .stageName2 }}.name
 			]
+			depends_on     = [platform_lifecycle_stage.{{ .stageName1 }}, platform_lifecycle_stage.{{ .stageName2 }}]
 		}
 	`
 
@@ -739,14 +716,6 @@ func TestAccLifecycle_global_lifecycle(t *testing.T) {
 	}
 
 	config := util.ExecuteTemplate(lifecycleName, stagesTemp, testData) + "\n" + util.ExecuteTemplate(lifecycleName, lifecycleTemp, testData)
-
-	// Teardown: clear promote_stages (global lifecycle) so stage destroy can succeed
-	lifecycleEmptyTemp := `
-		resource "platform_lifecycle" "{{ .resourceName }}" {
-			promote_stages = []
-		}
-	`
-	teardownConfig := util.ExecuteTemplate(lifecycleName, stagesTemp, testData) + "\n" + util.ExecuteTemplate(lifecycleName, lifecycleEmptyTemp, testData)
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -761,10 +730,6 @@ func TestAccLifecycle_global_lifecycle(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "promote_stages.0", testData["stageName1"]),
 					resource.TestCheckResourceAttr(fqrn, "promote_stages.1", testData["stageName2"]),
 				),
-			},
-			{
-				Config: teardownConfig,
-				Check:  resource.TestCheckResourceAttr(fqrn, "promote_stages.#", "0"),
 			},
 		},
 	})

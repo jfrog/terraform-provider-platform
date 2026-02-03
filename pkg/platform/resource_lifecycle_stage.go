@@ -211,6 +211,11 @@ func (r *lifecycleStageResource) Schema(ctx context.Context, req resource.Schema
 				Computed:            true,
 				MarkdownDescription: "The total number of repositories assigned to this stage. Read-only.",
 			},
+			"detach_on_destroy": schema.BoolAttribute{
+				Optional:            true,
+				Computed:            true,
+				MarkdownDescription: "If true, the stage will be detached from the lifecycle when the resource is destroyed. This is useful to prevent the stage from being deleted when the lifecycle is destroyed.",
+			},
 		},
 		MarkdownDescription: "Provides a lifecycle stage resource to create and manage lifecycle stages. A lifecycle stage represents a step in the software development lifecycle. See [JFrog documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/stages-lifecycle) for more details.",
 	}
@@ -226,6 +231,7 @@ type lifecycleStageResourceModel struct {
 	Created              types.Int64  `tfsdk:"created"`
 	Modified             types.Int64  `tfsdk:"modified"`
 	TotalRepositoryCount types.Int64  `tfsdk:"total_repository_count"`
+	DetachOnDestroy      types.Bool   `tfsdk:"detach_on_destroy"`
 }
 
 func (r *lifecycleStageResourceModel) toAPIModel(ctx context.Context, apiModel *lifecycleStageAPIModel) (ds diag.Diagnostics) {
@@ -295,6 +301,11 @@ func (r *lifecycleStageResourceModel) fromAPIModel(ctx context.Context, apiModel
 			return diags
 		}
 		r.UsedInLifecycles = emptyList
+	}
+
+	// detach_on_destroy is provider-only (API does not return it); keep known value or default to false
+	if r.DetachOnDestroy.IsNull() || r.DetachOnDestroy.IsUnknown() {
+		r.DetachOnDestroy = types.BoolValue(false)
 	}
 
 	return diags
@@ -550,6 +561,10 @@ func (r *lifecycleStageResource) Delete(ctx context.Context, req resource.Delete
 	var state lifecycleStageResourceModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if state.DetachOnDestroy.ValueBool() {
 		return
 	}
 
