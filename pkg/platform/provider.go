@@ -68,5 +68,7 @@ func (p *PlatformProvider) Resources(ctx context.Context) []func() resource.Reso
 		NewSCIMUserResource,
 		NewSCIMGroupResource,
 		NewWorkerServiceResource,
+		NewLifecycleStageResource,
+		NewLifecycleResource,
 	}
 }

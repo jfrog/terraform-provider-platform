@@ -1,3 +1,14 @@
+## 2.2.8 (Jan 13, 2025). Tested on Artifactory 7.125.10 with Terraform 1.14.3 and OpenTofu 1.11.2
+
+FEATURES:
+
+**New Resources:**
+
+* `platform_lifecycle` - Resource to manage lifecycle configurations for projects or globally. Defines the ordered stages through which software progresses. Supports both global and project-scoped lifecycles. 
+
+* `platform_lifecycle_stage` - Resource to manage individual lifecycle stages with their configuration and metadata. Supports global and project-scoped stages.
+
+
 ## 2.2.7 (Dec 16, 2025). Tested on Artifactory 7.125.8 with Terraform 1.14.2 and OpenTofu 1.11.1
 
 IMPROVEMENTS:
