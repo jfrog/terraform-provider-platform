@@ -1,3 +1,9 @@
+## 2.3.0 (February 23, 2026)
+
+FEATURES:
+
+* **New Resource:** `platform_federation_full_broadcast` PR: [#305](https://github.com/jfrog/terraform-provider-platform/pull/305)
+
 ## 2.2.8 (Feb 11, 2026). Tested on Artifactory 7.133.8 with Terraform 1.14.4 and OpenTofu 1.11.4
 
 FEATURES:
