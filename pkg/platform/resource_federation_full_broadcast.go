@@ -13,14 +13,11 @@ import (
 	utilfw "github.com/jfrog/terraform-provider-shared/util/fw"
 )
 
-const (
-	FullBroadcastEndpoint = "access/api/v1/system/federation/{federation_target_servername}/full_broadcast"
-	FullBroadcastEndpoint  = "access/api/v1/system/federation/{federation_target_servername}/full_broadcast"
-)
+const FullBroadcastEndpoint = "access/api/v1/system/federation/{federation_target_servername}/full_broadcast"
 
 func NewFederationFullBroadcastResource() resource.Resource {
 	return &FederationFullBroadcastResource{
-		TypeName: "platform_full_broadcast",
+		TypeName: "platform_federation_full_broadcast",
 	}
 }
 
@@ -33,14 +30,6 @@ type FederationFullBroadcastResourceModel struct {
 	FederationTargetServername types.String `tfsdk:"federation_target_servername"`
 }
 
-type FullBroadcastRequestAPIModel struct {
-	FederationTargetServername string `json:"federation_target_servername"`
-}
-
-type FullBroadcastAPIModel struct {
-	FederationTargetServername string `json:"federation_target_servername"`
-}
-
 func (r *FederationFullBroadcastResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = r.TypeName
 }
@@ -50,10 +39,17 @@ func (r *FederationFullBroadcastResource) Schema(_ context.Context, _ resource.S
 		Attributes: map[string]schema.Attribute{
 			"federation_target_servername": schema.StringAttribute{
 				Required: true,
-				Description: "The federation_target_servername of the resource.",
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
+				Description: "The server name of the federation target to invoke full broadcast on.",
 			},
 		},
-		MarkdownDescription: "Manages full_broadcast in JFrog Platform.",
+		MarkdownDescription: "Invokes [Access Federation full broadcast](https://jfrog.com/help/r/jfrog-rest-apis/full-broadcast-access-federation) " +
+			"from a single federation target. This triggers a full synchronization of all federated entities " +
+			"to the specified target.\n\n" +
+			"~>This resource is an action trigger. Creating it invokes the full broadcast. " +
+			"Destroying it only removes the resource from state without any API call.",
 	}
 }
 
@@ -64,7 +60,32 @@ func (r *FederationFullBroadcastResource) Configure(_ context.Context, req resou
 	r.ProviderData = req.ProviderData.(util.ProviderMetadata)
 }
 
+func (r *FederationFullBroadcastResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	go util.SendUsageResourceCreate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
 
+	var plan FederationFullBroadcastResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	response, err := r.ProviderData.Client.R().
+		SetPathParams(map[string]string{
+			"federation_target_servername": plan.FederationTargetServername.ValueString(),
+		}).
+		Put(FullBroadcastEndpoint)
+	if err != nil {
+		utilfw.UnableToCreateResourceError(resp, err.Error())
+		return
+	}
+
+	if response.IsError() {
+		utilfw.UnableToCreateResourceError(resp, response.String())
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
 
 func (r *FederationFullBroadcastResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	go util.SendUsageResourceRead(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
@@ -75,14 +96,13 @@ func (r *FederationFullBroadcastResource) Read(ctx context.Context, req resource
 		return
 	}
 
-	var result FederationFullBroadcastAPIModel
-
+	// Full broadcast is an action endpoint with no dedicated GET.
+	// Verify the federation target still exists using the federation endpoint.
 	response, err := r.ProviderData.Client.R().
 		SetPathParams(map[string]string{
-			"federation_target_servername": state.FederationTargetServername.ValueString(),
+			"server_name": state.FederationTargetServername.ValueString(),
 		}).
-		SetResult(&result).
-		Get(FullBroadcastEndpoint)
+		Get(FederationEndpoint)
 	if err != nil {
 		utilfw.UnableToRefreshResourceError(resp, err.Error())
 		return
@@ -101,38 +121,12 @@ func (r *FederationFullBroadcastResource) Read(ctx context.Context, req resource
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-
 func (r *FederationFullBroadcastResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	go util.SendUsageResourceUpdate(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
-
-	var plan FederationFullBroadcastResourceModel
-	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	requestBody := FederationFullBroadcastRequestAPIModel{
-		FederationTargetServername: plan.FederationTargetServername.ValueString(),
-	}
-
-	response, err := r.ProviderData.Client.R().
-		SetPathParams(map[string]string{
-			"federation_target_servername": plan.FederationTargetServername.ValueString(),
-		}).
-		SetBody(requestBody).
-		Put(FullBroadcastEndpoint)
-	if err != nil {
-		utilfw.UnableToUpdateResourceError(resp, err.Error())
-		return
-	}
-
-	if response.IsError() {
-		utilfw.UnableToUpdateResourceError(resp, response.String())
-		return
-	}
-
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	// federation_target_servername has RequiresReplace, so Update is never called.
 }
 
-
-
+func (r *FederationFullBroadcastResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	go util.SendUsageResourceDelete(ctx, r.ProviderData.Client.R(), r.ProviderData.ProductId, r.TypeName)
+	// Action-only resource: nothing to delete on the server side.
+	// Removing from state is handled automatically by the framework.
+}
