@@ -1,3 +1,9 @@
+## 2.4.0 (February 23, 2026)
+
+FEATURES:
+
+* **New Resource:** `platform_federation_full_broadcast` — PR: [#PENDING](https://github.com/jfrog/terraform-provider-platform/pull)
+
 ## 2.3.0 (February 23, 2026)
 
 FEATURES:
