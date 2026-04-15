@@ -42,7 +42,7 @@ resource "platform_saml_settings" "my-okta-saml-settings" {
 
 - `certificate` (String, Sensitive) The certificate for SAML Authentication in Base64 format. NOTE! The certificate must contain the public key to allow Artifactory to verify sign-in requests.
 - `login_url` (String) The identity provider login URL (when you try to login, the service provider redirects to this URL).
-- `logout_url` (String) The identity provider logout URL (when you try to logout, the service provider redirects to this URL).
+- `logout_url` (String) The identity provider logout URL (when you try to logout, the service provider redirects to this URL). Supports the `{baseUrl}` placeholder for dynamic base URL substitution (e.g. `{baseUrl}/ui/login/`).
 - `name` (String) SAML Settings name.
 - `service_provider_name` (String) The SAML service provider name. This should be a URI that is also known as the entityID, providerID, or entity identity.
 
