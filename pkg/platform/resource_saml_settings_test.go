@@ -301,6 +301,57 @@ func TestAccSAMLSettings_schema_migrate_from_v1_to_v2(t *testing.T) {
 	})
 }
 
+func TestAccSAMLSettings_baseUrl_placeholder_in_logout_url(t *testing.T) {
+	_, fqrn, name := testutil.MkNames("test-saml-settings", "platform_saml_settings")
+
+	temp := `
+	resource "platform_saml_settings" "{{ .name }}" {
+		name                         = "{{ .name }}"
+		enable                       = true
+		certificate                  = "{{ .certificate }}"
+		login_url                    = "http://tempurl.org/login"
+		logout_url                   = "{{ .logout_url }}"
+		auto_user_creation           = true
+		service_provider_name        = "okta"
+		allow_user_to_access_profile = true
+		auto_redirect                = false
+		sync_groups                  = false
+		verify_audience_restriction  = true
+		use_encrypted_assertion      = false
+	}`
+
+	testData := map[string]string{
+		"name":        name,
+		"certificate": "MIICTjCCAbegAwIBAgIBADANBgkqhkiG9w0BAQ0FADBEMQswCQYDVQQGEwJ1czELMAkGA1UECAwCQ0ExFjAUBgNVBAoMDUpGcm9nIFRlc3RpbmcxEDAOBgNVBAMMB1Rlc3RpbmcwHhcNMjQwODA4MTgzNjMxWhcNMjUwODA4MTgzNjMxWjBEMQswCQYDVQQGEwJ1czELMAkGA1UECAwCQ0ExFjAUBgNVBAoMDUpGcm9nIFRlc3RpbmcxEDAOBgNVBAMMB1Rlc3RpbmcwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJAoGBAOPwKU3SxuRaJply2by60NxYmbIPfelhM6sObgPRXbm49Mz4o1nbwH/vwhz1K+klVO4hOiKc5aP5GtQEoBejZbxOXlYlf8YirNqbtEXlIattvZA3tlC8O9oNOzBuT6tRdAA9CvN035p17fN0tpejz7Ptn1G1yUAt9klTUBBZ8eERAgMBAAGjUDBOMB0GA1UdDgQWBBR2y2SefjbqeSHTj+URrKc540YkGTAfBgNVHSMEGDAWgBR2y2SefjbqeSHTj+URrKc540YkGTAMBgNVHRMEBTADAQH/MA0GCSqGSIb3DQEBDQUAA4GBAKxnkFRgLZnQ4U6fWjfuJnx29cKbIq4oBr9RuWEKH2Hhx+jWy/3baNrxE0AsNWTLX6gGVd2qJbfae803AN6ZLx+VrLCWKl+c5MTTZBhuX6G/JvWviavE44P1U4cl2c6w4qvAmY+SY0cnJeWGLCBJ2vJ/fauXS/TIr0IfziSRcVYY",
+		"logout_url":  "{baseUrl}/ui/login/",
+	}
+
+	config := util.ExecuteTemplate(name, temp, testData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		CheckDestroy:             testAccSamlSettingsDestroy(fqrn),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
+					resource.TestCheckResourceAttr(fqrn, "logout_url", "{baseUrl}/ui/login/"),
+					resource.TestCheckResourceAttr(fqrn, "login_url", "http://tempurl.org/login"),
+				),
+			},
+			{
+				ResourceName:                         fqrn,
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateId:                        name,
+				ImportStateVerifyIdentifierAttribute: "name",
+			},
+		},
+	})
+}
+
 func testAccSamlSettingsDestroy(id string) func(*terraform.State) error {
 	return func(s *terraform.State) error {
 		c := TestProvider.(*platform.PlatformProvider).Meta.Client

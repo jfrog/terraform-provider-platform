@@ -1,3 +1,8 @@
+## 2.2.9 (April 21, 2026). Tested on Artifactory 7.146.7 with Terraform 1.14.9 and OpenTofu 1.11.6
+BUG FIXES:
+
+* resource/platform_saml_settings: Allow `{baseUrl}` placeholder in `logout_url` attribute for dynamic base URL substitution in multi-region deployments. Previously, validation rejected any value that was not a standard `http`/`https` URL. JTFPR-231
+
 ## 2.2.8 (Feb 11, 2026). Tested on Artifactory 7.133.8 with Terraform 1.14.4 and OpenTofu 1.11.4
 
 FEATURES:

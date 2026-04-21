@@ -17,6 +17,7 @@ package platform
 import (
 	"context"
 	"net/http"
+	"regexp"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/boolvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
@@ -247,9 +248,15 @@ var samlSettingsSchemaV0 = map[string]schema.Attribute{
 		Required: true,
 		Validators: []validator.String{
 			stringvalidator.LengthAtLeast(1),
-			validatorfw_string.IsURLHttpOrHttps(),
+			stringvalidator.Any(
+				validatorfw_string.IsURLHttpOrHttps(),
+				stringvalidator.RegexMatches(
+					regexp.MustCompile(`^\{baseUrl\}`),
+					"value must be a valid URL with http/https scheme or start with the {baseUrl} placeholder",
+				),
+			),
 		},
-		Description: "The identity provider logout URL (when you try to logout, the service provider redirects to this URL).",
+		MarkdownDescription: "The identity provider logout URL (when you try to logout, the service provider redirects to this URL). Supports the `{baseUrl}` placeholder for dynamic base URL substitution (e.g. `{baseUrl}/ui/login/`).",
 	},
 	"no_auto_user_creation": schema.BoolAttribute{
 		Optional:            true,
