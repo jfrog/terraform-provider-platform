@@ -85,8 +85,9 @@ Optional:
 
 - `exclude_patterns` (Set of String) Define patterns to for all repository paths for repositories to be excluded in the repoKeys. Defines those repositories that do not trigger the worker.
 - `include_patterns` (Set of String) Define patterns to match all repository paths for repositories identified in the repoKeys. Defines those repositories that trigger the worker.
-
-
+- `any_local` (Boolean) Whether to trigger the worker on any existing local repository.
+- `any_remote` (Boolean) Whether to trigger the worker on any existing remote repository.
+- `any_federated` (Boolean) Whether to trigger the worker on any existing federated repository.
 
 <a id="nestedatt--secrets"></a>
 ### Nested Schema for `secrets`
