@@ -36,10 +36,16 @@ resource "platform_group" "my-group" {
 
 - `admin_privileges` (Boolean) Any users added to this group will automatically be assigned with admin privileges in the system.
 - `auto_join` (Boolean) When this parameter is set, any new users defined in the system are automatically assigned to this group.
-- `description` (String) A description for the group.
+- `description` (String) A description for the group. Must be non-empty when set; omit the attribute to leave the group with no description. The Access service normalizes empty strings to null on read, so allowing `""` here would cause perpetual plan drift.
 - `external_id` (String) New external group ID used to configure the corresponding group in Azure AD.
+- `manage_resources` (Boolean) Whether group manages resources in the default project. Available from Artifactory 7.128.0.
+- `manage_webhook` (Boolean) Whether group has manage webhook permissions. Available from Artifactory 7.128.0.
 - `members` (Set of String, Deprecated) List of users assigned to the group.
+- `policy_manager` (Boolean) Whether group has policy manager role. The policy manager role implies the policy viewer role on the server side: setting this to `true` together with `policy_viewer = false` is rejected at plan time. Omit `policy_viewer` or set it to `true`. Available from Artifactory 7.128.0.
+- `policy_viewer` (Boolean) Whether group has policy viewer role. Implied by `policy_manager`: when `policy_manager = true`, the server forces this attribute to `true`. Available from Artifactory 7.128.0.
+- `reports_manager` (Boolean) Whether group has reports manager role. Available from Artifactory 7.128.0.
 - `use_group_members_resource` (Boolean) When set to `true`, this resource will ignore the `members` attributes and allow memberships to be managed by `platform_group_members` resource instead. Default value is `true`.
+- `watch_manager` (Boolean) Whether group has watch manager role. Available from Artifactory 7.128.0.
 
 ### Read-Only
 
@@ -53,4 +59,3 @@ Import is supported using the following syntax:
 ```sh
 terraform import platform_group.my-group my-group
 ```
-
