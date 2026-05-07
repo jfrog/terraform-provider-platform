@@ -16,6 +16,7 @@ package platform
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -24,6 +25,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -36,6 +38,9 @@ import (
 )
 
 var _ resource.Resource = (*groupResource)(nil)
+var _ resource.ResourceWithValidateConfig = (*groupResource)(nil)
+
+const groupRolesArtifactoryVersion = "7.128.0"
 
 type groupResource struct {
 	util.JFrogResource
@@ -70,7 +75,10 @@ var groupSchemaV0 = schema.Schema{
 			PlanModifiers: []planmodifier.String{
 				stringplanmodifier.UseStateForUnknown(),
 			},
-			MarkdownDescription: "A description for the group.",
+			Validators: []validator.String{
+				stringvalidator.LengthAtLeast(1),
+			},
+			MarkdownDescription: "A description for the group. Must be non-empty when set; omit the attribute to leave the group with no description. The Access service normalizes empty strings to null on read, so allowing `\"\"` here would cause perpetual plan drift.",
 		},
 		"external_id": schema.StringAttribute{
 			Optional: true,
@@ -105,11 +113,17 @@ var groupSchemaV0 = schema.Schema{
 			MarkdownDescription: "List of users assigned to the group.",
 		},
 		"realm": schema.StringAttribute{
-			Computed:            true,
+			Computed: true,
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.UseStateForUnknown(),
+			},
 			MarkdownDescription: "The realm for the group.",
 		},
 		"realm_attributes": schema.StringAttribute{
-			Computed:            true,
+			Computed: true,
+			PlanModifiers: []planmodifier.String{
+				stringplanmodifier.UseStateForUnknown(),
+			},
 			MarkdownDescription: "The realm for the group.",
 		},
 	},
@@ -136,6 +150,54 @@ var groupSchemaV1 = schema.Schema{
 				Default:             booldefault.StaticBool(true),
 				MarkdownDescription: "When set to `true`, this resource will ignore the `members` attributes and allow memberships to be managed by `platform_group_members` resource instead. Default value is `true`.",
 			},
+			"reports_manager": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+				MarkdownDescription: "Whether group has reports manager role. Available from Artifactory 7.128.0.",
+			},
+			"watch_manager": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+				MarkdownDescription: "Whether group has watch manager role. Available from Artifactory 7.128.0.",
+			},
+			"policy_manager": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+				MarkdownDescription: "Whether group has policy manager role. The policy manager role implies the policy viewer role on the server side: setting this to `true` together with `policy_viewer = false` is rejected at plan time. Omit `policy_viewer` or set it to `true`. Available from Artifactory 7.128.0.",
+			},
+			"policy_viewer": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+				MarkdownDescription: "Whether group has policy viewer role. Implied by `policy_manager`: when `policy_manager = true`, the server forces this attribute to `true`. Available from Artifactory 7.128.0.",
+			},
+			"manage_resources": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+				MarkdownDescription: "Whether group manages resources in the default project. Available from Artifactory 7.128.0.",
+			},
+			"manage_webhook": schema.BoolAttribute{
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+				MarkdownDescription: "Whether group has manage webhook permissions. Available from Artifactory 7.128.0.",
+			},
 		},
 	),
 	MarkdownDescription: groupSchemaV0.MarkdownDescription,
@@ -143,6 +205,69 @@ var groupSchemaV1 = schema.Schema{
 
 func (r *groupResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = groupSchemaV1
+}
+
+// ValidateConfig overrides the embedded JFrogResource.ValidateConfig to
+// enforce two cross-field rules at plan time:
+//  1. The policy_manager role implies policy_viewer on the server side, so the
+//     combination policy_manager=true + policy_viewer=false would be silently
+//     coerced by the API and surface as "Provider produced inconsistent result
+//     after apply". Reject it up front.
+//  2. The role boolean fields were introduced in Artifactory 7.128.0; reject
+//     configurations that set any of them against an older server. The
+//     resource as a whole still works against the base ValidArtifactoryVersion
+//     (7.49.3) when these fields are omitted.
+func (r *groupResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	r.JFrogResource.ValidateConfig(ctx, req, resp)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var data groupResourceModelV1
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Rule 1: policy_manager implies policy_viewer.
+	if data.PolicyManager.ValueBool() &&
+		!data.PolicyViewer.IsNull() && !data.PolicyViewer.IsUnknown() &&
+		!data.PolicyViewer.ValueBool() {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("policy_viewer"),
+			"Invalid Attribute Combination",
+			"policy_viewer can not be set to false when policy_manager is true; the policy manager role implies the policy viewer role.",
+		)
+	}
+
+	// Rule 2: role booleans require Artifactory >= groupRolesArtifactoryVersion.
+	if r.ProviderData == nil || r.ProviderData.ArtifactoryVersion == "" {
+		return
+	}
+	ok, err := util.CheckVersion(r.ProviderData.ArtifactoryVersion, groupRolesArtifactoryVersion)
+	if err != nil {
+		resp.Diagnostics.AddError("Failed to verify Artifactory version", err.Error())
+		return
+	}
+	if ok {
+		return
+	}
+
+	addIfSet := func(field types.Bool, attr string) {
+		if !field.IsNull() && !field.IsUnknown() {
+			resp.Diagnostics.AddAttributeError(
+				path.Root(attr),
+				"Incompatible Artifactory version",
+				fmt.Sprintf("Attribute %q requires Artifactory %s or later. Detected version: %s.", attr, groupRolesArtifactoryVersion, r.ProviderData.ArtifactoryVersion),
+			)
+		}
+	}
+	addIfSet(data.ReportsManager, "reports_manager")
+	addIfSet(data.WatchManager, "watch_manager")
+	addIfSet(data.PolicyManager, "policy_manager")
+	addIfSet(data.PolicyViewer, "policy_viewer")
+	addIfSet(data.ManageResources, "manage_resources")
+	addIfSet(data.ManageWebhook, "manage_webhook")
 }
 
 type groupResourceModelV0 struct {
@@ -159,6 +284,12 @@ type groupResourceModelV0 struct {
 type groupResourceModelV1 struct {
 	groupResourceModelV0
 	UseGroupMembersResource types.Bool `tfsdk:"use_group_members_resource"`
+	ReportsManager          types.Bool `tfsdk:"reports_manager"`
+	WatchManager            types.Bool `tfsdk:"watch_manager"`
+	PolicyManager           types.Bool `tfsdk:"policy_manager"`
+	PolicyViewer            types.Bool `tfsdk:"policy_viewer"`
+	ManageResources         types.Bool `tfsdk:"manage_resources"`
+	ManageWebhook           types.Bool `tfsdk:"manage_webhook"`
 }
 
 func (r *groupResourceModelV1) toAPIModel(ctx context.Context, apiModel *groupAPIModel) (ds diag.Diagnostics) {
@@ -179,6 +310,12 @@ func (r *groupResourceModelV1) toAPIModel(ctx context.Context, apiModel *groupAP
 		AutoJoin:        r.AutoJoin.ValueBoolPointer(),
 		AdminPrivileges: r.AdminPrivileges.ValueBoolPointer(),
 		Members:         members,
+		ReportsManager:  r.ReportsManager.ValueBoolPointer(),
+		WatchManager:    r.WatchManager.ValueBoolPointer(),
+		PolicyManager:   r.PolicyManager.ValueBoolPointer(),
+		PolicyViewer:    r.PolicyViewer.ValueBoolPointer(),
+		ManageResources: r.ManageResources.ValueBoolPointer(),
+		ManageWebhook:   r.ManageWebhook.ValueBoolPointer(),
 	}
 
 	return nil
@@ -194,6 +331,12 @@ func (r *groupResourceModelV1) fromAPIModel(ctx context.Context, apiModel groupA
 	r.AdminPrivileges = types.BoolPointerValue(apiModel.AdminPrivileges)
 	r.Realm = types.StringPointerValue(apiModel.Realm)
 	r.RealmAttributes = types.StringPointerValue(apiModel.RealmAttributes)
+	r.ReportsManager = types.BoolPointerValue(apiModel.ReportsManager)
+	r.WatchManager = types.BoolPointerValue(apiModel.WatchManager)
+	r.PolicyManager = types.BoolPointerValue(apiModel.PolicyManager)
+	r.PolicyViewer = types.BoolPointerValue(apiModel.PolicyViewer)
+	r.ManageResources = types.BoolPointerValue(apiModel.ManageResources)
+	r.ManageWebhook = types.BoolPointerValue(apiModel.ManageWebhook)
 
 	if !r.UseGroupMembersResource.ValueBool() {
 		if r.Members.IsUnknown() {
@@ -247,6 +390,13 @@ type groupAPIModel struct {
 	Members         []string `json:"members,omitempty"`          // only for create
 	Realm           *string  `json:"realm,omitempty"`            // read only
 	RealmAttributes *string  `json:"realm_attributes,omitempty"` // read only
+	// Available from Artifactory 7.128.0
+	ReportsManager  *bool `json:"reports_manager,omitempty"`
+	WatchManager    *bool `json:"watch_manager,omitempty"`
+	PolicyManager   *bool `json:"policy_manager,omitempty"`
+	PolicyViewer    *bool `json:"policy_viewer,omitempty"`
+	ManageResources *bool `json:"manage_resources,omitempty"`
+	ManageWebhook   *bool `json:"manage_webhook,omitempty"`
 }
 
 type groupMembersRequestAPIModel struct {
@@ -294,6 +444,19 @@ func (r *groupResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	plan.Realm = types.StringPointerValue(newGroup.Realm)
 	plan.RealmAttributes = types.StringPointerValue(newGroup.RealmAttributes)
+
+	// The role booleans are Optional+Computed (no Default), so when the user
+	// omits them in HCL the planned value is unknown. We must resolve them to
+	// known values from the POST response before saving state, otherwise
+	// Terraform errors with "All values must be known after apply". On older
+	// Artifactory (< 7.128.0) the response omits these fields and the
+	// pointers are nil, which BoolPointerValue maps to null - still known.
+	plan.ReportsManager = types.BoolPointerValue(newGroup.ReportsManager)
+	plan.WatchManager = types.BoolPointerValue(newGroup.WatchManager)
+	plan.PolicyManager = types.BoolPointerValue(newGroup.PolicyManager)
+	plan.PolicyViewer = types.BoolPointerValue(newGroup.PolicyViewer)
+	plan.ManageResources = types.BoolPointerValue(newGroup.ManageResources)
+	plan.ManageWebhook = types.BoolPointerValue(newGroup.ManageWebhook)
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)

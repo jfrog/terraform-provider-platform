@@ -25,6 +25,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/jfrog/terraform-provider-platform/v2/pkg/platform"
 	"github.com/jfrog/terraform-provider-shared/client"
+	"github.com/jfrog/terraform-provider-shared/util"
 )
 
 // TestProvider PreCheck(t) must be called before using this provider instance.
@@ -94,5 +95,24 @@ func testAccProviders() map[string]func() (tfprotov6.ProviderServer, error) {
 
 	return map[string]func() (tfprotov6.ProviderServer, error){
 		"platform": providerserver.NewProtocol6WithError(TestProvider),
+	}
+}
+
+// skipIfArtifactoryVersionBefore skips the current test when the Artifactory
+// instance under test is older than minVersion. The detected server version is
+// included in the skip message to make CI logs self-explanatory.
+func skipIfArtifactoryVersionBefore(t *testing.T, minVersion string) {
+	t.Helper()
+	restyClient := getTestResty(t)
+	version, err := util.GetArtifactoryVersion(restyClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	valid, err := util.CheckVersion(version, minVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !valid {
+		t.Skipf("Artifactory version %s is earlier than %s", version, minVersion)
 	}
 }

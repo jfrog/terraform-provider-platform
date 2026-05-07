@@ -27,6 +27,8 @@ import (
 )
 
 func TestAccGroup_full(t *testing.T) {
+	skipIfArtifactoryVersionBefore(t, "7.128.0")
+
 	_, fqrn, groupName := testutil.MkNames("test-group", "platform_group")
 
 	temp := `
@@ -38,21 +40,43 @@ func TestAccGroup_full(t *testing.T) {
 			admin_privileges           = false
 			use_group_members_resource = false
 			members                    = {{ .members }}
+			reports_manager            = {{ .reportsManager }}
+			watch_manager              = {{ .watchManager }}
+			policy_manager             = {{ .policyManager }}
+			policy_viewer              = {{ .policyViewer }}
+			manage_resources           = {{ .manageResources }}
+			manage_webhook             = {{ .manageWebhook }}
 		}
 	`
 
+	// The Access API treats policy_manager as implying policy_viewer (a
+	// manager is also a viewer). Keep the test data consistent with that
+	// hierarchy: when policy_manager = true, policy_viewer must also be true,
+	// otherwise the BoolImplies validator fires at plan time.
 	testData := map[string]string{
-		"groupName": groupName,
-		"autoJoin":  fmt.Sprintf("%t", testutil.RandBool()),
-		"members":   "[\"anonymous\", \"admin\"]",
+		"groupName":       groupName,
+		"autoJoin":        fmt.Sprintf("%t", testutil.RandBool()),
+		"members":         "[\"anonymous\", \"admin\"]",
+		"reportsManager":  "true",
+		"watchManager":    "false",
+		"policyManager":   "true",
+		"policyViewer":    "true",
+		"manageResources": "true",
+		"manageWebhook":   "false",
 	}
 
 	config := util.ExecuteTemplate(groupName, temp, testData)
 
 	updatedTestData := map[string]string{
-		"groupName": groupName,
-		"autoJoin":  fmt.Sprintf("%t", testutil.RandBool()),
-		"members":   "[\"admin\"]",
+		"groupName":       groupName,
+		"autoJoin":        fmt.Sprintf("%t", testutil.RandBool()),
+		"members":         "[\"admin\"]",
+		"reportsManager":  "false",
+		"watchManager":    "true",
+		"policyManager":   "false",
+		"policyViewer":    "true",
+		"manageResources": "false",
+		"manageWebhook":   "true",
 	}
 
 	updatedConfig := util.ExecuteTemplate(groupName, temp, updatedTestData)
@@ -62,9 +86,26 @@ func TestAccGroup_full(t *testing.T) {
 		"autoJoin":        fmt.Sprintf("%t", testutil.RandBool()),
 		"adminPrivileges": fmt.Sprintf("%t", testutil.RandBool()),
 		"members":         "[\"anonymous\"]",
+		"reportsManager":  "true",
+		"watchManager":    "true",
+		"policyManager":   "false",
+		"policyViewer":    "false",
+		"manageResources": "true",
+		"manageWebhook":   "true",
 	}
 
 	updated2Config := util.ExecuteTemplate(groupName, temp, updated2TestData)
+
+	rolesCheck := func(td map[string]string) resource.TestCheckFunc {
+		return resource.ComposeTestCheckFunc(
+			resource.TestCheckResourceAttr(fqrn, "reports_manager", td["reportsManager"]),
+			resource.TestCheckResourceAttr(fqrn, "watch_manager", td["watchManager"]),
+			resource.TestCheckResourceAttr(fqrn, "policy_manager", td["policyManager"]),
+			resource.TestCheckResourceAttr(fqrn, "policy_viewer", td["policyViewer"]),
+			resource.TestCheckResourceAttr(fqrn, "manage_resources", td["manageResources"]),
+			resource.TestCheckResourceAttr(fqrn, "manage_webhook", td["manageWebhook"]),
+		)
+	}
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -83,7 +124,19 @@ func TestAccGroup_full(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "members.#", "2"),
 					resource.TestCheckResourceAttr(fqrn, "members.0", "admin"),
 					resource.TestCheckResourceAttr(fqrn, "members.1", "anonymous"),
+					rolesCheck(testData),
 				),
+			},
+			{
+				// Re-applying the same config must produce no diff. This guards
+				// against drift on Computed-only attrs like realm/realm_attributes
+				// and the new role booleans.
+				Config: config,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectEmptyPlan(),
+					},
+				},
 			},
 			{
 				Config: updatedConfig,
@@ -97,6 +150,7 @@ func TestAccGroup_full(t *testing.T) {
 					resource.TestCheckNoResourceAttr(fqrn, "realm_attributes"),
 					resource.TestCheckResourceAttr(fqrn, "members.#", "1"),
 					resource.TestCheckResourceAttr(fqrn, "members.0", "admin"),
+					rolesCheck(updatedTestData),
 				),
 			},
 			{
@@ -111,6 +165,7 @@ func TestAccGroup_full(t *testing.T) {
 					resource.TestCheckNoResourceAttr(fqrn, "realm_attributes"),
 					resource.TestCheckResourceAttr(fqrn, "members.#", "1"),
 					resource.TestCheckResourceAttr(fqrn, "members.0", "anonymous"),
+					rolesCheck(updated2TestData),
 				),
 			},
 			{
@@ -290,6 +345,112 @@ func TestAccGroup_auto_join_conflict(t *testing.T) {
 			{
 				Config:      config,
 				ExpectError: regexp.MustCompile(".*can not be set to.*"),
+			},
+		},
+	})
+}
+
+// TestAccGroup_policy_manager_implies_viewer asserts that the BoolImplies
+// validator on policy_manager rejects the only invalid combination at plan
+// time: policy_manager = true together with policy_viewer = false. The Access
+// API would otherwise silently coerce policy_viewer back to true, surfacing as
+// a "Provider produced inconsistent result after apply" error.
+func TestAccGroup_policy_manager_implies_viewer(t *testing.T) {
+	skipIfArtifactoryVersionBefore(t, "7.128.0")
+
+	_, _, groupName := testutil.MkNames("test-group", "platform_group")
+	temp := `
+		resource "platform_group" "{{ .groupName }}" {
+			name           = "{{ .groupName }}"
+			description    = "Test group"
+			policy_manager = true
+			policy_viewer  = false
+		}
+	`
+
+	config := util.ExecuteTemplate(groupName, temp, map[string]string{"groupName": groupName})
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				Config:      config,
+				ExpectError: regexp.MustCompile(".*can not be set to.*"),
+			},
+		},
+	})
+}
+
+// TestAccGroup_description_empty verifies that the validator on the
+// `description` attribute rejects empty strings at plan time. The Access
+// service normalizes empty descriptions to null on read, so allowing `""`
+// would cause perpetual plan drift after import / first apply (see issue #265).
+func TestAccGroup_description_empty(t *testing.T) {
+	_, _, groupName := testutil.MkNames("test-group", "platform_group")
+
+	temp := `
+		resource "platform_group" "{{ .groupName }}" {
+			name        = "{{ .groupName }}"
+			description = ""
+		}
+	`
+	config := util.ExecuteTemplate(groupName, temp, map[string]string{"groupName": groupName})
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				Config:      config,
+				ExpectError: regexp.MustCompile(`(?i)attribute description string length must be at least 1`),
+			},
+		},
+	})
+}
+
+// TestAccGroup_import_no_description guards against the regression in issue
+// #265: a group whose description was never set on the server (the GET
+// response omits the field entirely) must be importable, must not show drift
+// on subsequent plans, and must round-trip through ImportStateVerify.
+func TestAccGroup_import_no_description(t *testing.T) {
+	_, fqrn, groupName := testutil.MkNames("test-group", "platform_group")
+
+	temp := `
+		resource "platform_group" "{{ .groupName }}" {
+			name = "{{ .groupName }}"
+		}
+	`
+	config := util.ExecuteTemplate(groupName, temp, map[string]string{"groupName": groupName})
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", groupName),
+					resource.TestCheckNoResourceAttr(fqrn, "description"),
+				),
+			},
+			{
+				// Re-applying the same config must produce no diff, even
+				// though the GET response omits the description field.
+				Config: config,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectEmptyPlan(),
+					},
+				},
+			},
+			{
+				ResourceName:                         fqrn,
+				ImportState:                          true,
+				ImportStateId:                        groupName,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "name",
+				ImportStateVerifyIgnore:              []string{"use_group_members_resource"},
 			},
 		},
 	})
