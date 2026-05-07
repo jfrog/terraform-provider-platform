@@ -1,4 +1,4 @@
-## 2.2.10 (May 6, 2026).
+## 2.2.10 (May 6, 2026). Tested on Artifactory 7.146.10 with Terraform 1.15.2 and OpenTofu 1.11.6
 
 IMPROVEMENTS:
 * resource/platform_group: Added new role boolean attributes (`reports_manager`, `watch_manager`, `policy_manager`, `policy_viewer`, `manage_resources`, `manage_webhook`), version-gated to Artifactory 7.128.0+. PR: [#316](https://github.com/jfrog/terraform-provider-platform/pull/316). Covers [#182](https://github.com/jfrog/terraform-provider-platform/issues/182), [#184](https://github.com/jfrog/terraform-provider-platform/issues/184)
