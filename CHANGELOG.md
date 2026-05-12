@@ -1,4 +1,4 @@
-## 2.2.11 (May 11, 2026)
+## 2.2.11 (May 11, 2026). Tested on Artifactory 7.146.10 with Terraform 1.15.2 and OpenTofu 1.11.7
 
 BUG FIXES:
 * resource/platform_oidc_identity_mapping: Fixed `project_key` being silently ignored. The `project_key` value is now correctly sent as a `?project_key=` query parameter on create, read, update, and delete requests, and is populated back into state from the API response. Previously, all mappings were created as global regardless of `project_key`. Issue: [#311](https://github.com/jfrog/terraform-provider-platform/issues/311)
