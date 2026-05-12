@@ -153,6 +153,7 @@ func TestAccOIDCConfiguration_with_project(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
 					resource.TestCheckResourceAttr(fqrn, "issuer_url", testData["issuerURL"]),
 					resource.TestCheckResourceAttr(fqrn, "provider_type", testData["providerType"]),
+					resource.TestCheckResourceAttr(fqrn, "project_key", projectKey),
 				),
 			},
 			{
@@ -452,6 +453,7 @@ resource "platform_oidc_configuration" "{{ .name }}" {
   issuer_url        = "{{ .issuerURL }}"
   provider_type     = "{{ .providerType }}"
   audience          = "{{ .audience }}"
+  azure_app_id      = "{{ .azureAppId }}"
   use_default_proxy = true
 }`
 
@@ -460,6 +462,7 @@ resource "platform_oidc_configuration" "{{ .name }}" {
 		"issuerURL":    "https://sts.windows.net/your-tenant-id/",
 		"providerType": "Azure",
 		"audience":     "azure-audience",
+		"azureAppId":   "test-azure-app-id",
 	}
 	updatedConfig := util.ExecuteTemplate(configName, updatedTemp, updatedTestData)
 
@@ -490,6 +493,7 @@ resource "platform_oidc_configuration" "{{ .name }}" {
 					resource.TestCheckResourceAttr(fqrn, "issuer_url", updatedTestData["issuerURL"]),
 					resource.TestCheckResourceAttr(fqrn, "provider_type", updatedTestData["providerType"]),
 					resource.TestCheckResourceAttr(fqrn, "audience", updatedTestData["audience"]),
+					resource.TestCheckResourceAttr(fqrn, "azure_app_id", updatedTestData["azureAppId"]),
 					resource.TestCheckResourceAttr(fqrn, "use_default_proxy", "true"),
 				),
 			},

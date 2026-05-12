@@ -155,3 +155,68 @@ resource "platform_permission" "my-permission" {
     ]
   }
 }
+
+
+# GitHub Actions OIDC provider
+resource "platform_oidc_configuration" "github" {
+  name          = "tf-github"
+  issuer_url    = "https://token.actions.githubusercontent.com"
+  provider_type = "GitHub"
+  organization  = "my-github-org"
+  audience      = "jfrog-platform"
+}
+
+# Azure OIDC provider with azure_app_id (new in 2.2.11)
+resource "platform_oidc_configuration" "azure" {
+  name          = "tf-azure"
+  issuer_url    = "https://login.microsoftonline.com/my-tenant-id/v2.0"
+  provider_type = "Azure"
+  azure_app_id  = "00000000-0000-0000-0000-000000000000"
+}
+
+# username_pattern + groups_pattern together (both now allowed — bug fix in 2.2.11)
+resource "platform_oidc_identity_mapping" "username_and_groups_pattern" {
+  name          = "tf-username-and-groups-pattern"
+  provider_name = platform_oidc_configuration.generic_global.name
+  priority      = 40
+  claims_json   = jsonencode({ sub = "ci-runner" })
+
+  token_spec = {
+    username_pattern = "{sub}"
+    groups_pattern   = "{groups}"
+    audience         = "*@*"
+    expires_in       = 60
+  }
+}
+
+# self_revocable token (new in 2.2.11)
+resource "platform_oidc_identity_mapping" "self_revocable" {
+  name          = "tf-self-revocable"
+  provider_name = platform_oidc_configuration.generic_global.name
+  priority      = 50
+  claims_json   = jsonencode({ sub = "ci-runner" })
+
+  token_spec = {
+    username       = "admin"
+    scope          = "applied-permissions/user"
+    audience       = "*@*"
+    expires_in     = 3600
+    self_revocable = true
+  }
+}
+
+# Project-scoped identity mapping — roles scope
+resource "platform_oidc_identity_mapping" "project_roles" {
+  name          = "tf-project-roles"
+  provider_name = platform_oidc_configuration.generic_global.name
+  priority      = 10
+  project_key   = "myproject"
+  claims_json   = jsonencode({ sub = "project-developer" })
+
+  token_spec = {
+    username   = "admin"
+    scope      = "applied-permissions/roles:myproject:\"Developer\""
+    audience   = "*@*"
+    expires_in = 120
+  }
+}

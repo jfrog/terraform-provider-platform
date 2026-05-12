@@ -1,3 +1,14 @@
+## 2.2.11 (Unreleased)
+
+IMPROVEMENTS:
+* resource/platform_oidc_configuration: Added `token_issuer` attribute (Optional, auto-populated by API for GitHub configurations with the organization name).
+* resource/platform_oidc_configuration: Added `azure_app_id` attribute (Optional, only valid when `provider_type = Azure`).
+* resource/platform_oidc_identity_mapping: Added `self_revocable` attribute to `token_spec` block. When set to `true`, the issued token can be revoked by the bearer itself.
+
+BUG FIXES:
+* resource/platform_oidc_identity_mapping: Fixed `username_pattern` and `groups_pattern` being incorrectly marked as mutually exclusive in `token_spec`. Both can now be set simultaneously in a single identity mapping, matching the behaviour of the UI and REST API.
+* resource/platform_oidc_configuration: Fixed `project_key` not being refreshed from the API response on Read, which caused perpetual plan drift for project-scoped OIDC configurations.
+
 ## 2.2.10 (May 6, 2026). Tested on Artifactory 7.146.10 with Terraform 1.15.2 and OpenTofu 1.11.6
 
 IMPROVEMENTS:
