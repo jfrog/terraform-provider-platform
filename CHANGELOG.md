@@ -1,4 +1,4 @@
-## 2.2.11 (Unreleased)
+## 2.2.11 (Unreleased). Tested on Artifactory 7.146.10 with Terraform 1.15.2 and OpenTofu 1.11.7
 
 IMPROVEMENTS:
 * resource/platform_oidc_configuration: Added `token_issuer` attribute (Optional, auto-populated by API for GitHub configurations with the organization name).
