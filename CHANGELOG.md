@@ -1,7 +1,8 @@
-## 2.2.11 (May 12, 2025). Tested on Artifactory 7.146.10 with Terraform 1.15.2 and OpenTofu 1.11.7
+## 2.2.11 (May 12, 2025). Tested on Artifactory 7.146.10 with Terraform 1.15.3 and OpenTofu 1.11.7
 
 IMPROVEMENTS:
-* resource/platform_workers_service: Added support for `SCHEDULED_EVENT` action type [#197](https://github.com/jfrog/terraform-provider-platform/issues/197) PR: [#281](https://github.com/jfrog/terraform-provider-platform/pull/281)
+* resource/platform_oidc_configuration: Added `azure_app_id` attribute (Optional, only valid when `provider_type = Azure`). Issue: [#312](https://github.com/jfrog/terraform-provider-platform/issues/312)
+* resource/platform_workers_service: Added support for `SCHEDULED_EVENT` action type. Issue: [#197](https://github.com/jfrog/terraform-provider-platform/issues/197) PR: [#281](https://github.com/jfrog/terraform-provider-platform/pull/281)
 
 BUG FIXES:
 * resource/platform_lifecycle: Fixed `terraform plan` failing with `Lifecycle Not Found` when the project and its lifecycle are deleted via the UI. The provider now correctly removes the resource from Terraform state on HTTP 404, allowing Terraform to plan a recreation instead of erroring.

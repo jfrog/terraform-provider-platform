@@ -127,6 +127,10 @@ func (r *oidcConfigurationResource) Schema(ctx context.Context, req resource.Sch
 				},
 				Description: "If set, this Identity Configuration will be available in the scope of the given project (editable by platform admin and project admin). If not set, this Identity Configuration will be global and only editable by platform admin. Once set, the projectKey cannot be changed.",
 			},
+			"azure_app_id": schema.StringAttribute{
+				Optional:    true,
+				Description: fmt.Sprintf("Azure Application ID. Only applicable when `provider_type` is `%s`.", azureProviderType),
+			},
 			"use_default_proxy": schema.BoolAttribute{
 				Optional:            true,
 				Computed:            true,
@@ -205,6 +209,14 @@ func (r oidcConfigurationResource) ValidateConfig(ctx context.Context, req resou
 			}
 		}
 	}
+
+	if !data.AzureAppId.IsNull() && data.ProviderType.ValueString() != azureProviderType {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("azure_app_id"),
+			"Invalid Attribute Configuration",
+			fmt.Sprintf("azure_app_id is only applicable when provider_type is set to '%s'.", azureProviderType),
+		)
+	}
 }
 
 type oidcConfigurationResourceModel struct {
@@ -215,6 +227,7 @@ type oidcConfigurationResourceModel struct {
 	Audience                      types.String `tfsdk:"audience"`
 	Organization                  types.String `tfsdk:"organization"`
 	ProjectKey                    types.String `tfsdk:"project_key"`
+	AzureAppId                    types.String `tfsdk:"azure_app_id"`
 	UseDefaultProxy               types.Bool   `tfsdk:"use_default_proxy"`
 	EnablePermissiveConfiguration types.Bool   `tfsdk:"enable_permissive_configuration"`
 }
@@ -227,6 +240,7 @@ type oidcConfigurationAPIModel struct {
 	Audience                      string `json:"audience,omitempty"`
 	Organization                  string `json:"organization"`
 	ProjectKey                    string `json:"project_key,omitempty"`
+	AzureAppId                    string `json:"azure_app_id,omitempty"`
 	UseDefaultProxy               bool   `json:"use_default_proxy"`
 	EnablePermissiveConfiguration bool   `json:"enable_permissive_configuration,omitempty"`
 }
@@ -256,6 +270,10 @@ func (r *oidcConfigurationResource) Create(ctx context.Context, req resource.Cre
 		Description:     plan.Description.ValueString(),
 		ProjectKey:      plan.ProjectKey.ValueString(),
 		UseDefaultProxy: plan.UseDefaultProxy.ValueBool(),
+	}
+
+	if plan.ProviderType.ValueString() == azureProviderType {
+		oidcConfig.AzureAppId = plan.AzureAppId.ValueString()
 	}
 
 	// Access version 7.138.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
@@ -392,6 +410,10 @@ func (r *oidcConfigurationResource) Read(ctx context.Context, req resource.ReadR
 		state.ProviderType = types.StringValue(oidcConfig.ProviderType)
 	}
 
+	if len(oidcConfig.AzureAppId) > 0 {
+		state.AzureAppId = types.StringValue(oidcConfig.AzureAppId)
+	}
+
 	state.UseDefaultProxy = types.BoolValue(oidcConfig.UseDefaultProxy)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -422,6 +444,10 @@ func (r *oidcConfigurationResource) Update(ctx context.Context, req resource.Upd
 		Description:     plan.Description.ValueString(),
 		ProjectKey:      plan.ProjectKey.ValueString(),
 		UseDefaultProxy: plan.UseDefaultProxy.ValueBool(),
+	}
+
+	if plan.ProviderType.ValueString() == azureProviderType {
+		oidcConfig.AzureAppId = plan.AzureAppId.ValueString()
 	}
 
 	// Access version 7.138.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
