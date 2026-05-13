@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sort"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
@@ -676,6 +677,29 @@ var resourceResourceModelAttributeTypes map[string]attr.Type = map[string]attr.T
 	},
 }
 
+// sortAttrValuesByName sorts a slice of `attr.Value` (each expected to be a
+// `types.Object` containing a `name` string attribute) in ascending order by
+// that name. This is used to give a deterministic order to slices that come
+// from non-deterministic Go map iteration before they are wrapped in a
+// `types.Set`. Even though the framework treats them as sets semantically,
+// ordering instability in the intermediate slice surfaces as a no-op
+// positional diff in `terraform plan`.
+func sortAttrValuesByName(values []attr.Value) {
+	sort.SliceStable(values, func(i, j int) bool {
+		oi, iOK := values[i].(types.Object)
+		oj, jOK := values[j].(types.Object)
+		if !iOK || !jOK {
+			return false
+		}
+		ni, niOK := oi.Attributes()["name"].(types.String)
+		nj, njOK := oj.Attributes()["name"].(types.String)
+		if !niOK || !njOK {
+			return false
+		}
+		return ni.ValueString() < nj.ValueString()
+	})
+}
+
 func (r *permissionResourceModel) fromUsersGroupsAPIModel(ctx context.Context, usersGroups map[string][]string) (set types.Set, ds diag.Diagnostics) {
 	userGroupSet := lo.MapToSlice(
 		usersGroups,
@@ -706,6 +730,12 @@ func (r *permissionResourceModel) fromUsersGroupsAPIModel(ctx context.Context, u
 			return t
 		},
 	)
+
+	// Sort by `name` so the slice order is deterministic. Without this,
+	// Go's randomized map iteration causes a different element order on
+	// each Read, which surfaces as a no-op positional diff in
+	// `terraform plan`.
+	sortAttrValuesByName(userGroupSet)
 
 	ugs, d := types.SetValue(
 		usersGroupsResourceModelAttributeTypes,
@@ -789,6 +819,12 @@ func (r *permissionResourceModel) fromResourceAPIModel(ctx context.Context, reso
 				return t
 			},
 		)
+
+		// Sort by `name` so the slice order is deterministic. Without
+		// this, Go's randomized map iteration causes a different
+		// element order on each Read, which surfaces as a no-op
+		// positional diff in `terraform plan`.
+		sortAttrValuesByName(targetsSlice)
 
 		targetsSet, d := types.SetValue(
 			targetsResourceModelAttributeTypes,
