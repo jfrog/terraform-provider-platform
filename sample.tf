@@ -2,7 +2,7 @@ terraform {
   required_providers {
     platform = {
       source  = "jfrog/platform"
-      version = "2.2.4"
+      version = "2.2.11"
     }
   }
 }
@@ -15,6 +15,19 @@ variable "jfrog_url" {
 provider "platform" {
   url = "${var.jfrog_url}"
   // supply JFROG_ACCESS_TOKEN as env var
+}
+
+# Generic OIDC provider with explicit token_issuer (not allowed for GitHub or GitHubEnterprise)
+resource "platform_oidc_configuration" "generic-token-issuer" {
+  name          = "tf-generic-token-issuer"
+  issuer_url    = "https://tempurl.org"
+  provider_type = "generic"
+  audience      = "jfrog-platform"
+  token_issuer  = "https://tempurl.org"
+}
+
+output "generic_token_issuer" {
+  value = platform_oidc_configuration.generic-token-issuer.token_issuer
 }
 
 resource "platform_workers_service" "my-workers-service" {
@@ -177,7 +190,7 @@ resource "platform_oidc_configuration" "azure" {
 # username_pattern + groups_pattern together (both now allowed — bug fix in 2.2.11)
 resource "platform_oidc_identity_mapping" "username_and_groups_pattern" {
   name          = "tf-username-and-groups-pattern"
-  provider_name = platform_oidc_configuration.generic_global.name
+  provider_name = platform_oidc_configuration.github.name
   priority      = 40
   claims_json   = jsonencode({ sub = "ci-runner" })
 
@@ -192,7 +205,7 @@ resource "platform_oidc_identity_mapping" "username_and_groups_pattern" {
 # self_revocable token (new in 2.2.11)
 resource "platform_oidc_identity_mapping" "self_revocable" {
   name          = "tf-self-revocable"
-  provider_name = platform_oidc_configuration.generic_global.name
+  provider_name = platform_oidc_configuration.github.name
   priority      = 50
   claims_json   = jsonencode({ sub = "ci-runner" })
 
@@ -208,7 +221,7 @@ resource "platform_oidc_identity_mapping" "self_revocable" {
 # Project-scoped identity mapping — roles scope
 resource "platform_oidc_identity_mapping" "project_roles" {
   name          = "tf-project-roles"
-  provider_name = platform_oidc_configuration.generic_global.name
+  provider_name = platform_oidc_configuration.github.name
   priority      = 10
   project_key   = "myproject"
   claims_json   = jsonencode({ sub = "project-developer" })

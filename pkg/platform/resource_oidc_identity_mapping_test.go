@@ -222,6 +222,7 @@ func TestAccOIDCIdentityMapping_with_project(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "token_spec.scope", "applied-permissions/user"),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.audience", "*@*"),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.expires_in", "60"),
+					resource.TestCheckResourceAttr(fqrn, "project_key", projectKey),
 				),
 			},
 			{

@@ -302,6 +302,10 @@ func (r *odicIdentityMappingResourceModel) fromAPIModel(ctx context.Context, api
 	}
 	r.TokenSpec = tokenSpec
 
+	if len(apiModel.ProjectKey) > 0 {
+		r.ProjectKey = types.StringValue(apiModel.ProjectKey)
+	}
+
 	return
 }
 
@@ -312,7 +316,7 @@ type odicIdentityMappingAPIModel struct {
 	Priority     int64                                `json:"priority"`
 	Claims       map[string]any                       `json:"claims"`
 	TokenSpec    odicIdentityMappingTokenSpecAPIModel `json:"token_spec"`
-	ProjectKey   string                               `json:"project_key,omitempty"`
+	ProjectKey   string                               `json:"project_key,omitempty"` // response only; sent as query param on create/update/delete
 }
 
 type odicIdentityMappingTokenSpecAPIModel struct {
@@ -395,6 +399,11 @@ func (r *odicIdentityMappingResource) Create(ctx context.Context, req resource.C
 		SetPathParam("provider_name", plan.ProviderName.ValueString()).
 		SetBody(&odicIdentityMapping)
 
+	if v := plan.ProjectKey.ValueString(); v != "" {
+		createReq = createReq.SetQueryParam("project_key", v)
+	}
+
+
 	response, err := createReq.Post(odicIdentityMappingEndpoint)
 	if err != nil {
 		utilfw.UnableToCreateResourceError(resp, err.Error())
@@ -427,6 +436,11 @@ func (r *odicIdentityMappingResource) Read(ctx context.Context, req resource.Rea
 			"name":          state.Name.ValueString(),
 		}).
 		SetResult(&odicIdentityMapping)
+
+	if v := state.ProjectKey.ValueString(); v != "" {
+		readReq = readReq.SetQueryParam("project_key", v)
+	}
+
 
 	response, err := readReq.Get(odicIdentityMappingEndpoint + "/{name}")
 
@@ -480,6 +494,11 @@ func (r *odicIdentityMappingResource) Update(ctx context.Context, req resource.U
 		}).
 		SetBody(&odicIdentityMapping)
 
+	if v := plan.ProjectKey.ValueString(); v != "" {
+		updateReq = updateReq.SetQueryParam("project_key", v)
+	}
+
+
 	response, err := updateReq.Put(odicIdentityMappingEndpoint + "/{name}")
 	if err != nil {
 		utilfw.UnableToUpdateResourceError(resp, err.Error())
@@ -510,6 +529,11 @@ func (r *odicIdentityMappingResource) Delete(ctx context.Context, req resource.D
 			"provider_name": state.ProviderName.ValueString(),
 			"name":          state.Name.ValueString(),
 		})
+
+	if v := state.ProjectKey.ValueString(); v != "" {
+		deleteReq = deleteReq.SetQueryParam("project_key", v)
+	}
+
 
 	response, err := deleteReq.Delete(odicIdentityMappingEndpoint + "/{name}")
 	if err != nil {

@@ -428,6 +428,88 @@ resource "platform_oidc_configuration" "{{ .name }}" {
 	})
 }
 
+func TestAccOIDCConfiguration_with_token_issuer(t *testing.T) {
+	_, fqrn, configName := testutil.MkNames("test-oidc-token-issuer", "platform_oidc_configuration")
+
+	temp := `
+resource "platform_oidc_configuration" "{{ .name }}" {
+  name          = "{{ .name }}"
+  issuer_url    = "{{ .issuerURL }}"
+  provider_type = "{{ .providerType }}"
+  token_issuer  = "{{ .tokenIssuer }}"
+}`
+
+	testData := map[string]string{
+		"name":         configName,
+		"issuerURL":    "https://tempurl.org",
+		"providerType": "generic",
+		"tokenIssuer":  "https://tempurl.org",
+	}
+
+	config := util.ExecuteTemplate(configName, temp, testData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["name"]),
+					resource.TestCheckResourceAttr(fqrn, "provider_type", testData["providerType"]),
+					resource.TestCheckResourceAttr(fqrn, "token_issuer", testData["tokenIssuer"]),
+				),
+			},
+			{
+				ResourceName:                         fqrn,
+				ImportState:                          true,
+				ImportStateId:                        configName,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "name",
+			},
+		},
+	})
+}
+
+func TestAccOIDCConfiguration_token_issuer_invalid_for_github(t *testing.T) {
+	_, _, configName := testutil.MkNames("test-oidc-token-issuer-invalid", "platform_oidc_configuration")
+
+	temp := `
+resource "platform_oidc_configuration" "{{ .name }}" {
+  name          = "{{ .name }}"
+  issuer_url    = "{{ .issuerURL }}"
+  provider_type = "{{ .providerType }}"
+  organization  = "{{ .organization }}"
+  token_issuer  = "{{ .tokenIssuer }}"
+}`
+
+	for _, providerType := range []string{"GitHub", "GitHubEnterprise"} {
+		issuerURL := "https://token.actions.githubusercontent.com"
+		if providerType == "GitHubEnterprise" {
+			issuerURL = "https://token.actions.githubusercontent.com/jfrog"
+		}
+		testData := map[string]string{
+			"name":         configName,
+			"issuerURL":    issuerURL,
+			"providerType": providerType,
+			"organization": "test-org",
+			"tokenIssuer":  "https://token.actions.githubusercontent.com/test-org",
+		}
+		config := util.ExecuteTemplate(configName, temp, testData)
+
+		resource.Test(t, resource.TestCase{
+			PreCheck:                 func() { testAccPreCheck(t) },
+			ProtoV6ProviderFactories: testAccProviders(),
+			Steps: []resource.TestStep{
+				{
+					Config:      config,
+					ExpectError: regexp.MustCompile(`token_issuer is not allowed when provider_type is set to`),
+				},
+			},
+		})
+	}
+}
+
 func TestAccOIDCConfiguration_azure(t *testing.T) {
 	_, fqrn, configName := testutil.MkNames("test-oidc-azure-configuration", "platform_oidc_configuration")
 

@@ -100,6 +100,9 @@ func (r *oidcConfigurationResource) Schema(ctx context.Context, req resource.Sch
 				Validators: []validator.String{
 					stringvalidator.OneOf([]string{"generic", gitHubProviderType, githubEnterpriseType, azureProviderType}...),
 				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 				MarkdownDescription: fmt.Sprintf("Type of OIDC provider. Can be `generic`, `%s`, `%s` or `%s`.", gitHubProviderType, githubEnterpriseType, azureProviderType),
 			},
 			"audience": schema.StringAttribute{
@@ -133,7 +136,7 @@ func (r *oidcConfigurationResource) Schema(ctx context.Context, req resource.Sch
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
-				Description: "Token issuer URL of the identity provider. For GitHub configurations, this is auto-populated by the API with the organization name.",
+				Description: fmt.Sprintf("Token issuer URL of the identity provider. Not allowed when `provider_type` is `%s` or `%s`.", gitHubProviderType, githubEnterpriseType),
 			},
 			"azure_app_id": schema.StringAttribute{
 				Optional:    true,
@@ -225,6 +228,17 @@ func (r oidcConfigurationResource) ValidateConfig(ctx context.Context, req resou
 			fmt.Sprintf("azure_app_id is only applicable when provider_type is set to '%s'.", azureProviderType),
 		)
 	}
+
+	if !data.TokenIssuer.IsNull() &&
+		(data.ProviderType.ValueString() == gitHubProviderType ||
+			data.ProviderType.ValueString() == githubEnterpriseType) {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("token_issuer"),
+			"Invalid Attribute Configuration",
+			fmt.Sprintf("token_issuer is not allowed when provider_type is set to '%s' or '%s'.", gitHubProviderType, githubEnterpriseType),
+		)
+	}
+
 
 	if !data.EnablePermissiveConfiguration.IsNull() &&
 		data.ProviderType.ValueString() != gitHubProviderType &&
@@ -448,6 +462,10 @@ func (r *oidcConfigurationResource) Read(ctx context.Context, req resource.ReadR
 		state.ProviderType = types.StringValue(oidcConfig.ProviderType)
 	}
 
+	if len(oidcConfig.AzureAppId) > 0 {
+		state.AzureAppId = types.StringValue(oidcConfig.AzureAppId)
+	}
+
 	state.UseDefaultProxy = types.BoolValue(oidcConfig.UseDefaultProxy)
 
 	if len(oidcConfig.ProjectKey) > 0 {
@@ -458,9 +476,6 @@ func (r *oidcConfigurationResource) Read(ctx context.Context, req resource.ReadR
 		state.TokenIssuer = types.StringValue(oidcConfig.TokenIssuer)
 	}
 
-	if len(oidcConfig.AzureAppId) > 0 {
-		state.AzureAppId = types.StringValue(oidcConfig.AzureAppId)
-	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
