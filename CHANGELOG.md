@@ -1,4 +1,4 @@
-## 2.2.11 (May 12, 2025).
+## 2.2.11 (May 12, 2025). Tested on Artifactory 7.146.10 with Terraform 1.15.3 and OpenTofu 1.11.7
 
 IMPROVEMENTS:
 * resource/platform_oidc_configuration: Added `azure_app_id` attribute (Optional, only valid when `provider_type = Azure`). Issue: [#312](https://github.com/jfrog/terraform-provider-platform/issues/312)
