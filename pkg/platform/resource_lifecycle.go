@@ -407,7 +407,35 @@ func (r *lifecycleResource) Read(ctx context.Context, req resource.ReadRequest, 
 		return
 	}
 
-	resp.Diagnostics.Append(r.readLifecycle(ctx, &state)...)
+	var lifecycle lifecycleAPIModel
+	var apiErrs util.JFrogErrors
+	request := r.ProviderData.Client.R().
+		SetResult(&lifecycle).
+		SetError(&apiErrs)
+
+	if !state.ProjectKey.IsNull() && state.ProjectKey.ValueString() != "" {
+		request = request.SetQueryParam("project_key", state.ProjectKey.ValueString())
+	}
+
+	response, err := request.Get(r.JFrogResource.CollectionEndpoint)
+	if err != nil {
+		utilfw.UnableToRefreshResourceError(resp, err.Error())
+		return
+	}
+
+	// Treat HTTP 404 Not Found status as a signal to recreate resource
+	// and return early
+	if response.StatusCode() == http.StatusNotFound {
+		resp.State.RemoveResource(ctx)
+		return
+	}
+
+	if response.IsError() {
+		utilfw.UnableToRefreshResourceError(resp, apiErrs.String())
+		return
+	}
+
+	resp.Diagnostics.Append(state.fromAPIModel(ctx, lifecycle)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -422,30 +450,14 @@ func (r *lifecycleResource) readLifecycle(ctx context.Context, model *lifecycleR
 		SetResult(&lifecycle).
 		SetError(&apiErrs)
 
-	// Add project_key as query parameter if set
 	if !model.ProjectKey.IsNull() && model.ProjectKey.ValueString() != "" {
 		request = request.SetQueryParam("project_key", model.ProjectKey.ValueString())
 	}
 
 	response, err := request.Get(r.JFrogResource.CollectionEndpoint)
-
 	if err != nil {
 		return diag.Diagnostics{
-			diag.NewErrorDiagnostic(
-				"Unable to Read Lifecycle",
-				err.Error(),
-			),
-		}
-	}
-
-	if response.StatusCode() == http.StatusNotFound {
-		// According to the API, lifecycle must exist - 404 means it truly doesn't exist
-		// This is an error for both global and project lifecycles
-		return diag.Diagnostics{
-			diag.NewErrorDiagnostic(
-				"Lifecycle Not Found",
-				"The lifecycle was not found. Lifecycles are created automatically when stages are added.",
-			),
+			diag.NewErrorDiagnostic("Unable to Read Lifecycle", err.Error()),
 		}
 	}
 
@@ -458,10 +470,7 @@ func (r *lifecycleResource) readLifecycle(ctx context.Context, model *lifecycleR
 			errorMsg = fmt.Sprintf("unexpected status code: %d", response.StatusCode())
 		}
 		return diag.Diagnostics{
-			diag.NewErrorDiagnostic(
-				"Unable to Read Lifecycle",
-				errorMsg,
-			),
+			diag.NewErrorDiagnostic("Unable to Read Lifecycle", errorMsg),
 		}
 	}
 
