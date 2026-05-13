@@ -2,7 +2,12 @@
 
 IMPROVEMENTS:
 * resource/platform_oidc_configuration: Added `azure_app_id` attribute (Optional, only valid when `provider_type = Azure`). Issue: [#312](https://github.com/jfrog/terraform-provider-platform/issues/312)
+* resource/platform_oidc_configuration: Added `token_issuer` attribute (Optional/Computed). Only applicable when `provider_type` is `generic` or `Azure`; not allowed for `GitHub` or `GitHubEnterprise`. Added `RequiresReplace` to `provider_type` to prevent invalid in-place type changes.
 * resource/platform_workers_service: Added support for `SCHEDULED_EVENT` action type. Issue: [#197](https://github.com/jfrog/terraform-provider-platform/issues/197) PR: [#281](https://github.com/jfrog/terraform-provider-platform/pull/281)
+
+NOTES:
+* resource/platform_oidc_configuration: `provider_type` now requires resource replacement when changed. Existing resources with an unchanged `provider_type` are unaffected.
+* resource/platform_oidc_configuration: `enable_permissive_configuration` is now validated to only be set when `provider_type` is `GitHub` or `GitHubEnterprise`. Configurations that incorrectly set this attribute on `generic` or `Azure` provider types will fail validation and must remove it before applying.
 
 BUG FIXES:
 * resource/platform_lifecycle: Fixed `terraform plan` failing with `Lifecycle Not Found` when the project and its lifecycle are deleted via the UI. The provider now correctly removes the resource from Terraform state on HTTP 404, allowing Terraform to plan a recreation instead of erroring.
