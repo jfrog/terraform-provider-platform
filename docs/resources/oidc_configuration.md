@@ -41,11 +41,12 @@ resource "platform_oidc_configuration" "my-generic-oidc-configuration" {
 
 
 resource "platform_oidc_configuration" "my-azure-oidc-configuration" {
-  name              = "{{ .name }}"
+  name              = "my-azure-oidc-configuration"
   description       = "My Azure OIDC configuration"
   issuer_url        = "https://sts.windows.net/your-tenant-id/"
   provider_type     = "Azure"
   audience          = "azure-audience"
+  azure_app_id      = "00000000-0000-0000-0000-000000000000"
   use_default_proxy = true
 }
 ```
@@ -62,6 +63,7 @@ resource "platform_oidc_configuration" "my-azure-oidc-configuration" {
 ### Optional
 
 - `audience` (String) Informational field that you can use to include details of the audience that uses the OIDC configuration.
+- `azure_app_id` (String) Azure Application ID. Only applicable when `provider_type` is `Azure`.
 - `description` (String) Description of the OIDC provider
 - `enable_permissive_configuration` (Boolean) Only settable when `provider_type` is GitHub or GitHubEnterprise. When set, Allows authentication without any restrictions. For security best practices, it is recommended to add restrictions to limit access and enforce stricter controls. Use with caution, as this may grant broader access.
 - `organization` (String) This field is mandatory, when `provider_type` is GitHub or GitHubEnterprise. Informational field that you can use to include details of the organization that uses the OIDC configuration.
