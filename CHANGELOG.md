@@ -1,3 +1,8 @@
+## 2.2.12 (May 13, 2026).
+
+BUG FIXES:
+* resource/platform_permission: Fixed spurious no-op diff where `targets`, `actions.users`, and `actions.groups` elements would swap positions on every `terraform plan` even when no real change occurred. The provider was iterating Go maps non-deterministically when building the state slice; the slice is now sorted by `name` before being wrapped in a `types.Set`.
+
 ## 2.2.11 (May 12, 2025).
 
 IMPROVEMENTS:
