@@ -22,6 +22,7 @@ resource "platform_oidc_configuration" "my-generic-oidc-configuration" {
   issuer_url    = "https://tempurl.org"
   provider_type = "generic"
   audience      = "jfrog-generic"
+  token_issuer  = "https://tempurl.org"
 }
 
 
