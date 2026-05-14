@@ -1,18 +1,27 @@
-## 2.2.11 (May 12, 2025). Tested on Artifactory 7.146.10 with Terraform 1.15.3 and OpenTofu 1.11.7
+## 2.2.11 (May 13, 2025). 
 
 IMPROVEMENTS:
 * resource/platform_oidc_configuration: Added `azure_app_id` attribute (Optional, only valid when `provider_type = Azure`). Issue: [#312](https://github.com/jfrog/terraform-provider-platform/issues/312)
 * resource/platform_oidc_configuration: Added `token_issuer` attribute (Optional/Computed). Only applicable when `provider_type` is `generic` or `Azure`; not allowed for `GitHub` or `GitHubEnterprise`. Added `RequiresReplace` to `provider_type` to prevent invalid in-place type changes.
+* resource/platform_oidc_identity_mapping: Added `self_revocable` attribute to `token_spec` block. When set to `true`, the issued token can be revoked by the bearer itself.
+* resource/platform_oidc_identity_mapping: Added `token_spec.scope` prefix validation. Each space-separated permission must start with `applied-permissions/admin`, `applied-permissions/user`, `applied-permissions/groups:`, or `applied-permissions/roles:`. Multiple space-separated permissions are supported.
 * resource/platform_workers_service: Added support for `SCHEDULED_EVENT` action type. Issue: [#197](https://github.com/jfrog/terraform-provider-platform/issues/197) PR: [#281](https://github.com/jfrog/terraform-provider-platform/pull/281)
 
 NOTES:
 * resource/platform_oidc_configuration: `provider_type` now requires resource replacement when changed. Existing resources with an unchanged `provider_type` are unaffected.
 * resource/platform_oidc_configuration: `enable_permissive_configuration` is now validated to only be set when `provider_type` is `GitHub` or `GitHubEnterprise`. Configurations that incorrectly set this attribute on `generic` or `Azure` provider types will fail validation and must remove it before applying.
+* resource/platform_oidc_identity_mapping: Existing resources that did not previously set `token_spec.self_revocable` may show a one-time plan diff displaying `self_revocable = false` after upgrading. This is a state-only update — no API call is made and the remote resource is unchanged.
 
 BUG FIXES:
 * resource/platform_lifecycle: Fixed `terraform plan` failing with `Lifecycle Not Found` when the project and its lifecycle are deleted via the UI. The provider now correctly removes the resource from Terraform state on HTTP 404, allowing Terraform to plan a recreation instead of erroring.
 * resource/platform_permission: Fixed incorrect example values for wildcard repository targets. Corrected `ALL-LOCAL` → `ANY LOCAL`, `ALL-REMOTE` → `ANY REMOTE`, and `ALL-DISTRIBUTION` → `ANY DISTRIBUTION` in docs and examples.
+* resource/platform_oidc_identity_mapping: Fixed `username_pattern` and `groups_pattern` being incorrectly marked as mutually exclusive in `token_spec`. Both can now be set simultaneously in a single identity mapping, matching the behaviour of the UI and REST API.
 * resource/platform_oidc_identity_mapping: Fixed `project_key` being silently ignored. The `project_key` value is now correctly sent as a `?project_key=` query parameter on create, read, update, and delete requests, and is populated back into state from the API response. Previously, all mappings were created as global regardless of `project_key`. Issue: [#311](https://github.com/jfrog/terraform-provider-platform/issues/311) PR: [#317](https://github.com/jfrog/terraform-provider-platform/pull/317)
+* resource/platform_oidc_configuration: Fixed `project_key` not being refreshed from the API response on Read, which caused perpetual plan drift for project-scoped OIDC configurations.
+* resource/platform_oidc_identity_mapping: Fixed incorrect validation that required `token_spec.username` to be set when using `applied-permissions/roles:` scope. The API and UI allow roles scope without a username; the requirement has been removed.
+* resource/platform_oidc_identity_mapping: Fixed incorrect `{{group}}` placeholder in `groups_pattern` documentation and examples. The correct value is `{{groups}}` (plural), matching what the API stores and returns.
+* resource/platform_oidc_configuration: Fixed `organization` not being populated on import for `GitHub` and `GitHubEnterprise` provider types. The API returns the organization name in the `token_issuer` field rather than `organization`; the provider now reads from `token_issuer` as a fallback, eliminating the perpetual plan diff after `terraform import`.
+* resource/platform_oidc_configuration: Fixed `enable_permissive_configuration` not being populated on import for `GitHub` and `GitHubEnterprise` provider types, causing a perpetual plan diff after `terraform import` when the attribute was set to `true`.
 
 ## 2.2.10 (May 6, 2026). Tested on Artifactory 7.146.10 with Terraform 1.15.2 and OpenTofu 1.11.6
 

@@ -82,10 +82,11 @@ func TestAccOIDCIdentityMapping_full(t *testing.T) {
 			updated_at = 1490198843
 		})
 		token_spec = {
-			username   = "{{ .username }}"
-			scope      = "applied-permissions/user"
-			audience   = "jfrt@* jfac@* jfmc@* jfmd@* jfevt@* jfxfer@* jflnk@* jfint@* jfwks@*"
-			expires_in = 120
+			username       = "{{ .username }}"
+			scope          = "applied-permissions/user"
+			audience       = "jfrt@* jfac@* jfmc@* jfmd@* jfevt@* jfxfer@* jflnk@* jfint@* jfwks@*"
+			expires_in     = 120
+			self_revocable = true
 		}
 	}`
 
@@ -116,6 +117,7 @@ func TestAccOIDCIdentityMapping_full(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "token_spec.scope", "applied-permissions/user"),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.audience", "*@*"),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.expires_in", "60"),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.self_revocable", "false"),
 				),
 			},
 			{
@@ -129,6 +131,7 @@ func TestAccOIDCIdentityMapping_full(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "token_spec.scope", "applied-permissions/user"),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.audience", "jfrt@* jfac@* jfmc@* jfmd@* jfevt@* jfxfer@* jflnk@* jfint@* jfwks@*"),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.expires_in", "120"),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.self_revocable", "true"),
 				),
 			},
 			{
@@ -519,6 +522,7 @@ func TestAccOIDCIdentityMapping_roles_scope_with_project(t *testing.T) {
 			updated_at = 1490198843
 		})
 		token_spec = {
+			username   = "admin"
 			scope      = "applied-permissions/roles:${project.{{ .projectName }}.key}:\"${project_role.role1.name}\",\"${project_role.role2.name}\""
 			audience   = "*@*"
 			expires_in = 120
@@ -559,6 +563,7 @@ func TestAccOIDCIdentityMapping_roles_scope_with_project(t *testing.T) {
 					resource.TestCheckResourceAttr(fqrn, "name", testData["identityMappingName"]),
 					resource.TestCheckResourceAttr(fqrn, "priority", testData["priority"]),
 					resource.TestCheckResourceAttr(fqrn, "claims_json", fmt.Sprintf("{\"sub\":\"%s\",\"updated_at\":1490198843}", testData["sub"])),
+					resource.TestCheckResourceAttr(fqrn, "token_spec.username", "admin"),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.scope", fmt.Sprintf("applied-permissions/roles:%s:\"role1\",\"role2\"", projectKey)),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.audience", "*@*"),
 					resource.TestCheckResourceAttr(fqrn, "token_spec.expires_in", "120"),
@@ -835,7 +840,7 @@ func TestAccOIDCIdentityMapping_invalid_scope(t *testing.T) {
 				Steps: []resource.TestStep{
 					{
 						Config:      config,
-						ExpectError: regexp.MustCompile(`.*must start with either.*`),
+						ExpectError: regexp.MustCompile(`Each scope permission must start with`),
 					},
 				},
 			})
