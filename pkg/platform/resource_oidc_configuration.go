@@ -418,13 +418,19 @@ func (r *oidcConfigurationResource) Read(ctx context.Context, req resource.ReadR
 	// Access version 7.138.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
 	if oidcConfig.ProviderType == gitHubProviderType {
 		if ok, err := util.CheckVersion(r.ProviderData.AccessVersion, AccessVersion); err == nil && ok {
-			if len(oidcConfig.Organization) > 0 {
-				state.Organization = types.StringValue(oidcConfig.Organization)
+			// The API stores organization as token_issuer in its GET response.
+			// Prefer the explicit organization field; fall back to token_issuer.
+			org := oidcConfig.Organization
+			if len(org) == 0 {
+				org = oidcConfig.TokenIssuer
 			}
-			if state.EnablePermissiveConfiguration.IsNull() {
-				// leave empty
-			} else {
-				state.EnablePermissiveConfiguration = types.BoolValue(oidcConfig.EnablePermissiveConfiguration)
+			if len(org) > 0 {
+				state.Organization = types.StringValue(org)
+			}
+			if oidcConfig.EnablePermissiveConfiguration {
+				state.EnablePermissiveConfiguration = types.BoolValue(true)
+			} else if !state.EnablePermissiveConfiguration.IsNull() {
+				state.EnablePermissiveConfiguration = types.BoolValue(false)
 			}
 		}
 	}
@@ -432,13 +438,17 @@ func (r *oidcConfigurationResource) Read(ctx context.Context, req resource.ReadR
 	// Access version 7.144.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHubEnterprise`
 	if oidcConfig.ProviderType == githubEnterpriseType {
 		if ok, err := util.CheckVersion(r.ProviderData.AccessVersion, GithubEnterpriseAccessVersion); err == nil && ok {
-			if len(oidcConfig.Organization) > 0 {
-				state.Organization = types.StringValue(oidcConfig.Organization)
+			org := oidcConfig.Organization
+			if len(org) == 0 {
+				org = oidcConfig.TokenIssuer
 			}
-			if state.EnablePermissiveConfiguration.IsNull() {
-				// leave empty
-			} else {
-				state.EnablePermissiveConfiguration = types.BoolValue(oidcConfig.EnablePermissiveConfiguration)
+			if len(org) > 0 {
+				state.Organization = types.StringValue(org)
+			}
+			if oidcConfig.EnablePermissiveConfiguration {
+				state.EnablePermissiveConfiguration = types.BoolValue(true)
+			} else if !state.EnablePermissiveConfiguration.IsNull() {
+				state.EnablePermissiveConfiguration = types.BoolValue(false)
 			}
 		}
 	}

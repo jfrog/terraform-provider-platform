@@ -30,6 +30,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
@@ -109,43 +110,31 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 							),
 							stringvalidator.ConflictsWith(
 								path.MatchRelative().AtParent().AtName("username_pattern"),
-								path.MatchRelative().AtParent().AtName("groups_pattern"),
 							),
 							stringvalidator.LengthAtLeast(1),
 						},
-						Description: "User name of the OIDC user. Not applicable when `scope` is set to `applied-permissions/groups`. Must be set when `scope` is set to `applied-permissions/roles`.",
+						Description: "User name of the OIDC user. Can be combined with `groups_pattern`.",
 					},
 					"username_pattern": schema.StringAttribute{
 						Optional: true,
 						Validators: []validator.String{
 							stringvalidator.ConflictsWith(
 								path.MatchRelative().AtParent().AtName("username"),
-								path.MatchRelative().AtParent().AtName("groups_pattern"),
 							),
 							stringvalidator.LengthAtLeast(1),
 						},
-						Description: "Provide a pattern which is used to map OIDC user to Artifactory user.",
+						Description: "Provide a pattern which is used to map OIDC user to Artifactory user. Can be combined with `groups_pattern`.",
 					},
 					"groups_pattern": schema.StringAttribute{
 						Optional: true,
 						Validators: []validator.String{
-							stringvalidator.ConflictsWith(
-								path.MatchRelative().AtParent().AtName("username"),
-								path.MatchRelative().AtParent().AtName("username_pattern"),
-							),
 							stringvalidator.LengthAtLeast(1),
 						},
-						Description: "Provide a pattern which is used to map OIDC groups to Artifactory groups.",
+						Description: "Provide a pattern which is used to map OIDC groups to Artifactory groups. Can be combined with `username`, `username_pattern`, or both.",
 					},
 					"scope": schema.StringAttribute{
-						Optional: true,
-						Validators: []validator.String{
-							stringvalidator.RegexMatches(
-								regexp.MustCompile(`^(applied-permissions\/admin|applied-permissions\/user|applied-permissions\/groups:.+|applied-permissions\/roles:.+)$`),
-								"must start with either 'applied-permissions/admin', 'applied-permissions/user', 'applied-permissions/groups:', or 'applied-permissions/roles:'",
-							),
-						},
-						MarkdownDescription: "Scope of the token. Must start with `applied-permissions/user`, `applied-permissions/admin`, `applied-permissions/roles:`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\\\"readers\\\",\\\"my-group\\\",` Role permissions are only applicable when in project scope and must be comma-separated, double quotes wrapped, e.g. `applied-permissions:roles:<project-key>:\"Developer\",\"Viewer\". `username` is also required when setting role permission.",
+						Optional:            true,
+						MarkdownDescription: "Scope of the token. Can be a single permission or a space-separated combination. Each permission must start with `applied-permissions/user`, `applied-permissions/admin`, `applied-permissions/roles:`, or `applied-permissions/groups:`. Group names must be comma-separated, double quotes wrapped, e.g. `applied-permissions/groups:\\\"readers\\\",\\\"my-group\\\"`. Role permissions are only applicable when in project scope, e.g. `applied-permissions/roles:<project-key>:\\\"Developer\\\",\\\"Viewer\\\"`. `username` is also required when setting role permission.",
 					},
 					"audience": schema.StringAttribute{
 						Optional: true,
@@ -164,6 +153,12 @@ func (r *odicIdentityMappingResource) Schema(ctx context.Context, req resource.S
 							int64validator.AtLeast(1),
 						},
 						MarkdownDescription: "Token expiry time in seconds. Default value is 60.",
+					},
+					"self_revocable": schema.BoolAttribute{
+						Optional:    true,
+						Computed:    true,
+						Default:     booldefault.StaticBool(false),
+						Description: "When set, the access token issued via this identity mapping can be revoked using the tokens/me API endpoint.",
 					},
 				},
 				Description: "Specifications of the token. In case of success, a token with the following details will be generated and passed to OIDC Provider.",
@@ -200,6 +195,7 @@ type odicIdentityMappingTokenSpecResourceModel struct {
 	Scope           types.String `tfsdk:"scope"`
 	Audience        types.String `tfsdk:"audience"`
 	ExpiresIn       types.Int64  `tfsdk:"expires_in"`
+	SelfRevocable   types.Bool   `tfsdk:"self_revocable"`
 }
 
 var odicIdentityMappingTokenSpecResourceModelAttributeType map[string]attr.Type = map[string]attr.Type{
@@ -209,6 +205,7 @@ var odicIdentityMappingTokenSpecResourceModelAttributeType map[string]attr.Type 
 	"scope":            types.StringType,
 	"audience":         types.StringType,
 	"expires_in":       types.Int64Type,
+	"self_revocable":   types.BoolType,
 }
 
 func (r *odicIdentityMappingResourceModel) toAPIModel(ctx context.Context, apiModel *odicIdentityMappingAPIModel) (ds diag.Diagnostics) {
@@ -240,6 +237,7 @@ func (r *odicIdentityMappingResourceModel) toAPIModel(ctx context.Context, apiMo
 			Scope:           tokenSpec.Scope.ValueString(),
 			Audience:        tokenSpec.Audience.ValueString(),
 			ExpiresIn:       tokenSpec.ExpiresIn.ValueInt64(),
+			SelfRevocable:   tokenSpec.SelfRevocable.ValueBool(),
 		},
 		ProjectKey: r.ProjectKey.ValueString(),
 	}
@@ -290,6 +288,8 @@ func (r *odicIdentityMappingResourceModel) fromAPIModel(ctx context.Context, api
 		tokenSpecResource.Audience = types.StringValue(apiModel.TokenSpec.Audience)
 	}
 
+	tokenSpecResource.SelfRevocable = types.BoolValue(apiModel.TokenSpec.SelfRevocable)
+
 	tokenSpec, d := types.ObjectValueFrom(
 		ctx,
 		odicIdentityMappingTokenSpecResourceModelAttributeType,
@@ -327,6 +327,76 @@ type odicIdentityMappingTokenSpecAPIModel struct {
 	Scope           string `json:"scope"`
 	Audience        string `json:"audience"`
 	ExpiresIn       int64  `json:"expires_in"`
+	SelfRevocable   bool   `json:"self_revocable,omitempty"`
+}
+
+func (r *odicIdentityMappingResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data odicIdentityMappingResourceModel
+
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	var tokenSpec odicIdentityMappingTokenSpecResourceModel
+	resp.Diagnostics.Append(data.TokenSpec.As(ctx, &tokenSpec, basetypes.ObjectAsOptions{})...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	scope := tokenSpec.Scope.ValueString()
+
+	if scope != "" {
+		validScopePrefixes := []string{
+			"applied-permissions/admin",
+			"applied-permissions/user",
+			"applied-permissions/groups:",
+			"applied-permissions/roles:",
+		}
+		// Split scope on " applied-permissions/" boundaries (Go RE2 has no lookahead support)
+		rawParts := strings.Split(" "+scope, " applied-permissions/")
+		var scopeParts []string
+		for _, p := range rawParts {
+			if p != "" {
+				scopeParts = append(scopeParts, "applied-permissions/"+p)
+			}
+		}
+		for _, part := range scopeParts {
+			valid := false
+			for _, prefix := range validScopePrefixes {
+				if strings.HasPrefix(part, prefix) {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				resp.Diagnostics.AddAttributeError(
+					path.Root("token_spec").AtName("scope"),
+					"Invalid Attribute Value",
+					"Each scope permission must start with 'applied-permissions/admin', 'applied-permissions/user', 'applied-permissions/groups:', or 'applied-permissions/roles:'.",
+				)
+				break
+			}
+		}
+	}
+
+	if strings.Contains(scope, "applied-permissions/admin") && strings.Contains(scope, " ") {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("token_spec").AtName("scope"),
+			"Invalid Attribute Configuration",
+			"applied-permissions/admin cannot be combined with other scopes.",
+		)
+	}
+
+	if strings.HasPrefix(scope, "applied-permissions/roles:") {
+		if !data.ProjectKey.IsUnknown() && (data.ProjectKey.IsNull() || data.ProjectKey.ValueString() == "") {
+			resp.Diagnostics.AddAttributeError(
+				path.Root("project_key"),
+				"Missing Attribute Configuration",
+				"project_key must be set when token_spec.scope uses applied-permissions/roles. Role permissions are only applicable within a project scope.",
+			)
+		}
+	}
 }
 
 func (r *odicIdentityMappingResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
