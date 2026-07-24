@@ -182,12 +182,12 @@ func (r *lifecycleStageResource) Schema(ctx context.Context, req resource.Schema
 				Computed: true,
 				Default:  stringdefault.StaticString("promote"),
 				Validators: []validator.String{
-					stringvalidator.OneOf("none", "code", "promote"),
+					stringvalidator.OneOf("none", "code", "promote", "release"),
 				},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
-				MarkdownDescription: "The category of the stage: `none`, `code`, or `promote` (default: `promote`).",
+				MarkdownDescription: "The category of the stage: `none`, `code`, `promote`, or `release` (default: `promote`). Note: `release` is used by predefined global stages such as `PROD`.",
 			},
 			"repositories": schema.SetAttribute{
 				ElementType:         types.StringType,
