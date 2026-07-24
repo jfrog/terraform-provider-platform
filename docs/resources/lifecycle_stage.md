@@ -50,7 +50,7 @@ resource "platform_lifecycle_stage" "test" {
 
 ### Optional
 
-- `category` (String) The category of the stage: `none`, `code`, or `promote` (default: `promote`).
+- `category` (String) The category of the stage: `none`, `code`, `promote`, or `release` (default: `promote`). Note: `release` is used by predefined global stages such as `PROD`.
 - `detach_on_destroy` (Boolean) If true, the stage will be detached from the lifecycle when the resource is destroyed. This is useful to prevent the stage from being deleted when the lifecycle is destroyed.
 - `project_key` (String) [For project-level stages only] The project key associated with the stage. When set, the stage name must be prefixed with this value (e.g. 'bookverse-deploy' if project_key is 'bookverse').
 

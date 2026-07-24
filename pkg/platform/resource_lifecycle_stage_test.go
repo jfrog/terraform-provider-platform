@@ -697,6 +697,70 @@ func TestAccLifecycleStage_category_none(t *testing.T) {
 	})
 }
 
+func TestAccLifecycleStage_category_release(t *testing.T) {
+	_, _, projectName := testutil.MkNames("test-project-", "project")
+	_, fqrn, stageName := testutil.MkNames("rel", "platform_lifecycle_stage")
+	projectKey := strings.ToLower(fmt.Sprintf("proj%d", testutil.RandomInt()))
+	fullStageName := fmt.Sprintf("%s-%s", projectKey, stageName)
+
+	projectTemp := `
+	resource "project" "{{ .projectName }}" {
+		key = "{{ .projectKey }}"
+		display_name = "{{ .projectName }}"
+		description = "test description"
+		admin_privileges {
+			manage_members = true
+			manage_resources = true
+			index_resources = true
+		}
+		max_storage_in_gibibytes = 1
+		block_deployments_on_limit = true
+		email_notification = false
+	}
+	`
+
+	// Regression test for "category=release errors": the schema validator must
+	// accept "release" (returned by the API for predefined global stages like
+	// PROD) instead of rejecting it at plan time with "must be one of".
+	temp := `
+		resource "platform_lifecycle_stage" "{{ .stageName }}" {
+			name        = "{{ .fullStageName }}"
+			project_key = project.{{ .projectName }}.key
+			category    = "release"
+		}
+	`
+
+	testData := map[string]string{
+		"projectName":   projectName,
+		"stageName":     stageName,
+		"fullStageName": fullStageName,
+		"projectKey":    projectKey,
+	}
+
+	projectConfig := util.ExecuteTemplate(stageName, projectTemp, testData)
+	config := projectConfig + "\n" + util.ExecuteTemplate(stageName, temp, testData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck: func() { testAccPreCheck(t) },
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"project": {
+				Source: "jfrog/project",
+			},
+		},
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", testData["fullStageName"]),
+					resource.TestCheckResourceAttr(fqrn, "category", "release"),
+					resource.TestCheckResourceAttr(fqrn, "scope", "PROJECT"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccLifecycleStage_category_multiple_updates(t *testing.T) {
 	_, _, projectName := testutil.MkNames("test-project-", "project")
 	_, fqrn, stageName := testutil.MkNames("cat", "platform_lifecycle_stage")

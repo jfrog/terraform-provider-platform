@@ -1,3 +1,9 @@
+## 2.2.12 (July 24, 2026)
+
+BUG FIXES:
+
+* resource/platform_lifecycle_stage: Fix platform_lifecycle_stage category=release errors Issue: [#333](https://github.com/jfrog/terraform-provider-platform/issues/333) PR: [#336](https://github.com/jfrog/terraform-provider-platform/pull/336)
+
 ## 2.2.11 (May 12, 2025). Tested on Artifactory 7.146.17 with Terraform 1.15.6 and OpenTofu 1.12.2
 
 IMPROVEMENTS:
