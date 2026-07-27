@@ -1,3 +1,8 @@
+## Unreleased
+
+BUG FIXES:
+* resource/platform_lifecycle: Fixed import of the global lifecycle via declarative `import{}` blocks. The documented import ID was an empty string, which Terraform CLI rejects in `import{}` blocks. The global lifecycle can now be imported using the non-empty special import id `"_global_"` (e.g. `id = "_global_"`). Project-level lifecycles continue to use the actual `project_key` as the import ID. Issue: [#331](https://github.com/jfrog/terraform-provider-platform/issues/331)
+
 ## 2.2.11 (August 24, 2026). Tested on Artifactory 7.161.19 with Terraform 1.15.9 and OpenTofu 1.12.6
 
 SECURITY:
