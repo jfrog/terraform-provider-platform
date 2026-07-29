@@ -41,33 +41,6 @@ const (
 )
 
 var globalRoleTypes []string = []string{"ADMIN", "CUSTOM_GLOBAL", "PREDEFINED"}
-var globalRoleActions []string = []string{
-	"READ_REPOSITORY",
-	"ANNOTATE_REPOSITORY",
-	"DEPLOY_CACHE_REPOSITORY",
-	"DELETE_OVERWRITE_REPOSITORY",
-	"MANAGE_XRAY_MD_REPOSITORY",
-	"READ_RELEASE_BUNDLE",
-	"ANNOTATE_RELEASE_BUNDLE",
-	"CREATE_RELEASE_BUNDLE",
-	"DISTRIBUTE_RELEASE_BUNDLE",
-	"DELETE_RELEASE_BUNDLE",
-	"MANAGE_XRAY_MD_RELEASE_BUNDLE",
-	"READ_BUILD",
-	"ANNOTATE_BUILD",
-	"DEPLOY_BUILD",
-	"DELETE_BUILD",
-	"MANAGE_XRAY_MD_BUILD",
-	"READ_SOURCES_PIPELINE",
-	"TRIGGER_PIPELINE",
-	"READ_INTEGRATIONS_PIPELINE",
-	"READ_POOLS_PIPELINE",
-	"REPORTS_SECURITY",
-	"WATCHES_SECURITY",
-	"POLICIES_SECURITY",
-	"RULES_SECURITY",
-	"READ_POLICIES_SECURITY",
-}
 
 var _ resource.Resource = (*globalRoleResource)(nil)
 
@@ -126,12 +99,11 @@ func (r *globalRoleResource) Schema(ctx context.Context, req resource.SchemaRequ
 				Required:    true,
 				Validators: []validator.Set{
 					setvalidator.SizeAtLeast(1),
-					setvalidator.ValueStringsAre(stringvalidator.OneOf(globalRoleActions...)),
 				},
 				PlanModifiers: []planmodifier.Set{
 					setplanmodifier.UseStateForUnknown(),
 				},
-				Description: fmt.Sprintf("List of actions. Allowed values: %s", strings.Join(globalRoleActions, ", ")),
+				Description: "List of actions.",
 			},
 		},
 		MarkdownDescription: "Provides a JFrog [global role](https://jfrog.com/help/r/jfrog-platform-administration-documentation/global-and-project-role-types) resource to manage custom global roles.",
