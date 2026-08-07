@@ -27,6 +27,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -129,6 +130,24 @@ func (r *workersServiceResource) Schema(ctx context.Context, req resource.Schema
 								Optional:    true,
 								Description: "Define patterns to for all repository paths for repositories to be excluded in the repoKeys. Defines those repositories that do not trigger the worker.",
 							},
+							"any_local": schema.BoolAttribute{
+								Optional:    true,
+								Computed:    true,
+								Default:     booldefault.StaticBool(false),
+								Description: "If set, the worker is triggered by any local repository.",
+							},
+							"any_remote": schema.BoolAttribute{
+								Optional:    true,
+								Computed:    true,
+								Default:     booldefault.StaticBool(false),
+								Description: "If set, the worker is triggered by any remote repository.",
+							},
+							"any_federated": schema.BoolAttribute{
+								Optional:    true,
+								Computed:    true,
+								Default:     booldefault.StaticBool(false),
+								Description: "If set, the worker is triggered by any federated repository.",
+							},
 						},
 					},
 					"schedule": schema.SingleNestedAttribute{
@@ -186,9 +205,12 @@ type filterCriteriaResourceModel struct {
 }
 
 type artifactFilterCriteriaResourceModel struct {
-	RepoKeys        types.Set `tfsdk:"repo_keys"`
-	IncludePatterns types.Set `tfsdk:"include_patterns"`
-	ExcludePatterns types.Set `tfsdk:"exclude_patterns"`
+	RepoKeys        types.Set  `tfsdk:"repo_keys"`
+	IncludePatterns types.Set  `tfsdk:"include_patterns"`
+	ExcludePatterns types.Set  `tfsdk:"exclude_patterns"`
+	AnyLocal        types.Bool `tfsdk:"any_local"`
+	AnyRemote       types.Bool `tfsdk:"any_remote"`
+	AnyFederated    types.Bool `tfsdk:"any_federated"`
 }
 
 type scheduleResourceModel struct {
@@ -224,6 +246,9 @@ func (r *workersServiceResourceModel) toAPIModel(ctx context.Context, apiModel *
 			RepoKeys:        repoKeys,
 			IncludePatterns: includePatterns,
 			ExcludePatterns: excludePatterns,
+			AnyLocal:        artifactFilterCriteria.AnyLocal.ValueBool(),
+			AnyRemote:       artifactFilterCriteria.AnyRemote.ValueBool(),
+			AnyFederated:    artifactFilterCriteria.AnyFederated.ValueBool(),
 		}
 	}
 
@@ -291,6 +316,9 @@ var artifactFilterCriteriaResourceModelAttributeTypes map[string]attr.Type = map
 	"repo_keys":        types.SetType{ElemType: types.StringType},
 	"include_patterns": types.SetType{ElemType: types.StringType},
 	"exclude_patterns": types.SetType{ElemType: types.StringType},
+	"any_local":        types.BoolType,
+	"any_remote":       types.BoolType,
+	"any_federated":    types.BoolType,
 }
 
 var scheduleResourceModelAttributeTypes map[string]attr.Type = map[string]attr.Type{
@@ -344,6 +372,9 @@ func (r *workersServiceResourceModel) fromAPIModel(ctx context.Context, apiModel
 			RepoKeys:        repoKeys,
 			IncludePatterns: includePatterns,
 			ExcludePatterns: excludePatterns,
+			AnyLocal:        types.BoolValue(apiModel.FilterCriteria.ArtifactFilterCriteria.AnyLocal),
+			AnyRemote:       types.BoolValue(apiModel.FilterCriteria.ArtifactFilterCriteria.AnyRemote),
+			AnyFederated:    types.BoolValue(apiModel.FilterCriteria.ArtifactFilterCriteria.AnyFederated),
 		}
 
 		atrifactFilterCriteria, d := types.ObjectValueFrom(
@@ -422,6 +453,9 @@ type artifactFilterCriteriaAPIModel struct {
 	RepoKeys        []string `json:"repoKeys"`
 	IncludePatterns []string `json:"includePatterns,omitempty"`
 	ExcludePatterns []string `json:"excludePatterns,omitempty"`
+	AnyLocal        bool     `json:"anyLocal"`
+	AnyRemote       bool     `json:"anyRemote"`
+	AnyFederated    bool     `json:"anyFederated"`
 }
 
 type scheduleAPIModel struct {
