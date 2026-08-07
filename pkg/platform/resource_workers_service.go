@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -100,23 +99,15 @@ func (r *workersServiceResource) Schema(ctx context.Context, req resource.Schema
 				Validators:  []validator.String{stringvalidator.OneOf(validActions...)},
 			},
 			"filter_criteria": schema.SingleNestedAttribute{
-				Required:    true,
-				Description: "Defines the criteria for triggering the worker, either by specifying repositories and path patterns for artifact-based filtering or by defining a schedule using a Cron expression.",
+				Optional:    true,
+				Description: "Defines the criteria for triggering the worker, either by specifying repositories and path patterns for artifact-based filtering or by defining a schedule using a Cron expression. This must be omitted for actions that reject a filter (e.g. `AFTER_BUILD_INFO_SAVE`, `AFTER_CREATE`, `AFTER_MOVE`).",
 				Attributes: map[string]schema.Attribute{
 					"artifact_filter_criteria": schema.SingleNestedAttribute{
 						Optional: true,
-						Validators: []validator.Object{
-							objectvalidator.ExactlyOneOf(
-								// self (required workaround for now)
-								path.MatchRelative(),
-								// sibling
-								path.MatchRelative().AtParent().AtName("schedule"),
-							),
-						},
 						Attributes: map[string]schema.Attribute{
 							"repo_keys": schema.SetAttribute{
 								ElementType: types.StringType,
-								Required:    true,
+								Optional:    true,
 								Description: "Defines which repositories are used when an action event occurs to trigger the worker.",
 							},
 							"include_patterns": schema.SetAttribute{
@@ -197,47 +188,58 @@ type scheduleResourceModel struct {
 }
 
 func (r *workersServiceResourceModel) toAPIModel(ctx context.Context, apiModel *WorkersServiceAPIModel, secretKeysToBeRemoved []string) (ds diag.Diagnostics) {
-	var filterCriteria filterCriteriaResourceModel
-	ds.Append(r.FilterCriteria.As(ctx, &filterCriteria, basetypes.ObjectAsOptions{})...)
-	if ds.HasError() {
-		return
-	}
-
-	var artifactFilterCriteriaObject *artifactFilterCriteriaAPIModel
-	if !filterCriteria.ArtifactFilterCriteria.IsNull() {
-		var artifactFilterCriteria artifactFilterCriteriaResourceModel
-		ds.Append(filterCriteria.ArtifactFilterCriteria.As(ctx, &artifactFilterCriteria, basetypes.ObjectAsOptions{})...)
+	// filter_criteria is optional. When it is not configured we must omit it
+	// entirely from the request body, otherwise actions that reject a filter
+	// (e.g. AFTER_BUILD_INFO_SAVE) fail with "Filter must not be set for this action".
+	var filterCriteriaObject *filterCriteriaAPIModel
+	if !r.FilterCriteria.IsNull() && !r.FilterCriteria.IsUnknown() {
+		var filterCriteria filterCriteriaResourceModel
+		ds.Append(r.FilterCriteria.As(ctx, &filterCriteria, basetypes.ObjectAsOptions{})...)
 		if ds.HasError() {
 			return
 		}
 
-		var repoKeys []string
-		artifactFilterCriteria.RepoKeys.ElementsAs(ctx, &repoKeys, false)
+		var artifactFilterCriteriaObject *artifactFilterCriteriaAPIModel
+		if !filterCriteria.ArtifactFilterCriteria.IsNull() {
+			var artifactFilterCriteria artifactFilterCriteriaResourceModel
+			ds.Append(filterCriteria.ArtifactFilterCriteria.As(ctx, &artifactFilterCriteria, basetypes.ObjectAsOptions{})...)
+			if ds.HasError() {
+				return
+			}
 
-		var includePatterns []string
-		artifactFilterCriteria.IncludePatterns.ElementsAs(ctx, &includePatterns, false)
+			var repoKeys []string
+			artifactFilterCriteria.RepoKeys.ElementsAs(ctx, &repoKeys, false)
 
-		var excludePatterns []string
-		artifactFilterCriteria.ExcludePatterns.ElementsAs(ctx, &excludePatterns, false)
+			var includePatterns []string
+			artifactFilterCriteria.IncludePatterns.ElementsAs(ctx, &includePatterns, false)
 
-		artifactFilterCriteriaObject = &artifactFilterCriteriaAPIModel{
-			RepoKeys:        repoKeys,
-			IncludePatterns: includePatterns,
-			ExcludePatterns: excludePatterns,
+			var excludePatterns []string
+			artifactFilterCriteria.ExcludePatterns.ElementsAs(ctx, &excludePatterns, false)
+
+			artifactFilterCriteriaObject = &artifactFilterCriteriaAPIModel{
+				RepoKeys:        repoKeys,
+				IncludePatterns: includePatterns,
+				ExcludePatterns: excludePatterns,
+			}
 		}
-	}
 
-	var scheduleObject *scheduleAPIModel
-	if !filterCriteria.Schedule.IsNull() && !filterCriteria.Schedule.IsUnknown() {
-		var schedule scheduleResourceModel
-		ds.Append(filterCriteria.Schedule.As(ctx, &schedule, basetypes.ObjectAsOptions{})...)
-		if ds.HasError() {
-			return
+		var scheduleObject *scheduleAPIModel
+		if !filterCriteria.Schedule.IsNull() && !filterCriteria.Schedule.IsUnknown() {
+			var schedule scheduleResourceModel
+			ds.Append(filterCriteria.Schedule.As(ctx, &schedule, basetypes.ObjectAsOptions{})...)
+			if ds.HasError() {
+				return
+			}
+
+			scheduleObject = &scheduleAPIModel{
+				Cron:     schedule.Cron.ValueString(),
+				Timezone: schedule.Timezone.ValueString(),
+			}
 		}
 
-		scheduleObject = &scheduleAPIModel{
-			Cron:     schedule.Cron.ValueString(),
-			Timezone: schedule.Timezone.ValueString(),
+		filterCriteriaObject = &filterCriteriaAPIModel{
+			ArtifactFilterCriteria: artifactFilterCriteriaObject,
+			Schedule:               scheduleObject,
 		}
 	}
 
@@ -263,16 +265,13 @@ func (r *workersServiceResourceModel) toAPIModel(ctx context.Context, apiModel *
 	}
 
 	*apiModel = WorkersServiceAPIModel{
-		Key:         r.Key.ValueString(),
-		Description: r.Description.ValueString(),
-		SourceCode:  r.SourceCode.ValueString(),
-		Action:      r.Action.ValueString(),
-		FilterCriteria: filterCriteriaAPIModel{
-			ArtifactFilterCriteria: artifactFilterCriteriaObject,
-			Schedule:               scheduleObject,
-		},
-		Enabled: r.Enabled.ValueBool(),
-		Secrets: secrets,
+		Key:            r.Key.ValueString(),
+		Description:    r.Description.ValueString(),
+		SourceCode:     r.SourceCode.ValueString(),
+		Action:         r.Action.ValueString(),
+		FilterCriteria: filterCriteriaObject,
+		Enabled:        r.Enabled.ValueBool(),
+		Secrets:        secrets,
 	}
 
 	return nil
@@ -305,7 +304,7 @@ func (r *workersServiceResourceModel) fromAPIModel(ctx context.Context, apiModel
 	r.Action = types.StringValue(apiModel.Action)
 
 	artifactFilterCriteriaObject := types.ObjectNull(artifactFilterCriteriaResourceModelAttributeTypes)
-	if apiModel.FilterCriteria.ArtifactFilterCriteria != nil {
+	if apiModel.FilterCriteria != nil && apiModel.FilterCriteria.ArtifactFilterCriteria != nil {
 		repoKeys, d := types.SetValueFrom(
 			ctx,
 			types.StringType,
@@ -362,7 +361,7 @@ func (r *workersServiceResourceModel) fromAPIModel(ctx context.Context, apiModel
 	}
 
 	scheduleObject := types.ObjectNull(scheduleResourceModelAttributeTypes)
-	if apiModel.FilterCriteria.Schedule != nil {
+	if apiModel.FilterCriteria != nil && apiModel.FilterCriteria.Schedule != nil {
 		scheduleValue := scheduleResourceModel{
 			Cron:     types.StringValue(apiModel.FilterCriteria.Schedule.Cron),
 			Timezone: types.StringValue(apiModel.FilterCriteria.Schedule.Timezone),
@@ -383,34 +382,38 @@ func (r *workersServiceResourceModel) fromAPIModel(ctx context.Context, apiModel
 		scheduleObject = schedule
 	}
 
-	filterCriteria, d := types.ObjectValue(
-		filterCriteriaResourceModelAttributeTypes,
-		map[string]attr.Value{
-			"artifact_filter_criteria": artifactFilterCriteriaObject,
-			"schedule":                 scheduleObject,
-		},
-	)
-	if d != nil {
-		ds = append(ds, d...)
-	}
-	if ds.HasError() {
-		return
-	}
+	if apiModel.FilterCriteria != nil {
+		filterCriteria, d := types.ObjectValue(
+			filterCriteriaResourceModelAttributeTypes,
+			map[string]attr.Value{
+				"artifact_filter_criteria": artifactFilterCriteriaObject,
+				"schedule":                 scheduleObject,
+			},
+		)
+		if d != nil {
+			ds = append(ds, d...)
+		}
+		if ds.HasError() {
+			return
+		}
 
-	r.FilterCriteria = filterCriteria
+		r.FilterCriteria = filterCriteria
+	} else {
+		r.FilterCriteria = types.ObjectNull(filterCriteriaResourceModelAttributeTypes)
+	}
 	r.Enabled = types.BoolValue(apiModel.Enabled)
 
 	return
 }
 
 type WorkersServiceAPIModel struct {
-	Key            string                 `json:"key"`
-	Description    string                 `json:"description"`
-	SourceCode     string                 `json:"sourceCode"`
-	Action         string                 `json:"action"`
-	FilterCriteria filterCriteriaAPIModel `json:"filterCriteria"`
-	Enabled        bool                   `json:"enabled"`
-	Secrets        []secretAPIModel       `json:"secrets"`
+	Key            string                  `json:"key"`
+	Description    string                  `json:"description"`
+	SourceCode     string                  `json:"sourceCode"`
+	Action         string                  `json:"action"`
+	FilterCriteria *filterCriteriaAPIModel `json:"filterCriteria,omitempty"`
+	Enabled        bool                    `json:"enabled"`
+	Secrets        []secretAPIModel        `json:"secrets"`
 }
 
 type filterCriteriaAPIModel struct {

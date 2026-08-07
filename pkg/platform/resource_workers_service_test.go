@@ -794,3 +794,73 @@ func TestAccWorkersService_Schedule(t *testing.T) {
 		},
 	})
 }
+
+const testAfterBuildInfoSave = "export default async (context: PlatformContext, data: AfterBuildInfoSaveRequest): Promise<AfterBuildInfoSaveResponse> => { console.log(await context.clients.platformHttp.get('/artifactory/api/system/ping')); return { message: 'proceed', } }"
+
+// TestAccWorkersService_NoFilterCriteria is a regression test for the bug where
+// filter_criteria (and repo_keys) were Required. Actions such as AFTER_BUILD_INFO_SAVE
+// reject a filter server-side ("Filter must not be set for this action"), so the worker
+// could never be created. filter_criteria must be optional and omitted entirely from the
+// request body when not configured.
+func TestAccWorkersService_NoFilterCriteria(t *testing.T) {
+	jfrogURL := os.Getenv("JFROG_URL")
+	if !strings.HasSuffix(jfrogURL, "jfrog.io") {
+		t.Skipf("JFROG_URL '%s' is not a cloud instance. Workers Service is only available on cloud.", jfrogURL)
+	}
+
+	_, fqrn, workersServiceName := testutil.MkNames("test-workers-service-", "platform_workers_service")
+
+	temp := `
+	resource "platform_workers_service" "{{ .key }}" {
+		key         = "{{ .key }}"
+		enabled     = {{ .enabled }}
+		description = "{{ .description }}"
+		source_code = "{{ .sourceCode }}"
+		action      = "{{ .action }}"
+
+		secrets = [
+			{
+				key   = "{{ .secretKey }}"
+				value = "{{ .secretValue }}"
+			}
+		]
+	}`
+	testData := map[string]string{
+		"key":         workersServiceName,
+		"enabled":     "true",
+		"description": "Description",
+		"sourceCode":  testAfterBuildInfoSave,
+		"action":      "AFTER_BUILD_INFO_SAVE",
+		"secretKey":   "test-secret-key",
+		"secretValue": "test-secret-value",
+	}
+
+	config := util.ExecuteTemplate(workersServiceName, temp, testData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		CheckDestroy:             testAccCheckWorkersServiceDestroy(fqrn),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "key", workersServiceName),
+					resource.TestCheckResourceAttr(fqrn, "enabled", testData["enabled"]),
+					resource.TestCheckResourceAttr(fqrn, "description", testData["description"]),
+					resource.TestCheckResourceAttr(fqrn, "source_code", testData["sourceCode"]),
+					resource.TestCheckResourceAttr(fqrn, "action", testData["action"]),
+					resource.TestCheckNoResourceAttr(fqrn, "filter_criteria"),
+				),
+			},
+			{
+				ResourceName:                         fqrn,
+				ImportState:                          true,
+				ImportStateId:                        workersServiceName,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "key",
+				ImportStateVerifyIgnore:              []string{"secrets"}, // `secrets.value` attribute is not being sent via API, can't be imported
+			},
+		},
+	})
+}

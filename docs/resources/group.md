@@ -59,3 +59,4 @@ Import is supported using the following syntax:
 ```sh
 terraform import platform_group.my-group my-group
 ```
+
