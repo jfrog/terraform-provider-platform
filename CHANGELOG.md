@@ -4,6 +4,7 @@ IMPROVEMENTS:
 * resource/platform_oidc_configuration: Added `azure_app_id` attribute (Optional, only valid when `provider_type = Azure`). Issue: [#312](https://github.com/jfrog/terraform-provider-platform/issues/312)
 * resource/platform_oidc_configuration: Added `token_issuer` attribute (Optional/Computed). Only applicable when `provider_type` is `generic` or `Azure`; not allowed for `GitHub` or `GitHubEnterprise`. Added `RequiresReplace` to `provider_type` to prevent invalid in-place type changes.
 * resource/platform_workers_service: Added support for `SCHEDULED_EVENT` action type. Issue: [#197](https://github.com/jfrog/terraform-provider-platform/issues/197) PR: [#281](https://github.com/jfrog/terraform-provider-platform/pull/281)
+* resource/platform_workers_service: Added `any_local`, `any_remote`, and `any_federated` boolean attributes to `filter_criteria.artifact_filter_criteria`, matching the Workers REST API. `repo_keys` is now optional so a worker can be triggered by any local/remote/federated repository without listing specific repositories. Issue: [#226](https://github.com/jfrog/terraform-provider-platform/issues/226)
 
 NOTES:
 * resource/platform_oidc_configuration: `provider_type` now requires resource replacement when changed. Existing resources with an unchanged `provider_type` are unaffected.

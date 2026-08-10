@@ -704,6 +704,84 @@ func TestAccWorkersService_AfterPropertyDelete(t *testing.T) {
 	})
 }
 
+// TestAccWorkersService_ArtifactFilterCriteriaAnyRepo is a regression test for
+// https://github.com/jfrog/terraform-provider-platform issue #226. It verifies that the
+// any_local / any_remote / any_federated booleans are accepted, persisted to the
+// API, and read back into state (previously they were silently dropped).
+func TestAccWorkersService_ArtifactFilterCriteriaAnyRepo(t *testing.T) {
+	jfrogURL := os.Getenv("JFROG_URL")
+	if !strings.HasSuffix(jfrogURL, "jfrog.io") {
+		t.Skipf("JFROG_URL '%s' is not a cloud instance. Workers Service is only available on cloud.", jfrogURL)
+	}
+
+	_, fqrn, workersServiceName := testutil.MkNames("test-workers-service-", "platform_workers_service")
+	_, _, repoKey := testutil.MkNames("test-repo-local-", "artifactory_local_generic_repository")
+
+	temp := `
+	resource "artifactory_local_generic_repository" "{{ .repoKey }}" {
+		key = "{{ .repoKey }}"
+	}
+
+	resource "platform_workers_service" "{{ .key }}" {
+		key         = "{{ .key }}"
+		enabled     = {{ .enabled }}
+		description = "{{ .description }}"
+		source_code = "{{ .sourceCode }}"
+		action      = "{{ .action }}"
+
+		filter_criteria = {
+			artifact_filter_criteria = {
+				repo_keys     = ["{{ .repoKey }}"]
+				any_local     = true
+				any_remote    = true
+				any_federated = false
+			}
+		}
+	}`
+	testData := map[string]string{
+		"key":         workersServiceName,
+		"enabled":     "false",
+		"description": "Description",
+		"sourceCode":  testSourceCode,
+		"action":      "BEFORE_DOWNLOAD",
+		"repoKey":     repoKey,
+	}
+
+	config := util.ExecuteTemplate(workersServiceName, temp, testData)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		ExternalProviders: map[string]resource.ExternalProvider{
+			"artifactory": {
+				Source:            "registry.terraform.io/jfrog/artifactory",
+				VersionConstraint: "9.9.0",
+			},
+		},
+		CheckDestroy: testAccCheckWorkersServiceDestroy(fqrn),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "key", workersServiceName),
+					resource.TestCheckResourceAttr(fqrn, "filter_criteria.artifact_filter_criteria.repo_keys.#", "1"),
+					resource.TestCheckResourceAttr(fqrn, "filter_criteria.artifact_filter_criteria.repo_keys.0", testData["repoKey"]),
+					resource.TestCheckResourceAttr(fqrn, "filter_criteria.artifact_filter_criteria.any_local", "true"),
+					resource.TestCheckResourceAttr(fqrn, "filter_criteria.artifact_filter_criteria.any_remote", "true"),
+					resource.TestCheckResourceAttr(fqrn, "filter_criteria.artifact_filter_criteria.any_federated", "false"),
+				),
+			},
+			{
+				ResourceName:                         fqrn,
+				ImportState:                          true,
+				ImportStateId:                        workersServiceName,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "key",
+			},
+		},
+	})
+}
+
 const testSchedule = "export default async (context: PlatformContext, data: ScheduledEventRequest): Promise<ScheduledEventResponse> => { console.log(await context.clients.platformHttp.get('/artifactory/api/system/ping')); console.log(await axios.get('https://my.external.resource')); return { message: 'proceed', } }"
 
 func TestAccWorkersService_Schedule(t *testing.T) {

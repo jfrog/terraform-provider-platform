@@ -17,7 +17,9 @@ EOT
 
   filter_criteria = {
     artifact_filter_criteria = {
-      repo_keys = ["my-repo-key"]
+      repo_keys        = ["my-repo-key"]
+      include_patterns = ["**/*.jar"]
+      exclude_patterns = ["**/*.txt"]
     }
   }
 
@@ -31,6 +33,32 @@ EOT
       value = "my-secret-value-2"
     }
   ]
+}
+
+# Worker triggered by an action event on any local, remote, or federated repository.
+# When any_local/any_remote/any_federated is used, repo_keys is not required.
+resource "platform_workers_service" "my-any-repo-workers-service" {
+  key         = "my-any-repo-workers-service"
+  enabled     = true
+  description = "My any-repo workers service"
+  source_code = <<EOT
+export default async (context: PlatformContext, data: BeforeDownloadRequest): Promise<BeforeDownloadResponse> => {
+  console.log(await context.clients.platformHttp.get('/artifactory/api/system/ping'));
+  return {
+    status: 'DOWNLOAD_PROCEED',
+    message: 'proceed',
+  }
+}
+EOT
+  action      = "BEFORE_DOWNLOAD"
+
+  filter_criteria = {
+    artifact_filter_criteria = {
+      any_local     = true
+      any_remote    = true
+      any_federated = false
+    }
+  }
 }
 
 # Worker triggerd by schedule

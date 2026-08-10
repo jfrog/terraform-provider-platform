@@ -27,6 +27,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -116,8 +117,26 @@ func (r *workersServiceResource) Schema(ctx context.Context, req resource.Schema
 						Attributes: map[string]schema.Attribute{
 							"repo_keys": schema.SetAttribute{
 								ElementType: types.StringType,
-								Required:    true,
-								Description: "Defines which repositories are used when an action event occurs to trigger the worker.",
+								Optional:    true,
+								Description: "Defines which repositories are used when an action event occurs to trigger the worker. Not required when any of `any_local`, `any_remote`, or `any_federated` is set to `true`.",
+							},
+							"any_local": schema.BoolAttribute{
+								Optional:    true,
+								Computed:    true,
+								Default:     booldefault.StaticBool(false),
+								Description: "If set to `true`, the worker is triggered by an action event on any local repository. Defaults to `false`.",
+							},
+							"any_remote": schema.BoolAttribute{
+								Optional:    true,
+								Computed:    true,
+								Default:     booldefault.StaticBool(false),
+								Description: "If set to `true`, the worker is triggered by an action event on any remote repository. Defaults to `false`.",
+							},
+							"any_federated": schema.BoolAttribute{
+								Optional:    true,
+								Computed:    true,
+								Default:     booldefault.StaticBool(false),
+								Description: "If set to `true`, the worker is triggered by an action event on any federated repository. Defaults to `false`.",
 							},
 							"include_patterns": schema.SetAttribute{
 								ElementType: types.StringType,
@@ -186,9 +205,12 @@ type filterCriteriaResourceModel struct {
 }
 
 type artifactFilterCriteriaResourceModel struct {
-	RepoKeys        types.Set `tfsdk:"repo_keys"`
-	IncludePatterns types.Set `tfsdk:"include_patterns"`
-	ExcludePatterns types.Set `tfsdk:"exclude_patterns"`
+	RepoKeys        types.Set  `tfsdk:"repo_keys"`
+	AnyLocal        types.Bool `tfsdk:"any_local"`
+	AnyRemote       types.Bool `tfsdk:"any_remote"`
+	AnyFederated    types.Bool `tfsdk:"any_federated"`
+	IncludePatterns types.Set  `tfsdk:"include_patterns"`
+	ExcludePatterns types.Set  `tfsdk:"exclude_patterns"`
 }
 
 type scheduleResourceModel struct {
@@ -222,6 +244,9 @@ func (r *workersServiceResourceModel) toAPIModel(ctx context.Context, apiModel *
 
 		artifactFilterCriteriaObject = &artifactFilterCriteriaAPIModel{
 			RepoKeys:        repoKeys,
+			AnyLocal:        artifactFilterCriteria.AnyLocal.ValueBool(),
+			AnyRemote:       artifactFilterCriteria.AnyRemote.ValueBool(),
+			AnyFederated:    artifactFilterCriteria.AnyFederated.ValueBool(),
 			IncludePatterns: includePatterns,
 			ExcludePatterns: excludePatterns,
 		}
@@ -289,6 +314,9 @@ var filterCriteriaResourceModelAttributeTypes map[string]attr.Type = map[string]
 
 var artifactFilterCriteriaResourceModelAttributeTypes map[string]attr.Type = map[string]attr.Type{
 	"repo_keys":        types.SetType{ElemType: types.StringType},
+	"any_local":        types.BoolType,
+	"any_remote":       types.BoolType,
+	"any_federated":    types.BoolType,
 	"include_patterns": types.SetType{ElemType: types.StringType},
 	"exclude_patterns": types.SetType{ElemType: types.StringType},
 }
@@ -342,6 +370,9 @@ func (r *workersServiceResourceModel) fromAPIModel(ctx context.Context, apiModel
 
 		artifactFilterCriteriaValue := artifactFilterCriteriaResourceModel{
 			RepoKeys:        repoKeys,
+			AnyLocal:        types.BoolValue(apiModel.FilterCriteria.ArtifactFilterCriteria.AnyLocal),
+			AnyRemote:       types.BoolValue(apiModel.FilterCriteria.ArtifactFilterCriteria.AnyRemote),
+			AnyFederated:    types.BoolValue(apiModel.FilterCriteria.ArtifactFilterCriteria.AnyFederated),
 			IncludePatterns: includePatterns,
 			ExcludePatterns: excludePatterns,
 		}
@@ -419,7 +450,10 @@ type filterCriteriaAPIModel struct {
 }
 
 type artifactFilterCriteriaAPIModel struct {
-	RepoKeys        []string `json:"repoKeys"`
+	RepoKeys        []string `json:"repoKeys,omitempty"`
+	AnyLocal        bool     `json:"anyLocal"`
+	AnyRemote       bool     `json:"anyRemote"`
+	AnyFederated    bool     `json:"anyFederated"`
 	IncludePatterns []string `json:"includePatterns,omitempty"`
 	ExcludePatterns []string `json:"excludePatterns,omitempty"`
 }
@@ -448,7 +482,7 @@ func (r *workersServiceResource) Create(ctx context.Context, req resource.Create
 
 	var plan workersServiceResourceModel
 
-	diags := req.Config.Get(ctx, &plan)
+	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -525,7 +559,7 @@ func (r *workersServiceResource) Update(ctx context.Context, req resource.Update
 	var plan workersServiceResourceModel
 	var state workersServiceResourceModel
 
-	resp.Diagnostics.Append(req.Config.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
