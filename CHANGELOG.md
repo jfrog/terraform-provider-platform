@@ -1,3 +1,35 @@
+## 2.2.12 (August 20, 2026)
+
+SECURITY:
+* CVE-2026-39821 (Critical, 9.6): Updated Go to 1.26.6 and golang.org/x/net to v0.58.0.
+* CVE-2026-56865 (High, 8.4): Remediated through Go 1.26.6.
+* CVE-2026-56864 (High, 7.5): Remediated through Go 1.26.6.
+* CVE-2026-33818 (High, 7.5): Remediated through Go 1.26.6.
+* CVE-2026-46600 (High, 7.5): Remediated through Go 1.26.6.
+* CVE-2026-56862 (High, 7.5): Remediated through Go 1.26.6.
+* CVE-2026-56859 (High, 7.5): Remediated through Go 1.26.6.
+* CVE-2026-56860 (High, 7.5): Remediated through Go 1.26.6.
+* CVE-2026-56858 (Medium, 6.1): Remediated through Go 1.26.6.
+* CVE-2026-56853 (Medium, 5.3): Remediated through Go 1.26.6.
+* CVE-2026-25680 (Medium, 6.5): Remediated through golang.org/x/net v0.58.0.
+* CVE-2026-42506 (Medium, 6.1): Remediated through golang.org/x/net v0.58.0.
+* CVE-2026-42502 (Medium, 6.1): Remediated through golang.org/x/net v0.58.0.
+* CVE-2026-25681 (Medium, 6.1): Remediated through golang.org/x/net v0.58.0.
+* CVE-2026-27136 (Medium, 6.1): Remediated through golang.org/x/net v0.58.0.
+* CVE-2026-46595 (Critical, 10.0): Remediated through golang.org/x/crypto v0.55.0.
+* CVE-2026-42508 (Critical, 9.1): Remediated through golang.org/x/crypto v0.55.0.
+* CVE-2026-39834 (Critical, 9.1): Remediated through golang.org/x/crypto v0.55.0.
+* CVE-2026-39833 (Critical, 9.1): Remediated through golang.org/x/crypto v0.55.0.
+* CVE-2026-39832 (Critical, 9.1): Remediated through golang.org/x/crypto v0.55.0.
+* CVE-2026-39831 (Critical, 9.1): Remediated through golang.org/x/crypto v0.55.0.
+* CVE-2026-39830 (Critical, 9.1): Remediated through golang.org/x/crypto v0.55.0.
+* CVE-2026-39829 (High, 7.5): Remediated through golang.org/x/crypto v0.55.0.
+* CVE-2026-46597 (High, 7.5): Remediated through golang.org/x/crypto v0.55.0.
+* CVE-2026-39828 (Medium, 6.3): Remediated through golang.org/x/crypto v0.55.0.
+* CVE-2026-39827 (Medium, 6.5): Remediated through golang.org/x/crypto v0.55.0.
+* CVE-2026-39835 (Medium, 5.3): Remediated through golang.org/x/crypto v0.55.0.
+* CVE-2026-46598 (Medium, 5.3): Remediated through golang.org/x/crypto v0.55.0.
+
 ## 2.2.11 (May 12, 2025). Tested on Artifactory 7.146.17 with Terraform 1.15.6 and OpenTofu 1.12.2
 
 IMPROVEMENTS:
