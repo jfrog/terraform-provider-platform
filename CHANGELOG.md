@@ -1,4 +1,4 @@
-## 2.2.11 (August 24, 2026).
+## 2.2.11 (August 24, 2026). Tested on Artifactory 7.161.17 with Terraform 1.15.9 and OpenTofu 1.12.6
 
 SECURITY:
 * CVE-2026-39821 (Critical, 9.6): Updated Go to 1.26.6 and golang.org/x/net to v0.58.0.
