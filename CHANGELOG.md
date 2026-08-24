@@ -1,4 +1,4 @@
-## 2.2.12 (August 20, 2026). Tested on Artifactory 7.161.16 with Terraform 1.15.9 and OpenTofu 1.12.6
+## 2.2.11 (August 24, 2026).
 
 SECURITY:
 * CVE-2026-39821 (Critical, 9.6): Updated Go to 1.26.6 and golang.org/x/net to v0.58.0.
@@ -30,21 +30,23 @@ SECURITY:
 * CVE-2026-39835 (Medium, 5.3): Remediated through golang.org/x/crypto v0.55.0.
 * CVE-2026-46598 (Medium, 5.3): Remediated through golang.org/x/crypto v0.55.0.
 
-## 2.2.11 (May 12, 2025). Tested on Artifactory 7.146.17 with Terraform 1.15.6 and OpenTofu 1.12.2
-
 IMPROVEMENTS:
-* resource/platform_oidc_configuration: Added `azure_app_id` attribute (Optional, only valid when `provider_type = Azure`). Issue: [#312](https://github.com/jfrog/terraform-provider-platform/issues/312)
-* resource/platform_oidc_configuration: Added `token_issuer` attribute (Optional/Computed). Only applicable when `provider_type` is `generic` or `Azure`; not allowed for `GitHub` or `GitHubEnterprise`. Added `RequiresReplace` to `provider_type` to prevent invalid in-place type changes.
-* resource/platform_workers_service: Added support for `SCHEDULED_EVENT` action type. Issue: [#197](https://github.com/jfrog/terraform-provider-platform/issues/197) PR: [#281](https://github.com/jfrog/terraform-provider-platform/pull/281)
-
-NOTES:
-* resource/platform_oidc_configuration: `provider_type` now requires resource replacement when changed. Existing resources with an unchanged `provider_type` are unaffected.
-* resource/platform_oidc_configuration: `enable_permissive_configuration` is now validated to only be set when `provider_type` is `GitHub` or `GitHubEnterprise`. Configurations that incorrectly set this attribute on `generic` or `Azure` provider types will fail validation and must remove it before applying.
+* resource/platform_oidc_configuration: Added `azure_app_id` attribute. Optional, and only applicable when `provider_type` is `Azure`. Issue: [#312](https://github.com/jfrog/terraform-provider-platform/issues/312)
+* resource/platform_oidc_configuration: Added `token_issuer` attribute. Optional, and only applicable when `provider_type` is `generic` or `Azure`; it is rejected for `GitHub` and `GitHubEnterprise`. Removing it from the configuration clears the value on the JFrog platform.
+* resource/platform_workers_service: Added support for the `SCHEDULED_EVENT` action type, which runs a worker on a schedule rather than in response to artifact events. Adds `filter_criteria.schedule` with `cron` and an optional `timezone`. Issue: [#197](https://github.com/jfrog/terraform-provider-platform/issues/197) PR: [#281](https://github.com/jfrog/terraform-provider-platform/pull/281)
 
 BUG FIXES:
-* resource/platform_lifecycle: Fixed `terraform plan` failing with `Lifecycle Not Found` when the project and its lifecycle are deleted via the UI. The provider now correctly removes the resource from Terraform state on HTTP 404, allowing Terraform to plan a recreation instead of erroring.
-* resource/platform_permission: Fixed incorrect example values for wildcard repository targets. Corrected `ALL-LOCAL` → `ANY LOCAL`, `ALL-REMOTE` → `ANY REMOTE`, and `ALL-DISTRIBUTION` → `ANY DISTRIBUTION` in docs and examples.
-* resource/platform_oidc_identity_mapping: Fixed `project_key` being silently ignored. The `project_key` value is now correctly sent as a `?project_key=` query parameter on create, read, update, and delete requests, and is populated back into state from the API response. Previously, all mappings were created as global regardless of `project_key`. Issue: [#311](https://github.com/jfrog/terraform-provider-platform/issues/311) PR: [#317](https://github.com/jfrog/terraform-provider-platform/pull/317)
+* resource/platform_oidc_configuration: `organization` and `enable_permissive_configuration` are now applied when `provider_type` is `GitHubEnterprise`. Both were previously ignored, so the configuration was left unrestricted on the JFrog platform no matter what was configured. After upgrading, the first apply sends the values already present in your configuration.
+* resource/platform_oidc_configuration: `enable_permissive_configuration = false` is now sent to the JFrog platform. It was previously omitted from the request, leaving the setting at the server default.
+* resource/platform_oidc_configuration: `organization` is now refreshed from the JFrog platform when `provider_type` is `GitHub`. Changes made outside Terraform are detected, and `terraform import` no longer reports a spurious `organization` change on the first plan.
+* resource/platform_lifecycle: `terraform plan` no longer fails with `Lifecycle Not Found` after a project and its lifecycle are deleted through the UI. The resource is now removed from state so Terraform can plan a recreation.
+* resource/platform_permission: Corrected the wildcard repository values in the documentation and examples. The supported values are `ANY LOCAL`, `ANY REMOTE`, and `ANY DISTRIBUTION`, not `ALL-LOCAL`, `ALL-REMOTE`, and `ALL-DISTRIBUTION`.
+* resource/platform_oidc_identity_mapping: Corrected the `project_key` documentation. The attribute is accepted but has no effect: the JFrog platform derives the project from `token_spec.scope`, and only a scope matching `applied-permissions/roles:<project_key>:<role>` produces a project-scoped Identity Mapping. Every other scope type produces a global Identity Mapping. Behaviour is unchanged from 2.2.10. Issue: [#311](https://github.com/jfrog/terraform-provider-platform/issues/311)
+
+NOTES:
+* resource/platform_oidc_configuration: Setting `enable_permissive_configuration` when `provider_type` is `generic` or `Azure` now emits a warning and the value is ignored, as the JFrog platform does not apply it to those provider types. Existing configurations continue to plan and apply unchanged.
+* resource/platform_oidc_configuration: On Access 7.176.x, `enable_permissive_configuration` is only applied when `provider_type` is `GitHub`. For `GitHubEnterprise` the platform reports the value as `true` regardless of what is configured, so the attribute has no effect there and is not refreshed into state.
+* resource/platform_oidc_configuration: `organization` cannot be read back when `provider_type` is `GitHubEnterprise`. The JFrog platform accepts the value but does not return it, so `terraform import` reports it as an addition on the first plan. Applying once reconciles the state.
 
 ## 2.2.10 (May 6, 2026). Tested on Artifactory 7.146.10 with Terraform 1.15.2 and OpenTofu 1.11.6
 

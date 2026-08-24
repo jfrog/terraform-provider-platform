@@ -52,6 +52,22 @@ var OIDCConfigurationNameValidators = []validator.String{
 	),
 }
 
+// apiProviderType maps a schema `provider_type` value onto the value the Access API expects.
+func apiProviderType(providerType string) string {
+	switch providerType {
+	case "generic":
+		return "Generic OpenID Connect"
+	case githubEnterpriseType:
+		return "GitHub Enterprise"
+	default:
+		return providerType
+	}
+}
+
+func isGitHubProviderType(providerType string) bool {
+	return providerType == gitHubProviderType || providerType == githubEnterpriseType
+}
+
 var _ resource.Resource = (*oidcConfigurationResource)(nil)
 
 type oidcConfigurationResource struct {
@@ -100,9 +116,6 @@ func (r *oidcConfigurationResource) Schema(ctx context.Context, req resource.Sch
 				Validators: []validator.String{
 					stringvalidator.OneOf([]string{"generic", gitHubProviderType, githubEnterpriseType, azureProviderType}...),
 				},
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
 				MarkdownDescription: fmt.Sprintf("Type of OIDC provider. Can be `generic`, `%s`, `%s` or `%s`.", gitHubProviderType, githubEnterpriseType, azureProviderType),
 			},
 			"audience": schema.StringAttribute{
@@ -131,11 +144,7 @@ func (r *oidcConfigurationResource) Schema(ctx context.Context, req resource.Sch
 				Description: "If set, this Identity Configuration will be available in the scope of the given project (editable by platform admin and project admin). If not set, this Identity Configuration will be global and only editable by platform admin. Once set, the projectKey cannot be changed.",
 			},
 			"token_issuer": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
+				Optional:    true,
 				Description: fmt.Sprintf("Token issuer URL of the identity provider. Not allowed when `provider_type` is `%s` or `%s`.", gitHubProviderType, githubEnterpriseType),
 			},
 			"azure_app_id": schema.StringAttribute{
@@ -150,7 +159,7 @@ func (r *oidcConfigurationResource) Schema(ctx context.Context, req resource.Sch
 			},
 			"enable_permissive_configuration": schema.BoolAttribute{
 				Optional:            true,
-				MarkdownDescription: fmt.Sprintf("Only settable when `provider_type` is %s or %s. When set, Allows authentication without any restrictions. For security best practices, it is recommended to add restrictions to limit access and enforce stricter controls. Use with caution, as this may grant broader access.", gitHubProviderType, githubEnterpriseType),
+				MarkdownDescription: fmt.Sprintf("Only applicable when `provider_type` is %s or %s; for any other `provider_type` the attribute is ignored and a warning is emitted. When set, Allows authentication without any restrictions. For security best practices, it is recommended to add restrictions to limit access and enforce stricter controls. Use with caution, as this may grant broader access.", gitHubProviderType, githubEnterpriseType),
 			},
 		},
 		MarkdownDescription: "Manage OIDC configuration in JFrog platform. See the JFrog [OIDC configuration documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-an-oidc-integration) for more information.",
@@ -240,12 +249,18 @@ func (r oidcConfigurationResource) ValidateConfig(ctx context.Context, req resou
 	}
 
 	if !data.EnablePermissiveConfiguration.IsNull() &&
+		!data.ProviderType.IsNull() && !data.ProviderType.IsUnknown() &&
 		data.ProviderType.ValueString() != gitHubProviderType &&
 		data.ProviderType.ValueString() != githubEnterpriseType {
-		resp.Diagnostics.AddAttributeError(
+		resp.Diagnostics.AddAttributeWarning(
 			path.Root("enable_permissive_configuration"),
-			"Invalid Attribute Configuration",
-			fmt.Sprintf("enable_permissive_configuration is only applicable when provider_type is set to '%s' or '%s'.", gitHubProviderType, githubEnterpriseType),
+			"Ignored Attribute Configuration",
+			fmt.Sprintf(
+				"enable_permissive_configuration is only applicable when provider_type is set to '%s' or '%s'. "+
+					"It is ignored for provider_type '%s' and is not sent to the JFrog platform. "+
+					"Remove the attribute from your configuration to silence this warning.",
+				gitHubProviderType, githubEnterpriseType, data.ProviderType.ValueString(),
+			),
 		)
 	}
 }
@@ -265,17 +280,19 @@ type oidcConfigurationResourceModel struct {
 }
 
 type oidcConfigurationAPIModel struct {
-	Name                          string `json:"name"`
-	Description                   string `json:"description,omitempty"`
-	IssuerURL                     string `json:"issuer_url"`
-	ProviderType                  string `json:"provider_type"`
-	Audience                      string `json:"audience,omitempty"`
-	Organization                  string `json:"organization"`
-	ProjectKey                    string `json:"project_key,omitempty"`
-	TokenIssuer                   string `json:"token_issuer,omitempty"`
-	AzureAppId                    string `json:"azure_app_id,omitempty"`
-	UseDefaultProxy               bool   `json:"use_default_proxy"`
-	EnablePermissiveConfiguration bool   `json:"enable_permissive_configuration,omitempty"`
+	Name            string `json:"name"`
+	Description     string `json:"description,omitempty"`
+	IssuerURL       string `json:"issuer_url"`
+	ProviderType    string `json:"provider_type"`
+	Audience        string `json:"audience,omitempty"`
+	Organization    string `json:"organization"`
+	ProjectKey      string `json:"project_key,omitempty"`
+	TokenIssuer     string `json:"token_issuer,omitempty"`
+	AzureAppId      string `json:"azure_app_id,omitempty"`
+	UseDefaultProxy bool   `json:"use_default_proxy"`
+	// Pointer so that an explicit `false` is sent to the API and only an unset
+	// attribute is omitted.
+	EnablePermissiveConfiguration *bool `json:"enable_permissive_configuration,omitempty"`
 }
 
 func (r *oidcConfigurationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -289,58 +306,40 @@ func (r *oidcConfigurationResource) Create(ctx context.Context, req resource.Cre
 	}
 
 	providerType := plan.ProviderType.ValueString()
-	if providerType == "generic" {
-		providerType = "Generic OpenID Connect"
-	} else if providerType == githubEnterpriseType {
-		providerType = "GitHub Enterprise"
-	}
 
 	oidcConfig := oidcConfigurationAPIModel{
 		Name:            plan.Name.ValueString(),
 		IssuerURL:       plan.IssuerURL.ValueString(),
-		ProviderType:    providerType,
+		ProviderType:    apiProviderType(providerType),
 		Audience:        plan.Audience.ValueString(),
 		Description:     plan.Description.ValueString(),
 		ProjectKey:      plan.ProjectKey.ValueString(),
-		TokenIssuer:     plan.TokenIssuer.ValueString(),
 		UseDefaultProxy: plan.UseDefaultProxy.ValueBool(),
 	}
 
-	if plan.ProviderType.ValueString() == azureProviderType {
+	// For GitHub provider types the API reuses the `token_issuer` field to carry the
+	// organization, so sending it here would override `organization`.
+	if !isGitHubProviderType(providerType) {
+		oidcConfig.TokenIssuer = plan.TokenIssuer.ValueString()
+	}
+
+	if providerType == azureProviderType {
 		oidcConfig.AzureAppId = plan.AzureAppId.ValueString()
 	}
 
 	// Access version 7.138.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
 	if providerType == gitHubProviderType {
 		if ok, err := util.CheckVersion(r.ProviderData.AccessVersion, AccessVersion); err == nil && ok {
-			oidcGithubConfig := oidcConfigurationAPIModel{
-				Organization:                  plan.Organization.ValueString(),
-				EnablePermissiveConfiguration: plan.EnablePermissiveConfiguration.ValueBool(),
-			}
-
-			oidcConfig.Organization = oidcGithubConfig.Organization
-			if plan.EnablePermissiveConfiguration.IsNull() {
-				// leave empty
-			} else {
-				oidcConfig.EnablePermissiveConfiguration = oidcGithubConfig.EnablePermissiveConfiguration
-			}
+			oidcConfig.Organization = plan.Organization.ValueString()
+			oidcConfig.EnablePermissiveConfiguration = plan.EnablePermissiveConfiguration.ValueBoolPointer()
 		}
 	}
 
 	// Access version 7.144.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHubEnterprise`
 	if providerType == githubEnterpriseType {
 		if ok, err := util.CheckVersion(r.ProviderData.AccessVersion, GithubEnterpriseAccessVersion); err == nil && ok {
-			oidcGithubConfig := oidcConfigurationAPIModel{
-				Organization:                  plan.Organization.ValueString(),
-				EnablePermissiveConfiguration: plan.EnablePermissiveConfiguration.ValueBool(),
-			}
-
-			oidcConfig.Organization = oidcGithubConfig.Organization
-			if plan.EnablePermissiveConfiguration.IsNull() {
-				// leave empty
-			} else {
-				oidcConfig.EnablePermissiveConfiguration = oidcGithubConfig.EnablePermissiveConfiguration
-			}
+			oidcConfig.Organization = plan.Organization.ValueString()
+			oidcConfig.EnablePermissiveConfiguration = plan.EnablePermissiveConfiguration.ValueBoolPointer()
 		}
 	}
 
@@ -355,13 +354,6 @@ func (r *oidcConfigurationResource) Create(ctx context.Context, req resource.Cre
 	if response.IsError() {
 		utilfw.UnableToCreateResourceError(resp, response.String())
 		return
-	}
-
-	// token_issuer is Computed — if the user didn't set it, the plan value is unknown.
-	// UseStateForUnknown only replaces unknown when prior state is non-null, so on first
-	// create state is null and the unknown survives. Null it here; Read will populate it.
-	if plan.TokenIssuer.IsUnknown() {
-		plan.TokenIssuer = types.StringNull()
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -415,50 +407,69 @@ func (r *oidcConfigurationResource) Read(ctx context.Context, req resource.ReadR
 		state.Audience = types.StringValue(oidcConfig.Audience)
 	}
 
-	// Access version 7.138.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
-	if oidcConfig.ProviderType == gitHubProviderType {
-		if ok, err := util.CheckVersion(r.ProviderData.AccessVersion, AccessVersion); err == nil && ok {
-			if len(oidcConfig.Organization) > 0 {
-				state.Organization = types.StringValue(oidcConfig.Organization)
-			}
-			if state.EnablePermissiveConfiguration.IsNull() {
-				// leave empty
-			} else {
-				state.EnablePermissiveConfiguration = types.BoolValue(oidcConfig.EnablePermissiveConfiguration)
-			}
-		}
-	}
-
-	// Access version 7.144.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHubEnterprise`
-	if oidcConfig.ProviderType == githubEnterpriseType {
-		if ok, err := util.CheckVersion(r.ProviderData.AccessVersion, GithubEnterpriseAccessVersion); err == nil && ok {
-			if len(oidcConfig.Organization) > 0 {
-				state.Organization = types.StringValue(oidcConfig.Organization)
-			}
-			if state.EnablePermissiveConfiguration.IsNull() {
-				// leave empty
-			} else {
-				state.EnablePermissiveConfiguration = types.BoolValue(oidcConfig.EnablePermissiveConfiguration)
-			}
-		}
-	}
-
-	if oidcConfig.ProviderType == "Generic OpenID Connect" {
+	// The API reports the provider type in its own vocabulary, so normalize it back to
+	// the schema vocabulary before using it for any provider-specific handling below.
+	switch oidcConfig.ProviderType {
+	case "Generic OpenID Connect":
 		state.ProviderType = types.StringValue("generic")
-	} else if oidcConfig.ProviderType == "GitHub Enterprise" {
+	case "GitHub Enterprise":
 		state.ProviderType = types.StringValue(githubEnterpriseType)
-	} else {
+	default:
 		state.ProviderType = types.StringValue(oidcConfig.ProviderType)
 	}
+	providerType := state.ProviderType.ValueString()
 
-	if len(oidcConfig.AzureAppId) > 0 {
-		state.AzureAppId = types.StringValue(oidcConfig.AzureAppId)
+	if isGitHubProviderType(providerType) {
+		// Access version 7.138.0 (GitHub) or 7.144.0 (GitHubEnterprise) or later is
+		// required for the `organization` attribute.
+		requiredVersion := AccessVersion
+		if providerType == githubEnterpriseType {
+			requiredVersion = GithubEnterpriseAccessVersion
+		}
+
+		if ok, err := util.CheckVersion(r.ProviderData.AccessVersion, requiredVersion); err == nil && ok {
+			// The API returns the organization in the `token_issuer` field and omits
+			// `organization` entirely, so fall back to it to keep the attribute
+			// refreshed on import and to detect out-of-band changes.
+			organization := oidcConfig.Organization
+			if len(organization) == 0 {
+				organization = oidcConfig.TokenIssuer
+			}
+			if len(organization) > 0 {
+				state.Organization = types.StringValue(organization)
+			}
+			// The platform only honours enable_permissive_configuration for GitHub. For
+			// GitHubEnterprise it always reports true, so refreshing it there would
+			// produce a diff that can never converge.
+			//
+			// Only refresh when the attribute is set in state, so that an unset
+			// Optional attribute is never populated from the API response.
+			if providerType == gitHubProviderType &&
+				!state.EnablePermissiveConfiguration.IsNull() &&
+				oidcConfig.EnablePermissiveConfiguration != nil {
+				state.EnablePermissiveConfiguration = types.BoolPointerValue(oidcConfig.EnablePermissiveConfiguration)
+			}
+		}
+	}
+
+	// Only refresh when the attribute is already tracked in state, so that a value
+	// configured outside Terraform is not planned for removal.
+	if !state.AzureAppId.IsNull() {
+		if len(oidcConfig.AzureAppId) > 0 {
+			state.AzureAppId = types.StringValue(oidcConfig.AzureAppId)
+		} else {
+			state.AzureAppId = types.StringNull()
+		}
 	}
 
 	state.UseDefaultProxy = types.BoolValue(oidcConfig.UseDefaultProxy)
 
-	if len(oidcConfig.TokenIssuer) > 0 {
+	// For GitHub provider types the `token_issuer` field carries the organization,
+	// which is not a valid value for this attribute.
+	if len(oidcConfig.TokenIssuer) > 0 && !isGitHubProviderType(providerType) {
 		state.TokenIssuer = types.StringValue(oidcConfig.TokenIssuer)
+	} else {
+		state.TokenIssuer = types.StringNull()
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -475,58 +486,40 @@ func (r *oidcConfigurationResource) Update(ctx context.Context, req resource.Upd
 	}
 
 	providerType := plan.ProviderType.ValueString()
-	if providerType == "generic" {
-		providerType = "Generic OpenID Connect"
-	} else if providerType == githubEnterpriseType {
-		providerType = "GitHub Enterprise"
-	}
 
 	oidcConfig := oidcConfigurationAPIModel{
 		Name:            plan.Name.ValueString(),
 		IssuerURL:       plan.IssuerURL.ValueString(),
-		ProviderType:    providerType,
+		ProviderType:    apiProviderType(providerType),
 		Audience:        plan.Audience.ValueString(),
 		Description:     plan.Description.ValueString(),
 		ProjectKey:      plan.ProjectKey.ValueString(),
-		TokenIssuer:     plan.TokenIssuer.ValueString(),
 		UseDefaultProxy: plan.UseDefaultProxy.ValueBool(),
 	}
 
-	if plan.ProviderType.ValueString() == azureProviderType {
+	// For GitHub provider types the API reuses the `token_issuer` field to carry the
+	// organization, so sending it here would override `organization`.
+	if !isGitHubProviderType(providerType) {
+		oidcConfig.TokenIssuer = plan.TokenIssuer.ValueString()
+	}
+
+	if providerType == azureProviderType {
 		oidcConfig.AzureAppId = plan.AzureAppId.ValueString()
 	}
 
 	// Access version 7.138.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHub`
 	if providerType == gitHubProviderType {
 		if ok, err := util.CheckVersion(r.ProviderData.AccessVersion, AccessVersion); err == nil && ok {
-			oidcGithubConfig := oidcConfigurationAPIModel{
-				Organization:                  plan.Organization.ValueString(),
-				EnablePermissiveConfiguration: plan.EnablePermissiveConfiguration.ValueBool(),
-			}
-			oidcConfig.Organization = oidcGithubConfig.Organization
-
-			if plan.EnablePermissiveConfiguration.IsNull() {
-				// leave empty
-			} else {
-				oidcConfig.EnablePermissiveConfiguration = oidcGithubConfig.EnablePermissiveConfiguration
-			}
+			oidcConfig.Organization = plan.Organization.ValueString()
+			oidcConfig.EnablePermissiveConfiguration = plan.EnablePermissiveConfiguration.ValueBoolPointer()
 		}
 	}
 
 	// Access version 7.144.0 or later is required for the `organization` attribute when `provider_type` is set to `GitHubEnterprise`
 	if providerType == githubEnterpriseType {
 		if ok, err := util.CheckVersion(r.ProviderData.AccessVersion, GithubEnterpriseAccessVersion); err == nil && ok {
-			oidcGithubConfig := oidcConfigurationAPIModel{
-				Organization:                  plan.Organization.ValueString(),
-				EnablePermissiveConfiguration: plan.EnablePermissiveConfiguration.ValueBool(),
-			}
-			oidcConfig.Organization = oidcGithubConfig.Organization
-
-			if plan.EnablePermissiveConfiguration.IsNull() {
-				// leave empty
-			} else {
-				oidcConfig.EnablePermissiveConfiguration = oidcGithubConfig.EnablePermissiveConfiguration
-			}
+			oidcConfig.Organization = plan.Organization.ValueString()
+			oidcConfig.EnablePermissiveConfiguration = plan.EnablePermissiveConfiguration.ValueBoolPointer()
 		}
 	}
 
@@ -542,10 +535,6 @@ func (r *oidcConfigurationResource) Update(ctx context.Context, req resource.Upd
 	if response.IsError() {
 		utilfw.UnableToUpdateResourceError(resp, response.String())
 		return
-	}
-
-	if plan.TokenIssuer.IsUnknown() {
-		plan.TokenIssuer = types.StringNull()
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
