@@ -342,6 +342,60 @@ func TestAccOIDCConfiguration_custom_provider_type_enable_premissive_configurati
 	})
 }
 
+// enable_permissive_configuration is not applicable to non-GitHub provider types, but
+// setting it must not block the plan — provider versions <= 2.2.10 accepted it, so
+// erroring out would lock existing workspaces on upgrade. It is ignored instead.
+func TestAccOIDCConfiguration_enable_permissive_configuration_ignored_for_non_github(t *testing.T) {
+	for _, testCase := range []struct {
+		providerType string
+		issuerURL    string
+	}{
+		{providerType: "generic", issuerURL: "https://tempurl.org"},
+		{providerType: "Azure", issuerURL: "https://sts.windows.net/your-tenant-id/"},
+	} {
+		t.Run(testCase.providerType, func(t *testing.T) {
+			_, fqrn, configName := testutil.MkNames("test-oidc-permissive-ignored", "platform_oidc_configuration")
+
+			temp := `
+	resource "platform_oidc_configuration" "{{ .name }}" {
+		name          = "{{ .name }}"
+		description   = "Test description"
+		issuer_url    = "{{ .issuerURL }}"
+		provider_type = "{{ .providerType }}"
+		audience      = "{{ .audience }}"
+		enable_permissive_configuration = false
+	}`
+
+			testData := map[string]string{
+				"name":         configName,
+				"issuerURL":    testCase.issuerURL,
+				"providerType": testCase.providerType,
+				"audience":     "test-audience",
+			}
+
+			config := util.ExecuteTemplate(configName, temp, testData)
+
+			resource.Test(t, resource.TestCase{
+				PreCheck:                 func() { testAccPreCheck(t) },
+				ProtoV6ProviderFactories: testAccProviders(),
+				Steps: []resource.TestStep{
+					{
+						Config: config,
+						Check: resource.ComposeTestCheckFunc(
+							resource.TestCheckResourceAttr(fqrn, "provider_type", testCase.providerType),
+							resource.TestCheckResourceAttr(fqrn, "enable_permissive_configuration", "false"),
+						),
+					},
+					{
+						Config:   config,
+						PlanOnly: true,
+					},
+				},
+			})
+		})
+	}
+}
+
 func TestAccOIDCConfiguration_github_enterprise(t *testing.T) {
 	_, fqrn, configName := testutil.MkNames("test-oidc-ge-configuration", "platform_oidc_configuration")
 

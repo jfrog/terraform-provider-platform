@@ -52,7 +52,6 @@ resource "platform_oidc_identity_mapping" "my-github-oidc-project-roles-identity
     expires_in = 7200
   }
 
-  project_key = "my-project"
 }
 
 resource "platform_oidc_identity_mapping" "my-github-oidc-username-pattern-identity-mapping" {
