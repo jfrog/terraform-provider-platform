@@ -164,9 +164,9 @@ Optional:
 - `any_federated` (Boolean) Trigger the worker for every federated repository, in addition to any repository listed in `repo_keys`.
 - `any_local` (Boolean) Trigger the worker for every local repository, in addition to any repository listed in `repo_keys`.
 - `any_remote` (Boolean) Trigger the worker for every remote repository, in addition to any repository listed in `repo_keys`.
-- `exclude_patterns` (Set of String) Define patterns to for all repository paths for repositories to be excluded in the repoKeys. Defines those repositories that do not trigger the worker.
-- `include_patterns` (Set of String) Define patterns to match all repository paths for repositories identified in the repoKeys. Defines those repositories that trigger the worker.
-- `repo_keys` (Set of String) Defines which repositories are used when an action event occurs to trigger the worker. Can be omitted when at least one of `any_local`, `any_remote`, or `any_federated` is set.
+- `exclude_patterns` (Set of String) Define patterns to for all repository paths for repositories to be excluded in the repoKeys. Defines those repositories that do not trigger the worker. An explicit empty set is transmitted and round-trips as an empty set; omit the attribute when no exclude patterns are intended.
+- `include_patterns` (Set of String) Define patterns to match all repository paths for repositories identified in the repoKeys. Defines those repositories that trigger the worker. An explicit empty set is transmitted and round-trips as an empty set; omit the attribute when no include patterns are intended.
+- `repo_keys` (Set of String) Defines which repositories are used when an action event occurs to trigger the worker. Can be omitted when at least one of `any_local`, `any_remote`, or `any_federated` is set. An explicit empty set (`repo_keys = []`) is transmitted to the platform and round-trips as an empty set; omit the attribute entirely when no repository list is intended.
 
 
 <a id="nestedatt--filter_criteria--schedule"></a>
