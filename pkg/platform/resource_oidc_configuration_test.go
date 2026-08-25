@@ -393,7 +393,7 @@ func TestAccOIDCConfiguration_enable_permissive_configuration_false_rejected_for
 				Steps: []resource.TestStep{
 					{
 						Config:      config,
-						ExpectError: regexp.MustCompile(`enable_permissive_configuration = false is only applicable when provider_type is set to 'GitHub'`),
+						ExpectError: regexp.MustCompile(`(?s)enable_permissive_configuration = false is only applicable when provider_type[\s\n]+is set to 'GitHub'`),
 					},
 				},
 			})
