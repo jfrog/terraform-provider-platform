@@ -1,52 +1,27 @@
-## 2.2.11 (August 24, 2026).
+## 2.2.11 (August 24, 2026). Tested on Artifactory 7.161.17 with Terraform 1.15.9 and OpenTofu 1.12.6
 
 SECURITY:
-* CVE-2026-39821 (Critical, 9.6): Updated Go to 1.26.6 and golang.org/x/net to v0.58.0.
-* CVE-2026-56865 (High, 8.4): Remediated through Go 1.26.6.
-* CVE-2026-56864 (High, 7.5): Remediated through Go 1.26.6.
-* CVE-2026-33818 (High, 7.5): Remediated through Go 1.26.6.
-* CVE-2026-46600 (High, 7.5): Remediated through Go 1.26.6.
-* CVE-2026-56862 (High, 7.5): Remediated through Go 1.26.6.
-* CVE-2026-56859 (High, 7.5): Remediated through Go 1.26.6.
-* CVE-2026-56860 (High, 7.5): Remediated through Go 1.26.6.
-* CVE-2026-56858 (Medium, 6.1): Remediated through Go 1.26.6.
-* CVE-2026-56853 (Medium, 5.3): Remediated through Go 1.26.6.
-* CVE-2026-25680 (Medium, 6.5): Remediated through golang.org/x/net v0.58.0.
-* CVE-2026-42506 (Medium, 6.1): Remediated through golang.org/x/net v0.58.0.
-* CVE-2026-42502 (Medium, 6.1): Remediated through golang.org/x/net v0.58.0.
-* CVE-2026-25681 (Medium, 6.1): Remediated through golang.org/x/net v0.58.0.
-* CVE-2026-27136 (Medium, 6.1): Remediated through golang.org/x/net v0.58.0.
-* CVE-2026-46595 (Critical, 10.0): Remediated through golang.org/x/crypto v0.55.0.
-* CVE-2026-42508 (Critical, 9.1): Remediated through golang.org/x/crypto v0.55.0.
-* CVE-2026-39834 (Critical, 9.1): Remediated through golang.org/x/crypto v0.55.0.
-* CVE-2026-39833 (Critical, 9.1): Remediated through golang.org/x/crypto v0.55.0.
-* CVE-2026-39832 (Critical, 9.1): Remediated through golang.org/x/crypto v0.55.0.
-* CVE-2026-39831 (Critical, 9.1): Remediated through golang.org/x/crypto v0.55.0.
-* CVE-2026-39830 (Critical, 9.1): Remediated through golang.org/x/crypto v0.55.0.
-* CVE-2026-39829 (High, 7.5): Remediated through golang.org/x/crypto v0.55.0.
-* CVE-2026-46597 (High, 7.5): Remediated through golang.org/x/crypto v0.55.0.
-* CVE-2026-39828 (Medium, 6.3): Remediated through golang.org/x/crypto v0.55.0.
-* CVE-2026-39827 (Medium, 6.5): Remediated through golang.org/x/crypto v0.55.0.
-* CVE-2026-39835 (Medium, 5.3): Remediated through golang.org/x/crypto v0.55.0.
-* CVE-2026-46598 (Medium, 5.3): Remediated through golang.org/x/crypto v0.55.0.
+* Updated Go to 1.26.6, remediating CVE-2026-39821 (Critical, 9.6), CVE-2026-56865, CVE-2026-56864, CVE-2026-33818, CVE-2026-46600, CVE-2026-56862, CVE-2026-56859, CVE-2026-56860, CVE-2026-56858, and CVE-2026-56853.
+* Updated `golang.org/x/crypto` to v0.55.0, remediating CVE-2026-46595 (Critical, 10.0), CVE-2026-42508, CVE-2026-39834, CVE-2026-39833, CVE-2026-39832, CVE-2026-39831, CVE-2026-39830, CVE-2026-39829, CVE-2026-46597, CVE-2026-39828, CVE-2026-39827, CVE-2026-39835, and CVE-2026-46598.
+* Updated `golang.org/x/net` to v0.58.0, remediating CVE-2026-25680, CVE-2026-42506, CVE-2026-42502, CVE-2026-25681, and CVE-2026-27136.
 
 IMPROVEMENTS:
-* resource/platform_oidc_configuration: Added `azure_app_id` attribute. Optional, and only applicable when `provider_type` is `Azure`. Issue: [#312](https://github.com/jfrog/terraform-provider-platform/issues/312)
-* resource/platform_oidc_configuration: Added `token_issuer` attribute. Optional, and only applicable when `provider_type` is `generic` or `Azure`; it is rejected for `GitHub` and `GitHubEnterprise`. Removing it from the configuration clears the value on the JFrog platform.
-* resource/platform_workers_service: Added support for the `SCHEDULED_EVENT` action type, which runs a worker on a schedule rather than in response to artifact events. Adds `filter_criteria.schedule` with `cron` and an optional `timezone`. Issue: [#197](https://github.com/jfrog/terraform-provider-platform/issues/197) PR: [#281](https://github.com/jfrog/terraform-provider-platform/pull/281)
+* resource/platform_oidc_configuration: Added `azure_app_id` (`Azure` only) and `token_issuer` (`generic` and `Azure` only) attributes. Issue: [#312](https://github.com/jfrog/terraform-provider-platform/issues/312)
+* resource/platform_workers_service: Added support for the `SCHEDULED_EVENT` action type via `filter_criteria.schedule`, with `cron` and an optional `timezone`. Issue: [#197](https://github.com/jfrog/terraform-provider-platform/issues/197) PR: [#281](https://github.com/jfrog/terraform-provider-platform/pull/281)
+* resource/platform_workers_service: Added `any_local`, `any_remote`, and `any_federated` to `filter_criteria.artifact_filter_criteria`, so a worker can target every local, remote, or federated repository without naming each one in `repo_keys`. Issue: [#226](https://github.com/jfrog/terraform-provider-platform/issues/226)
+* resource/platform_workers_service: `filter_criteria` is now validated against `action` at plan time (artifact actions require `artifact_filter_criteria`, `SCHEDULED_EVENT` requires `schedule`, `AFTER_BUILD_INFO_SAVE` rejects both, and exactly one of the two may be set). Violations are errors when `enabled` is `true` and warnings when it is `false`.
 
 BUG FIXES:
-* resource/platform_oidc_configuration: `organization` and `enable_permissive_configuration` are now applied when `provider_type` is `GitHubEnterprise`. Both were previously ignored, so the configuration was left unrestricted on the JFrog platform no matter what was configured. After upgrading, the first apply sends the values already present in your configuration.
-* resource/platform_oidc_configuration: `enable_permissive_configuration = false` is now sent to the JFrog platform. It was previously omitted from the request, leaving the setting at the server default.
-* resource/platform_oidc_configuration: `organization` is now refreshed from the JFrog platform when `provider_type` is `GitHub`. Changes made outside Terraform are detected, and `terraform import` no longer reports a spurious `organization` change on the first plan.
-* resource/platform_lifecycle: `terraform plan` no longer fails with `Lifecycle Not Found` after a project and its lifecycle are deleted through the UI. The resource is now removed from state so Terraform can plan a recreation.
-* resource/platform_permission: Corrected the wildcard repository values in the documentation and examples. The supported values are `ANY LOCAL`, `ANY REMOTE`, and `ANY DISTRIBUTION`, not `ALL-LOCAL`, `ALL-REMOTE`, and `ALL-DISTRIBUTION`.
-* resource/platform_oidc_identity_mapping: Corrected the `project_key` documentation. The attribute is accepted but has no effect: the JFrog platform derives the project from `token_spec.scope`, and only a scope matching `applied-permissions/roles:<project_key>:<role>` produces a project-scoped Identity Mapping. Every other scope type produces a global Identity Mapping. Behaviour is unchanged from 2.2.10. Issue: [#311](https://github.com/jfrog/terraform-provider-platform/issues/311)
+* resource/platform_oidc_configuration: `organization` and `enable_permissive_configuration` are now applied for `GitHubEnterprise`, `enable_permissive_configuration = false` is now sent rather than omitted, and `organization` is refreshed from the platform for `GitHub`. The first apply after upgrading sends the values already in your configuration.
+* resource/platform_lifecycle: `terraform plan` no longer fails with `Lifecycle Not Found` after a project and its lifecycle are deleted through the UI; the resource is removed from state so it can be recreated.
+* resource/platform_workers_service: `filter_criteria` and `filter_criteria.artifact_filter_criteria.repo_keys` are now optional, allowing actions that reject a filter (such as `AFTER_BUILD_INFO_SAVE`) and filters expressed only with `any_local`, `any_remote`, or `any_federated`.
+* resource/platform_workers_service: Create and update now read planned values instead of raw configuration, fixing `Provider produced inconsistent result after apply` when `filter_criteria.schedule` omitted `timezone`.
+* resource/platform_permission: Corrected the wildcard repository values in documentation and examples to `ANY LOCAL`, `ANY REMOTE`, and `ANY DISTRIBUTION`.
+* resource/platform_oidc_identity_mapping: Corrected the `project_key` documentation; the attribute is accepted but has no effect, as the platform derives the project from `token_spec.scope`. Behaviour is unchanged from 2.2.10. Issue: [#311](https://github.com/jfrog/terraform-provider-platform/issues/311)
 
 NOTES:
-* resource/platform_oidc_configuration: Setting `enable_permissive_configuration` when `provider_type` is `generic` or `Azure` now emits a warning and the value is ignored, as the JFrog platform does not apply it to those provider types. Existing configurations continue to plan and apply unchanged.
-* resource/platform_oidc_configuration: On Access 7.176.x, `enable_permissive_configuration` is only applied when `provider_type` is `GitHub`. For `GitHubEnterprise` the platform reports the value as `true` regardless of what is configured, so the attribute has no effect there and is not refreshed into state.
-* resource/platform_oidc_configuration: `organization` cannot be read back when `provider_type` is `GitHubEnterprise`. The JFrog platform accepts the value but does not return it, so `terraform import` reports it as an addition on the first plan. Applying once reconciles the state.
+* resource/platform_oidc_configuration: `enable_permissive_configuration` now emits a warning and is ignored for `generic` and `Azure`. On Access 7.176.x it is only applied for `GitHub`; `GitHubEnterprise` always reports `true`, so it is not refreshed into state.
+* resource/platform_oidc_configuration: `organization` cannot be read back for `GitHubEnterprise`, so `terraform import` reports it as an addition on the first plan. Applying once reconciles the state.
 
 ## 2.2.10 (May 6, 2026). Tested on Artifactory 7.146.10 with Terraform 1.15.2 and OpenTofu 1.11.6
 

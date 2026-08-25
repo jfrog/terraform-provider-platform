@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -54,7 +55,39 @@ var validActions = []string{
 	"SCHEDULED_EVENT",
 }
 
+// actionFilterRequirement is what `filter_criteria` an action expects.
+type actionFilterRequirement int
+
+const (
+	// filterRejected: the action does not accept a filter at all.
+	filterRejected actionFilterRequirement = iota
+	// filterArtifactRequired: the action needs `filter_criteria.artifact_filter_criteria`.
+	filterArtifactRequired
+	// filterScheduleRequired: the action needs `filter_criteria.schedule`.
+	filterScheduleRequired
+)
+
+// Derived from `GET /worker/api/v2/actions`, which reports a `mandatoryFilter` flag
+// and a `filterType` for every action: an action with no `mandatoryFilter` rejects a
+// filter, `FILTER_REPO` requires an artifact filter, and `SCHEDULE` requires a
+// schedule. The JFrog platform only enforces any of it while the worker is enabled.
+// Keep in sync with validActions.
+var actionFilterRequirements = map[string]actionFilterRequirement{
+	"BEFORE_DOWNLOAD":        filterArtifactRequired,
+	"AFTER_DOWNLOAD":         filterArtifactRequired,
+	"BEFORE_UPLOAD":          filterArtifactRequired,
+	"AFTER_CREATE":           filterArtifactRequired,
+	"AFTER_BUILD_INFO_SAVE":  filterRejected,
+	"AFTER_MOVE":             filterArtifactRequired,
+	"BEFORE_PROPERTY_CREATE": filterArtifactRequired,
+	"BEFORE_PROPERTY_DELETE": filterArtifactRequired,
+	"AFTER_PROPERTY_CREATE":  filterArtifactRequired,
+	"AFTER_PROPERTY_DELETE":  filterArtifactRequired,
+	"SCHEDULED_EVENT":        filterScheduleRequired,
+}
+
 var _ resource.Resource = (*workersServiceResource)(nil)
+var _ resource.ResourceWithValidateConfig = (*workersServiceResource)(nil)
 
 type workersServiceResource struct {
 	ProviderData util.ProviderMetadata
@@ -100,8 +133,8 @@ func (r *workersServiceResource) Schema(ctx context.Context, req resource.Schema
 				Validators:  []validator.String{stringvalidator.OneOf(validActions...)},
 			},
 			"filter_criteria": schema.SingleNestedAttribute{
-				Required:    true,
-				Description: "Defines the criteria for triggering the worker, either by specifying repositories and path patterns for artifact-based filtering or by defining a schedule using a Cron expression.",
+				Optional:    true,
+				Description: "Defines the criteria for triggering the worker, either by specifying repositories and path patterns for artifact-based filtering or by defining a schedule using a Cron expression. Most actions require a filter once the worker is enabled: every artifact action requires `artifact_filter_criteria`, and `SCHEDULED_EVENT` requires `schedule`. `AFTER_BUILD_INFO_SAVE` is the only action that rejects a filter, so omit this attribute for it.",
 				Attributes: map[string]schema.Attribute{
 					"artifact_filter_criteria": schema.SingleNestedAttribute{
 						Optional: true,
@@ -116,8 +149,27 @@ func (r *workersServiceResource) Schema(ctx context.Context, req resource.Schema
 						Attributes: map[string]schema.Attribute{
 							"repo_keys": schema.SetAttribute{
 								ElementType: types.StringType,
-								Required:    true,
-								Description: "Defines which repositories are used when an action event occurs to trigger the worker.",
+								Optional:    true,
+								Description: "Defines which repositories are used when an action event occurs to trigger the worker. Can be omitted when at least one of `any_local`, `any_remote`, or `any_federated` is set.",
+								Validators: []validator.Set{
+									setvalidator.AtLeastOneOf(
+										path.MatchRelative().AtParent().AtName("any_local"),
+										path.MatchRelative().AtParent().AtName("any_remote"),
+										path.MatchRelative().AtParent().AtName("any_federated"),
+									),
+								},
+							},
+							"any_local": schema.BoolAttribute{
+								Optional:    true,
+								Description: "Trigger the worker for every local repository, in addition to any repository listed in `repo_keys`.",
+							},
+							"any_remote": schema.BoolAttribute{
+								Optional:    true,
+								Description: "Trigger the worker for every remote repository, in addition to any repository listed in `repo_keys`.",
+							},
+							"any_federated": schema.BoolAttribute{
+								Optional:    true,
+								Description: "Trigger the worker for every federated repository, in addition to any repository listed in `repo_keys`.",
 							},
 							"include_patterns": schema.SetAttribute{
 								ElementType: types.StringType,
@@ -186,9 +238,12 @@ type filterCriteriaResourceModel struct {
 }
 
 type artifactFilterCriteriaResourceModel struct {
-	RepoKeys        types.Set `tfsdk:"repo_keys"`
-	IncludePatterns types.Set `tfsdk:"include_patterns"`
-	ExcludePatterns types.Set `tfsdk:"exclude_patterns"`
+	RepoKeys        types.Set  `tfsdk:"repo_keys"`
+	AnyLocal        types.Bool `tfsdk:"any_local"`
+	AnyRemote       types.Bool `tfsdk:"any_remote"`
+	AnyFederated    types.Bool `tfsdk:"any_federated"`
+	IncludePatterns types.Set  `tfsdk:"include_patterns"`
+	ExcludePatterns types.Set  `tfsdk:"exclude_patterns"`
 }
 
 type scheduleResourceModel struct {
@@ -197,8 +252,13 @@ type scheduleResourceModel struct {
 }
 
 func (r *workersServiceResourceModel) toAPIModel(ctx context.Context, apiModel *WorkersServiceAPIModel, secretKeysToBeRemoved []string) (ds diag.Diagnostics) {
+	// filter_criteria is optional: actions such as AFTER_BUILD_INFO_SAVE reject a
+	// filter entirely. When it is absent both nested attributes stay nil and the
+	// request carries an empty filterCriteria object, which the API accepts.
 	var filterCriteria filterCriteriaResourceModel
-	ds.Append(r.FilterCriteria.As(ctx, &filterCriteria, basetypes.ObjectAsOptions{})...)
+	ds.Append(r.FilterCriteria.As(ctx, &filterCriteria, basetypes.ObjectAsOptions{
+		UnhandledNullAsEmpty: true,
+	})...)
 	if ds.HasError() {
 		return
 	}
@@ -222,6 +282,9 @@ func (r *workersServiceResourceModel) toAPIModel(ctx context.Context, apiModel *
 
 		artifactFilterCriteriaObject = &artifactFilterCriteriaAPIModel{
 			RepoKeys:        repoKeys,
+			AnyLocal:        artifactFilterCriteria.AnyLocal.ValueBoolPointer(),
+			AnyRemote:       artifactFilterCriteria.AnyRemote.ValueBoolPointer(),
+			AnyFederated:    artifactFilterCriteria.AnyFederated.ValueBoolPointer(),
 			IncludePatterns: includePatterns,
 			ExcludePatterns: excludePatterns,
 		}
@@ -289,6 +352,9 @@ var filterCriteriaResourceModelAttributeTypes map[string]attr.Type = map[string]
 
 var artifactFilterCriteriaResourceModelAttributeTypes map[string]attr.Type = map[string]attr.Type{
 	"repo_keys":        types.SetType{ElemType: types.StringType},
+	"any_local":        types.BoolType,
+	"any_remote":       types.BoolType,
+	"any_federated":    types.BoolType,
 	"include_patterns": types.SetType{ElemType: types.StringType},
 	"exclude_patterns": types.SetType{ElemType: types.StringType},
 }
@@ -342,6 +408,9 @@ func (r *workersServiceResourceModel) fromAPIModel(ctx context.Context, apiModel
 
 		artifactFilterCriteriaValue := artifactFilterCriteriaResourceModel{
 			RepoKeys:        repoKeys,
+			AnyLocal:        types.BoolPointerValue(apiModel.FilterCriteria.ArtifactFilterCriteria.AnyLocal),
+			AnyRemote:       types.BoolPointerValue(apiModel.FilterCriteria.ArtifactFilterCriteria.AnyRemote),
+			AnyFederated:    types.BoolPointerValue(apiModel.FilterCriteria.ArtifactFilterCriteria.AnyFederated),
 			IncludePatterns: includePatterns,
 			ExcludePatterns: excludePatterns,
 		}
@@ -383,21 +452,29 @@ func (r *workersServiceResourceModel) fromAPIModel(ctx context.Context, apiModel
 		scheduleObject = schedule
 	}
 
-	filterCriteria, d := types.ObjectValue(
-		filterCriteriaResourceModelAttributeTypes,
-		map[string]attr.Value{
-			"artifact_filter_criteria": artifactFilterCriteriaObject,
-			"schedule":                 scheduleObject,
-		},
-	)
-	if d != nil {
-		ds = append(ds, d...)
-	}
-	if ds.HasError() {
-		return
+	// A worker created without a filter comes back as an empty filterCriteria object.
+	// Materialising it here would put an object holding two null attributes into state,
+	// which drifts forever against a configuration that omits filter_criteria entirely.
+	filterCriteriaObject := types.ObjectNull(filterCriteriaResourceModelAttributeTypes)
+	if apiModel.FilterCriteria.ArtifactFilterCriteria != nil || apiModel.FilterCriteria.Schedule != nil {
+		filterCriteria, d := types.ObjectValue(
+			filterCriteriaResourceModelAttributeTypes,
+			map[string]attr.Value{
+				"artifact_filter_criteria": artifactFilterCriteriaObject,
+				"schedule":                 scheduleObject,
+			},
+		)
+		if d != nil {
+			ds = append(ds, d...)
+		}
+		if ds.HasError() {
+			return
+		}
+
+		filterCriteriaObject = filterCriteria
 	}
 
-	r.FilterCriteria = filterCriteria
+	r.FilterCriteria = filterCriteriaObject
 	r.Enabled = types.BoolValue(apiModel.Enabled)
 
 	return
@@ -419,7 +496,10 @@ type filterCriteriaAPIModel struct {
 }
 
 type artifactFilterCriteriaAPIModel struct {
-	RepoKeys        []string `json:"repoKeys"`
+	RepoKeys        []string `json:"repoKeys,omitempty"`
+	AnyLocal        *bool    `json:"anyLocal,omitempty"`
+	AnyRemote       *bool    `json:"anyRemote,omitempty"`
+	AnyFederated    *bool    `json:"anyFederated,omitempty"`
 	IncludePatterns []string `json:"includePatterns,omitempty"`
 	ExcludePatterns []string `json:"excludePatterns,omitempty"`
 }
@@ -435,6 +515,104 @@ type secretAPIModel struct {
 	MarkedForRemoval bool   `json:"markedForRemoval,omitempty"`
 }
 
+// ValidateConfig reports at plan time the filter combinations the JFrog platform
+// rejects at apply time. The rules span `action`, `enabled` and `filter_criteria`
+// together, so they cannot be expressed as validators on a single attribute.
+func (r *workersServiceResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var data workersServiceResourceModel
+
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	resp.Diagnostics.Append(validateFilterCriteria(ctx, data.Action, data.Enabled, data.FilterCriteria)...)
+}
+
+// validateFilterCriteria holds the whole rule set, as a pure function of the three
+// attributes the rules depend on, so it can be exercised directly by a unit test
+// without a Terraform configuration, the acceptance harness, or a live platform. It
+// returns no diagnostics for a combination the JFrog platform accepts.
+func validateFilterCriteria(ctx context.Context, action types.String, enabled types.Bool, filterCriteria types.Object) diag.Diagnostics {
+	var ds diag.Diagnostics
+
+	// Every rule keys off the action, and `filter_criteria` as a whole has to be
+	// resolved before its nested attributes can be inspected. An interpolation that
+	// is still unknown leaves nothing to check until apply time.
+	if action.IsNull() || action.IsUnknown() || filterCriteria.IsUnknown() {
+		return ds
+	}
+
+	actionName := action.ValueString()
+	requirement, ok := actionFilterRequirements[actionName]
+	if !ok {
+		// stringvalidator.OneOf on `action` already reports an unrecognised value.
+		return ds
+	}
+
+	// The JFrog platform only enforces these rules for an enabled worker, so a hard
+	// error would refuse configurations it genuinely accepts. An unknown `enabled` is
+	// treated as enabled, that being the stricter reading of a value that may well
+	// resolve to true.
+	addDiagnostic := func(summary, message, disabledNote string) {
+		if enabled.IsNull() || enabled.IsUnknown() || enabled.ValueBool() {
+			ds.Append(diag.NewAttributeErrorDiagnostic(path.Root("filter_criteria"), summary, message))
+			return
+		}
+		ds.Append(diag.NewAttributeWarningDiagnostic(
+			path.Root("filter_criteria"),
+			summary,
+			fmt.Sprintf("%s %s", message, disabledNote),
+		))
+	}
+
+	filter := filterCriteriaResourceModel{
+		ArtifactFilterCriteria: types.ObjectNull(artifactFilterCriteriaResourceModelAttributeTypes),
+		Schedule:               types.ObjectNull(scheduleResourceModelAttributeTypes),
+	}
+	if !filterCriteria.IsNull() {
+		ds.Append(filterCriteria.As(ctx, &filter, basetypes.ObjectAsOptions{})...)
+		if ds.HasError() {
+			return ds
+		}
+	}
+
+	switch requirement {
+	case filterArtifactRequired:
+		if filter.ArtifactFilterCriteria.IsUnknown() {
+			return ds
+		}
+		if filter.ArtifactFilterCriteria.IsNull() {
+			addDiagnostic(
+				"Missing Attribute Configuration",
+				fmt.Sprintf("filter_criteria.artifact_filter_criteria must be configured when action is set to '%s'. This action is triggered by repository events, so the JFrog platform requires a repository filter and rejects an enabled worker without one with \"Filter must be set if worker is enabled\".", actionName),
+				"The JFrog platform does not enforce this while enabled is false, but it will reject the worker as soon as enabled is set to true.",
+			)
+		}
+	case filterScheduleRequired:
+		if filter.Schedule.IsUnknown() {
+			return ds
+		}
+		if filter.Schedule.IsNull() {
+			addDiagnostic(
+				"Missing Attribute Configuration",
+				fmt.Sprintf("filter_criteria.schedule must be configured when action is set to '%s'. This action is triggered by a Cron schedule rather than by repository events, so the JFrog platform requires a schedule and rejects an enabled worker without one with \"Filter must be set if worker is enabled\".", actionName),
+				"The JFrog platform does not enforce this while enabled is false, but it will reject the worker as soon as enabled is set to true.",
+			)
+		}
+	case filterRejected:
+		if !filterCriteria.IsNull() {
+			addDiagnostic(
+				"Invalid Attribute Configuration",
+				fmt.Sprintf("filter_criteria must be omitted when action is set to '%s'. This is the only worker action that does not accept a filter, and the JFrog platform rejects an enabled worker that supplies one with \"Filter must not be set for this action\".", actionName),
+				"The JFrog platform does not reject this while enabled is false: it accepts the worker and silently discards the filter. The refresh that follows the apply then reads filter_criteria back as null, so every subsequent terraform plan reports a difference that no apply can resolve. Remove filter_criteria from the configuration.",
+			)
+		}
+	}
+
+	return ds
+}
+
 func (r *workersServiceResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	// Prevent panic if the provider has not been configured.
 	if req.ProviderData == nil {
@@ -448,7 +626,7 @@ func (r *workersServiceResource) Create(ctx context.Context, req resource.Create
 
 	var plan workersServiceResourceModel
 
-	diags := req.Config.Get(ctx, &plan)
+	diags := req.Plan.Get(ctx, &plan)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -525,7 +703,7 @@ func (r *workersServiceResource) Update(ctx context.Context, req resource.Update
 	var plan workersServiceResourceModel
 	var state workersServiceResourceModel
 
-	resp.Diagnostics.Append(req.Config.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
