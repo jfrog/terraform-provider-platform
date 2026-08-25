@@ -16,6 +16,7 @@ Provides a JFrog [Workers Service](https://jfrog.com/help/r/jfrog-platform-admin
 ## Example Usage
 
 ```terraform
+# Worker triggered by BEFORE_DOWNLOAD
 resource "platform_workers_service" "my-workers-service" {
   key         = "my-workers-service"
   enabled     = true
@@ -34,7 +35,87 @@ EOT
 
   filter_criteria = {
     artifact_filter_criteria = {
-      repo_keys = ["my-repo-key"]
+      repo_keys        = ["my-repo-key"]
+      include_patterns = ["**/*.jar"]
+      exclude_patterns = ["**/*.txt"]
+    }
+  }
+
+  secrets = [
+    {
+      key   = "my-secret-key-1"
+      value = "my-secret-value-1"
+    },
+    {
+      key   = "my-secret-key-2"
+      value = "my-secret-value-2"
+    }
+  ]
+}
+
+# Worker triggered by every local and federated repository, without naming any
+# repository explicitly. At least one of `repo_keys`, `any_local`, `any_remote` or
+# `any_federated` must be set.
+resource "platform_workers_service" "my-any-repo-workers-service" {
+  key         = "my-any-repo-workers-service"
+  enabled     = true
+  description = "My workers service for every local and federated repository"
+  source_code = <<EOT
+export default async (context: PlatformContext, data: BeforeDownloadRequest): Promise<BeforeDownloadResponse> => {
+  console.log(await context.clients.platformHttp.get('/artifactory/api/system/ping'));
+  return {
+    status: 'DOWNLOAD_PROCEED',
+    message: 'proceed',
+  }
+}
+EOT
+  action      = "BEFORE_DOWNLOAD"
+
+  filter_criteria = {
+    artifact_filter_criteria = {
+      any_local     = true
+      any_federated = true
+    }
+  }
+}
+
+# Worker triggered by an action that does not accept a filter. `filter_criteria` must
+# be omitted entirely, otherwise the JFrog platform rejects the request.
+resource "platform_workers_service" "my-build-info-workers-service" {
+  key         = "my-build-info-workers-service"
+  enabled     = true
+  description = "My workers service triggered after build info is saved"
+  source_code = <<EOT
+export default async (context: PlatformContext, data: AfterBuildInfoSaveRequest): Promise<AfterBuildInfoSaveResponse> => {
+  console.log(await context.clients.platformHttp.get('/artifactory/api/system/ping'));
+  return {
+    message: 'proceed',
+  }
+}
+EOT
+  action      = "AFTER_BUILD_INFO_SAVE"
+}
+
+# Worker triggered by schedule
+resource "platform_workers_service" "my-scheduled-workers-service" {
+  key         = "my-scheduled-workers-service"
+  enabled     = true
+  description = "My Scheduled workers service"
+  source_code = <<EOT
+export default async (context: PlatformContext, data: BeforeDownloadRequest): Promise<BeforeDownloadResponse> => {
+  console.log(await context.clients.platformHttp.get('/artifactory/api/system/ping'));
+  console.log(await axios.get('https://my.external.resource'));
+  return {
+    message: 'Request is successful',
+  }
+}
+EOT
+  action      = "SCHEDULED_EVENT"
+
+  filter_criteria = {
+    schedule = {
+      cron     = "*/2 * * * *"
+      timezone = "UTC"
     }
   }
 
@@ -56,35 +137,48 @@ EOT
 
 ### Required
 
-- `action` (String) The worker action with which the worker is associated. Valid values: BEFORE_DOWNLOAD, AFTER_DOWNLOAD, BEFORE_UPLOAD, AFTER_CREATE, AFTER_BUILD_INFO_SAVE, AFTER_MOVE, BEFORE_PROPERTY_CREATE, BEFORE_PROPERTY_DELETE, AFTER_PROPERTY_CREATE, AFTER_PROPERTY_DELETE
+- `action` (String) The worker action with which the worker is associated. Valid values: BEFORE_DOWNLOAD, AFTER_DOWNLOAD, BEFORE_UPLOAD, AFTER_CREATE, AFTER_BUILD_INFO_SAVE, AFTER_MOVE, BEFORE_PROPERTY_CREATE, BEFORE_PROPERTY_DELETE, AFTER_PROPERTY_CREATE, AFTER_PROPERTY_DELETE, SCHEDULED_EVENT
 - `enabled` (Boolean) Whether to enable the worker immediately after creation.
-- `filter_criteria` (Attributes) Defines the repositories to be used or excluded. (see [below for nested schema](#nestedatt--filter_criteria))
 - `key` (String) The unique ID of the worker.
 - `source_code` (String) The worker script in TypeScript or JavaScript.
 
 ### Optional
 
 - `description` (String) Description of the worker.
+- `filter_criteria` (Attributes) Defines the criteria for triggering the worker, either by specifying repositories and path patterns for artifact-based filtering or by defining a schedule using a Cron expression. Most actions require a filter once the worker is enabled: every artifact action requires `artifact_filter_criteria`, and `SCHEDULED_EVENT` requires `schedule`. `AFTER_BUILD_INFO_SAVE` is the only action that rejects a filter, so omit this attribute for it. (see [below for nested schema](#nestedatt--filter_criteria))
 - `secrets` (Attributes Set) The secrets to be added to the worker. (see [below for nested schema](#nestedatt--secrets))
 
 <a id="nestedatt--filter_criteria"></a>
 ### Nested Schema for `filter_criteria`
 
-Required:
+Optional:
 
 - `artifact_filter_criteria` (Attributes) (see [below for nested schema](#nestedatt--filter_criteria--artifact_filter_criteria))
+- `schedule` (Attributes) (see [below for nested schema](#nestedatt--filter_criteria--schedule))
 
 <a id="nestedatt--filter_criteria--artifact_filter_criteria"></a>
 ### Nested Schema for `filter_criteria.artifact_filter_criteria`
 
+Optional:
+
+- `any_federated` (Boolean) Trigger the worker for every federated repository, in addition to any repository listed in `repo_keys`.
+- `any_local` (Boolean) Trigger the worker for every local repository, in addition to any repository listed in `repo_keys`.
+- `any_remote` (Boolean) Trigger the worker for every remote repository, in addition to any repository listed in `repo_keys`.
+- `exclude_patterns` (Set of String) Define patterns to for all repository paths for repositories to be excluded in the repoKeys. Defines those repositories that do not trigger the worker.
+- `include_patterns` (Set of String) Define patterns to match all repository paths for repositories identified in the repoKeys. Defines those repositories that trigger the worker.
+- `repo_keys` (Set of String) Defines which repositories are used when an action event occurs to trigger the worker. Can be omitted when at least one of `any_local`, `any_remote`, or `any_federated` is set.
+
+
+<a id="nestedatt--filter_criteria--schedule"></a>
+### Nested Schema for `filter_criteria.schedule`
+
 Required:
 
-- `repo_keys` (Set of String) Defines which repositories are used when an action event occurs to trigger the worker.
+- `cron` (String) Defines the Cron expression to schedule the worker.
 
 Optional:
 
-- `exclude_patterns` (Set of String) Define patterns to for all repository paths for repositories to be excluded in the repoKeys. Defines those repositories that do not trigger the worker.
-- `include_patterns` (Set of String) Define patterns to match all repository paths for repositories identified in the repoKeys. Defines those repositories that trigger the worker.
+- `timezone` (String) Define which timezone the schedule applies to if provided.
 
 
 
