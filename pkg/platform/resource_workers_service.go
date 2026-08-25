@@ -150,7 +150,7 @@ func (r *workersServiceResource) Schema(ctx context.Context, req resource.Schema
 							"repo_keys": schema.SetAttribute{
 								ElementType: types.StringType,
 								Optional:    true,
-								Description: "Defines which repositories are used when an action event occurs to trigger the worker. Can be omitted when at least one of `any_local`, `any_remote`, or `any_federated` is set.",
+								Description: "Defines which repositories are used when an action event occurs to trigger the worker. Can be omitted when at least one of `any_local`, `any_remote`, or `any_federated` is set. An explicit empty set (`repo_keys = []`) is transmitted to the platform and round-trips as an empty set; omit the attribute entirely when no repository list is intended.",
 								Validators: []validator.Set{
 									setvalidator.AtLeastOneOf(
 										path.MatchRelative().AtParent().AtName("any_local"),
@@ -174,12 +174,12 @@ func (r *workersServiceResource) Schema(ctx context.Context, req resource.Schema
 							"include_patterns": schema.SetAttribute{
 								ElementType: types.StringType,
 								Optional:    true,
-								Description: "Define patterns to match all repository paths for repositories identified in the repoKeys. Defines those repositories that trigger the worker.",
+								Description: "Define patterns to match all repository paths for repositories identified in the repoKeys. Defines those repositories that trigger the worker. An explicit empty set is transmitted and round-trips as an empty set; omit the attribute when no include patterns are intended.",
 							},
 							"exclude_patterns": schema.SetAttribute{
 								ElementType: types.StringType,
 								Optional:    true,
-								Description: "Define patterns to for all repository paths for repositories to be excluded in the repoKeys. Defines those repositories that do not trigger the worker.",
+								Description: "Define patterns to for all repository paths for repositories to be excluded in the repoKeys. Defines those repositories that do not trigger the worker. An explicit empty set is transmitted and round-trips as an empty set; omit the attribute when no exclude patterns are intended.",
 							},
 						},
 					},
@@ -271,14 +271,23 @@ func (r *workersServiceResourceModel) toAPIModel(ctx context.Context, apiModel *
 			return
 		}
 
-		var repoKeys []string
-		artifactFilterCriteria.RepoKeys.ElementsAs(ctx, &repoKeys, false)
+		repoKeys, d := stringSetToOptionalSlicePtr(ctx, artifactFilterCriteria.RepoKeys)
+		ds.Append(d...)
+		if ds.HasError() {
+			return
+		}
 
-		var includePatterns []string
-		artifactFilterCriteria.IncludePatterns.ElementsAs(ctx, &includePatterns, false)
+		includePatterns, d := stringSetToOptionalSlicePtr(ctx, artifactFilterCriteria.IncludePatterns)
+		ds.Append(d...)
+		if ds.HasError() {
+			return
+		}
 
-		var excludePatterns []string
-		artifactFilterCriteria.ExcludePatterns.ElementsAs(ctx, &excludePatterns, false)
+		excludePatterns, d := stringSetToOptionalSlicePtr(ctx, artifactFilterCriteria.ExcludePatterns)
+		ds.Append(d...)
+		if ds.HasError() {
+			return
+		}
 
 		artifactFilterCriteriaObject = &artifactFilterCriteriaAPIModel{
 			RepoKeys:        repoKeys,
@@ -372,36 +381,18 @@ func (r *workersServiceResourceModel) fromAPIModel(ctx context.Context, apiModel
 
 	artifactFilterCriteriaObject := types.ObjectNull(artifactFilterCriteriaResourceModelAttributeTypes)
 	if apiModel.FilterCriteria.ArtifactFilterCriteria != nil {
-		repoKeys, d := types.SetValueFrom(
-			ctx,
-			types.StringType,
-			apiModel.FilterCriteria.ArtifactFilterCriteria.RepoKeys,
-		)
-		if d != nil {
-			ds = append(ds, d...)
-		}
+		repoKeys, d := optionalSlicePtrToStringSet(ctx, apiModel.FilterCriteria.ArtifactFilterCriteria.RepoKeys)
+		ds.Append(d...)
 		if ds.HasError() {
 			return
 		}
-		includePatterns, d := types.SetValueFrom(
-			ctx,
-			types.StringType,
-			apiModel.FilterCriteria.ArtifactFilterCriteria.IncludePatterns,
-		)
-		if d != nil {
-			ds = append(ds, d...)
-		}
+		includePatterns, d := optionalSlicePtrToStringSet(ctx, apiModel.FilterCriteria.ArtifactFilterCriteria.IncludePatterns)
+		ds.Append(d...)
 		if ds.HasError() {
 			return
 		}
-		excludePatterns, d := types.SetValueFrom(
-			ctx,
-			types.StringType,
-			apiModel.FilterCriteria.ArtifactFilterCriteria.ExcludePatterns,
-		)
-		if d != nil {
-			ds = append(ds, d...)
-		}
+		excludePatterns, d := optionalSlicePtrToStringSet(ctx, apiModel.FilterCriteria.ArtifactFilterCriteria.ExcludePatterns)
+		ds.Append(d...)
 		if ds.HasError() {
 			return
 		}
@@ -496,12 +487,44 @@ type filterCriteriaAPIModel struct {
 }
 
 type artifactFilterCriteriaAPIModel struct {
-	RepoKeys        []string `json:"repoKeys,omitempty"`
-	AnyLocal        *bool    `json:"anyLocal,omitempty"`
-	AnyRemote       *bool    `json:"anyRemote,omitempty"`
-	AnyFederated    *bool    `json:"anyFederated,omitempty"`
-	IncludePatterns []string `json:"includePatterns,omitempty"`
-	ExcludePatterns []string `json:"excludePatterns,omitempty"`
+	RepoKeys        *[]string `json:"repoKeys,omitempty"`
+	AnyLocal        *bool     `json:"anyLocal,omitempty"`
+	AnyRemote       *bool     `json:"anyRemote,omitempty"`
+	AnyFederated    *bool     `json:"anyFederated,omitempty"`
+	IncludePatterns *[]string `json:"includePatterns,omitempty"`
+	ExcludePatterns *[]string `json:"excludePatterns,omitempty"`
+}
+
+// stringSetToOptionalSlicePtr maps a Terraform set to a JSON slice pointer. A null
+// set becomes a nil pointer so omitempty drops the key; an empty set becomes a
+// pointer to an empty slice so the API receives [] rather than an omitted key.
+func stringSetToOptionalSlicePtr(ctx context.Context, set types.Set) (*[]string, diag.Diagnostics) {
+	if set.IsNull() {
+		return nil, nil
+	}
+
+	var values []string
+	ds := set.ElementsAs(ctx, &values, false)
+	if ds.HasError() {
+		return nil, ds
+	}
+
+	return &values, ds
+}
+
+// optionalSlicePtrToStringSet maps a JSON slice pointer back to a Terraform set. A
+// nil pointer becomes a null set; a pointer to an empty slice becomes an empty set.
+func optionalSlicePtrToStringSet(ctx context.Context, values *[]string) (types.Set, diag.Diagnostics) {
+	if values == nil {
+		return types.SetNull(types.StringType), nil
+	}
+
+	set, d := types.SetValueFrom(ctx, types.StringType, *values)
+	if d != nil {
+		return types.SetNull(types.StringType), d
+	}
+
+	return set, nil
 }
 
 type scheduleAPIModel struct {

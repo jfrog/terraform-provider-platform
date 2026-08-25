@@ -131,7 +131,7 @@ func (r *oidcConfigurationResource) Schema(ctx context.Context, req resource.Sch
 				Validators: []validator.String{
 					stringvalidator.LengthAtLeast(1),
 				},
-				Description: fmt.Sprintf("This field is mandatory, when `provider_type` is %s or %s. Informational field that you can use to include details of the organization that uses the OIDC configuration.", gitHubProviderType, githubEnterpriseType),
+				MarkdownDescription: fmt.Sprintf("This field is mandatory when `provider_type` is `%[1]s` or `%[2]s`. It is only applicable to those provider types: the JFrog platform discards it for `generic` and `%[3]s`, so configuring it with any other `provider_type` is rejected at plan time. For `%[2]s`, the platform stores the value in `token_issuer`. Informational field that you can use to include details of the organization that uses the OIDC configuration. **Upgrade caveat (provider 2.2.6 through 2.2.10):** if you created a `%[2]s` configuration with `organization` set on those provider versions, upgrading to 2.2.11 with an unchanged configuration can leave the value in Terraform state but not on the platform — `terraform plan` and `terraform plan -refresh-only` report no changes. Perform a one-time remediation: change any attribute (for example `description`) and run `terraform apply`, run `terraform apply -replace='platform_oidc_configuration.<name>'`, change `organization` and apply, or `terraform import` the resource and apply. Leaving the configuration unchanged leaves a silent security gap: the platform does not enforce the organization restriction Terraform state asserts.", gitHubProviderType, githubEnterpriseType, azureProviderType),
 			},
 			"project_key": schema.StringAttribute{
 				Optional: true,
@@ -158,8 +158,14 @@ func (r *oidcConfigurationResource) Schema(ctx context.Context, req resource.Sch
 				MarkdownDescription: "This enables and disables the default proxy for OIDC integration. If enabled, the OIDC mechanism will utilize the default proxy for all OIDC requests. If disabled, the OIDC mechanism does not use any proxy for all OIDC requests. Before enabling this functionality you must configure the default proxy.",
 			},
 			"enable_permissive_configuration": schema.BoolAttribute{
-				Optional:            true,
-				MarkdownDescription: fmt.Sprintf("Only enforced when `provider_type` is `%s`. The JFrog platform ignores this attribute for `%s` (where it is sent but not applied), and for `generic` and `%s` (where it is not sent at all), reporting permissive authentication as enabled regardless; for those provider types a plan-time warning is emitted and Terraform state will not reflect the platform. When set, Allows authentication without any restrictions. For security best practices, it is recommended to add restrictions to limit access and enforce stricter controls. Use with caution, as this may grant broader access.", gitHubProviderType, githubEnterpriseType, azureProviderType),
+				Optional: true,
+				MarkdownDescription: fmt.Sprintf(
+					"Only `%[1]s` accepts `false`. Setting `enable_permissive_configuration = false` for `%[2]s`, `generic`, or `%[3]s` is rejected at plan time: "+
+						"the JFrog platform does not enforce restrictive (non-permissive) authentication for those provider types and keeps permissive authentication enabled regardless. "+
+						"When set to `true` or left unset, the attribute is accepted for all provider types but only enforced for `%[1]s`. "+
+						"When set, allows authentication without any restrictions. For security best practices, it is recommended to add restrictions to limit access and enforce stricter controls. Use with caution, as this may grant broader access.",
+					gitHubProviderType, githubEnterpriseType, azureProviderType,
+				),
 			},
 		},
 		MarkdownDescription: "Manage OIDC configuration in JFrog platform. See the JFrog [OIDC configuration documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-an-oidc-integration) for more information.",
@@ -230,7 +236,31 @@ func (r oidcConfigurationResource) ValidateConfig(ctx context.Context, req resou
 		}
 	}
 
-	if !data.AzureAppId.IsNull() && data.ProviderType.ValueString() != azureProviderType {
+	// The platform only stores `organization` for the GitHub provider types, where the API
+	// carries it in the `token_issuer` field. For every other provider type the value is
+	// discarded, so it would sit in state forever without the platform ever knowing about
+	// it. Validation is deferred while `provider_type` is unknown.
+	if !data.Organization.IsNull() &&
+		!data.ProviderType.IsNull() && !data.ProviderType.IsUnknown() &&
+		!isGitHubProviderType(data.ProviderType.ValueString()) {
+		resp.Diagnostics.AddAttributeError(
+			path.Root("organization"),
+			"Invalid Attribute Configuration",
+			fmt.Sprintf(
+				"organization is only applicable when provider_type is set to '%s' or '%s'. "+
+					"The JFrog platform discards it for provider_type '%s', so the value never takes effect. "+
+					"Remove the attribute from your configuration.",
+				gitHubProviderType, githubEnterpriseType, data.ProviderType.ValueString(),
+			),
+		)
+	}
+
+	// Validation is deferred while `provider_type` is unknown: an unknown value may still
+	// resolve to `Azure`, and rejecting it here fails the plan of a configuration that
+	// would apply cleanly.
+	if !data.AzureAppId.IsNull() &&
+		!data.ProviderType.IsNull() && !data.ProviderType.IsUnknown() &&
+		data.ProviderType.ValueString() != azureProviderType {
 		resp.Diagnostics.AddAttributeError(
 			path.Root("azure_app_id"),
 			"Invalid Attribute Configuration",
@@ -238,7 +268,11 @@ func (r oidcConfigurationResource) ValidateConfig(ctx context.Context, req resou
 		)
 	}
 
+	// Validation is deferred while `provider_type` is unknown. The guard is redundant
+	// today, because an unknown value matches neither GitHub provider type, but it keeps
+	// the deferral independent of the polarity of the comparison below.
 	if !data.TokenIssuer.IsNull() &&
+		!data.ProviderType.IsNull() && !data.ProviderType.IsUnknown() &&
 		(data.ProviderType.ValueString() == gitHubProviderType ||
 			data.ProviderType.ValueString() == githubEnterpriseType) {
 		resp.Diagnostics.AddAttributeError(
@@ -248,46 +282,26 @@ func (r oidcConfigurationResource) ValidateConfig(ctx context.Context, req resou
 		)
 	}
 
-	// The platform only enforces `enable_permissive_configuration` for `GitHub`. For
-	// `GitHubEnterprise` the value is sent but ignored, and for every other provider type
-	// it is not sent at all; either way the platform keeps reporting permissive
-	// authentication as enabled, so the configured value never takes effect and state
-	// cannot be refreshed to the truth without producing a diff that never converges.
+	// The platform only enforces `enable_permissive_configuration` for `GitHub`. Setting
+	// `false` for any other provider type creates a false sense of security: the platform
+	// keeps permissive authentication enabled regardless. Validation is deferred while
+	// `provider_type` is unknown.
 	if !data.EnablePermissiveConfiguration.IsNull() &&
+		!data.EnablePermissiveConfiguration.IsUnknown() &&
+		!data.EnablePermissiveConfiguration.ValueBool() &&
 		!data.ProviderType.IsNull() && !data.ProviderType.IsUnknown() &&
 		data.ProviderType.ValueString() != gitHubProviderType {
 		providerType := data.ProviderType.ValueString()
-
-		transmission := fmt.Sprintf("It is not sent to the JFrog platform for provider_type '%s'.", providerType)
-		if providerType == githubEnterpriseType {
-			transmission = "It is sent to the JFrog platform, which ignores it."
-		}
-
-		var detail string
-		if !data.EnablePermissiveConfiguration.IsUnknown() && !data.EnablePermissiveConfiguration.ValueBool() {
-			detail = fmt.Sprintf(
-				"Security impact: enable_permissive_configuration = false does NOT restrict authentication when provider_type is '%s'. "+
-					"The JFrog platform only enforces this attribute for provider_type '%s'. %s "+
-					"The platform keeps reporting enable_permissive_configuration as true, so authentication without restrictions remains permitted, "+
-					"Terraform state records false and does not reflect the platform, and the plan stays empty so no later run surfaces the difference. "+
-					"Restrict access through the claims and token_spec.scope of your platform_oidc_identity_mapping resources instead, "+
-					"or remove the attribute from your configuration to silence this warning.",
-				providerType, gitHubProviderType, transmission,
-			)
-		} else {
-			detail = fmt.Sprintf(
-				"enable_permissive_configuration is only enforced when provider_type is '%s'. %s "+
-					"The platform reports enable_permissive_configuration as true for provider_type '%s' regardless of the configured value, "+
-					"so Terraform state does not reflect the platform and the plan stays empty. "+
-					"Remove the attribute from your configuration to silence this warning.",
-				gitHubProviderType, transmission, providerType,
-			)
-		}
-
-		resp.Diagnostics.AddAttributeWarning(
+		resp.Diagnostics.AddAttributeError(
 			path.Root("enable_permissive_configuration"),
-			"Unenforced Attribute Configuration",
-			detail,
+			"Invalid Attribute Configuration",
+			fmt.Sprintf(
+				"enable_permissive_configuration = false is only applicable when provider_type is set to '%s'. "+
+					"The JFrog platform does not enforce restrictive (non-permissive) authentication for provider_type '%s': "+
+					"permissive authentication remains enabled regardless of this setting. "+
+					"Remove enable_permissive_configuration from your configuration, or set provider_type to '%s' if you need to restrict authentication.",
+				gitHubProviderType, providerType, gitHubProviderType,
+			),
 		)
 	}
 }
