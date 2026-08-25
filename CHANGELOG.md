@@ -1,4 +1,4 @@
-## 2.2.11 (August 24, 2026). Tested on Artifactory 7.161.17 with Terraform 1.15.9 and OpenTofu 1.12.6
+## 2.2.11 (August 24, 2026). Tested on Artifactory 7.161.19 with Terraform 1.15.9 and OpenTofu 1.12.6
 
 SECURITY:
 * Updated Go to 1.26.6, remediating CVE-2026-39821 (Critical, 9.6), CVE-2026-56865, CVE-2026-56864, CVE-2026-33818, CVE-2026-46600, CVE-2026-56862, CVE-2026-56859, CVE-2026-56860, CVE-2026-56858, and CVE-2026-56853.
@@ -12,7 +12,8 @@ IMPROVEMENTS:
 * resource/platform_workers_service: `filter_criteria` is now validated against `action` at plan time (artifact actions require `artifact_filter_criteria`, `SCHEDULED_EVENT` requires `schedule`, `AFTER_BUILD_INFO_SAVE` rejects both, and exactly one of the two may be set). Violations are errors when `enabled` is `true` and warnings when it is `false`.
 
 BUG FIXES:
-* resource/platform_oidc_configuration: `organization` and `enable_permissive_configuration` are now applied for `GitHubEnterprise`, `enable_permissive_configuration = false` is now sent rather than omitted, and `organization` is refreshed from the platform for `GitHub`. The first apply after upgrading sends the values already in your configuration.
+* resource/platform_oidc_configuration: `organization` is now applied for `GitHubEnterprise`, `enable_permissive_configuration = false` is now sent rather than omitted (the platform still ignores it for every `provider_type` other than `GitHub`), and `organization` is refreshed from the platform for `GitHub`. The first apply after upgrading sends the values already in your configuration.
+* resource/platform_oidc_configuration: `enable_permissive_configuration` now warns at plan time for every `provider_type` where the platform does not enforce it, including `GitHubEnterprise`, which previously received no diagnostic at all. When `false` is configured, the warning states that authentication is not restricted: verified on Access 7.176.15, `GET /access/api/v1/oidc/{name}` reports `"enable_permissive_configuration":true` for `GitHubEnterprise`, `generic` and `Azure` after a successful apply of `false`, while state records `false` and the plan stays empty.
 * resource/platform_lifecycle: `terraform plan` no longer fails with `Lifecycle Not Found` after a project and its lifecycle are deleted through the UI; the resource is removed from state so it can be recreated.
 * resource/platform_workers_service: `filter_criteria` and `filter_criteria.artifact_filter_criteria.repo_keys` are now optional, allowing actions that reject a filter (such as `AFTER_BUILD_INFO_SAVE`) and filters expressed only with `any_local`, `any_remote`, or `any_federated`.
 * resource/platform_workers_service: Create and update now read planned values instead of raw configuration, fixing `Provider produced inconsistent result after apply` when `filter_criteria.schedule` omitted `timezone`.
@@ -20,7 +21,7 @@ BUG FIXES:
 * resource/platform_oidc_identity_mapping: Corrected the `project_key` documentation; the attribute is accepted but has no effect, as the platform derives the project from `token_spec.scope`. Behaviour is unchanged from 2.2.10. Issue: [#311](https://github.com/jfrog/terraform-provider-platform/issues/311)
 
 NOTES:
-* resource/platform_oidc_configuration: `enable_permissive_configuration` now emits a warning and is ignored for `generic` and `Azure`. On Access 7.176.x it is only applied for `GitHub`; `GitHubEnterprise` always reports `true`, so it is not refreshed into state.
+* resource/platform_oidc_configuration: `enable_permissive_configuration` is only enforced for `GitHub`. On Access 7.176.x, `GitHubEnterprise` is sent the value but ignores it, and for `generic` and `Azure` the value is not sent at all; all three report `true` regardless, so the attribute is not refreshed into state and a plan-time warning is emitted instead.
 * resource/platform_oidc_configuration: `organization` cannot be read back for `GitHubEnterprise`, so `terraform import` reports it as an addition on the first plan. Applying once reconciles the state.
 
 ## 2.2.10 (May 6, 2026). Tested on Artifactory 7.146.10 with Terraform 1.15.2 and OpenTofu 1.11.6

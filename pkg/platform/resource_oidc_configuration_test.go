@@ -15,13 +15,18 @@
 package platform_test
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"strings"
 	"testing"
 
+	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/jfrog/terraform-provider-artifactory/v12/pkg/acctest"
+	"github.com/jfrog/terraform-provider-platform/v2/pkg/platform"
 	"github.com/jfrog/terraform-provider-shared/testutil"
 	"github.com/jfrog/terraform-provider-shared/util"
 )
@@ -642,4 +647,201 @@ resource "platform_oidc_configuration" "{{ .name }}" {
 			},
 		},
 	})
+}
+
+// TestOIDCConfigurationValidateConfig_enable_permissive_configuration exercises
+// ValidateConfig directly because the plan-time diagnostic under test is a warning, and
+// the acceptance test harness (terraform-plugin-testing v1.15.0) can only match errors.
+func TestOIDCConfigurationValidateConfig_enable_permissive_configuration(t *testing.T) {
+	ctx := context.Background()
+
+	const (
+		gitHubProviderType   = "GitHub"
+		githubEnterpriseType = "GitHubEnterprise"
+		azureProviderType    = "Azure"
+		gitHubProviderURL    = "https://token.actions.githubusercontent.com"
+	)
+
+	r, ok := platform.NewOIDCConfigurationResource().(interface {
+		fwresource.ResourceWithConfigure
+		fwresource.ResourceWithValidateConfig
+	})
+	if !ok {
+		t.Fatal("expected the OIDC configuration resource to implement Configure and ValidateConfig")
+	}
+
+	configureResp := fwresource.ConfigureResponse{}
+	r.Configure(ctx, fwresource.ConfigureRequest{
+		ProviderData: util.ProviderMetadata{AccessVersion: "7.176.15"},
+	}, &configureResp)
+	if configureResp.Diagnostics.HasError() {
+		t.Fatalf("expected the resource to configure cleanly, got: %v", configureResp.Diagnostics.Errors())
+	}
+
+	schemaResp := fwresource.SchemaResponse{}
+	r.Schema(ctx, fwresource.SchemaRequest{}, &schemaResp)
+
+	objectType, ok := schemaResp.Schema.Type().TerraformType(ctx).(tftypes.Object)
+	if !ok {
+		t.Fatalf("expected schema to be an object type, got %T", schemaResp.Schema.Type().TerraformType(ctx))
+	}
+
+	testCases := []struct {
+		name                          string
+		providerType                  string
+		enablePermissiveConfiguration interface{}
+		expectWarning                 bool
+		expectedDetailSubstrings      []string
+	}{
+		{
+			name:                          "GitHub honours the attribute so false is not warned about",
+			providerType:                  gitHubProviderType,
+			enablePermissiveConfiguration: false,
+		},
+		{
+			name:                          "GitHub honours the attribute so true is not warned about",
+			providerType:                  gitHubProviderType,
+			enablePermissiveConfiguration: true,
+		},
+		{
+			name:                          "GitHubEnterprise false warns that authentication is not restricted",
+			providerType:                  githubEnterpriseType,
+			enablePermissiveConfiguration: false,
+			expectWarning:                 true,
+			expectedDetailSubstrings: []string{
+				"Security impact",
+				"does NOT restrict authentication when provider_type is 'GitHubEnterprise'",
+				"only enforces this attribute for provider_type 'GitHub'",
+				"It is sent to the JFrog platform, which ignores it.",
+				"keeps reporting enable_permissive_configuration as true",
+				"Terraform state records false and does not reflect the platform",
+			},
+		},
+		{
+			name:                          "GitHubEnterprise true warns that the value is not enforced",
+			providerType:                  githubEnterpriseType,
+			enablePermissiveConfiguration: true,
+			expectWarning:                 true,
+			expectedDetailSubstrings: []string{
+				"only enforced when provider_type is 'GitHub'",
+				"It is sent to the JFrog platform, which ignores it.",
+				"regardless of the configured value",
+			},
+		},
+		{
+			name:                          "generic false warns that authentication is not restricted",
+			providerType:                  "generic",
+			enablePermissiveConfiguration: false,
+			expectWarning:                 true,
+			expectedDetailSubstrings: []string{
+				"Security impact",
+				"does NOT restrict authentication when provider_type is 'generic'",
+				"It is not sent to the JFrog platform for provider_type 'generic'.",
+			},
+		},
+		{
+			name:                          "generic true warns that the value is not enforced",
+			providerType:                  "generic",
+			enablePermissiveConfiguration: true,
+			expectWarning:                 true,
+			expectedDetailSubstrings: []string{
+				"only enforced when provider_type is 'GitHub'",
+				"It is not sent to the JFrog platform for provider_type 'generic'.",
+			},
+		},
+		{
+			name:                          "Azure false warns that authentication is not restricted",
+			providerType:                  azureProviderType,
+			enablePermissiveConfiguration: false,
+			expectWarning:                 true,
+			expectedDetailSubstrings: []string{
+				"Security impact",
+				"does NOT restrict authentication when provider_type is 'Azure'",
+				"It is not sent to the JFrog platform for provider_type 'Azure'.",
+			},
+		},
+		{
+			name:                          "Azure true warns that the value is not enforced",
+			providerType:                  azureProviderType,
+			enablePermissiveConfiguration: true,
+			expectWarning:                 true,
+			expectedDetailSubstrings: []string{
+				"only enforced when provider_type is 'GitHub'",
+				"It is not sent to the JFrog platform for provider_type 'Azure'.",
+			},
+		},
+		{
+			name:                          "an unknown value still warns, without claiming which value was configured",
+			providerType:                  "generic",
+			enablePermissiveConfiguration: tftypes.UnknownValue,
+			expectWarning:                 true,
+			expectedDetailSubstrings: []string{
+				"only enforced when provider_type is 'GitHub'",
+				"regardless of the configured value",
+			},
+		},
+		{
+			name:                          "an unset attribute is never warned about",
+			providerType:                  "generic",
+			enablePermissiveConfiguration: nil,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			attributeValues := map[string]tftypes.Value{}
+			for attributeName, attributeType := range objectType.AttributeTypes {
+				attributeValues[attributeName] = tftypes.NewValue(attributeType, nil)
+			}
+
+			issuerURL := "https://tempurl.org/oidc"
+			if testCase.providerType == gitHubProviderType || testCase.providerType == githubEnterpriseType {
+				issuerURL = gitHubProviderURL
+				attributeValues["organization"] = tftypes.NewValue(tftypes.String, "test-org")
+			}
+
+			attributeValues["name"] = tftypes.NewValue(tftypes.String, "test-oidc-configuration")
+			attributeValues["issuer_url"] = tftypes.NewValue(tftypes.String, issuerURL)
+			attributeValues["provider_type"] = tftypes.NewValue(tftypes.String, testCase.providerType)
+			attributeValues["use_default_proxy"] = tftypes.NewValue(tftypes.Bool, false)
+			attributeValues["enable_permissive_configuration"] = tftypes.NewValue(tftypes.Bool, testCase.enablePermissiveConfiguration)
+
+			req := fwresource.ValidateConfigRequest{
+				Config: tfsdk.Config{
+					Raw:    tftypes.NewValue(objectType, attributeValues),
+					Schema: schemaResp.Schema,
+				},
+			}
+			resp := fwresource.ValidateConfigResponse{}
+
+			r.ValidateConfig(ctx, req, &resp)
+
+			if resp.Diagnostics.HasError() {
+				t.Fatalf("expected no errors, got: %v", resp.Diagnostics.Errors())
+			}
+
+			warnings := resp.Diagnostics.Warnings()
+
+			if !testCase.expectWarning {
+				if len(warnings) != 0 {
+					t.Fatalf("expected no warnings, got: %v", warnings)
+				}
+				return
+			}
+
+			if len(warnings) != 1 {
+				t.Fatalf("expected 1 warning, got %d: %v", len(warnings), warnings)
+			}
+
+			if warnings[0].Summary() != "Unenforced Attribute Configuration" {
+				t.Errorf("unexpected warning summary: %q", warnings[0].Summary())
+			}
+
+			for _, substring := range testCase.expectedDetailSubstrings {
+				if !strings.Contains(warnings[0].Detail(), substring) {
+					t.Errorf("expected warning detail to contain %q, got: %s", substring, warnings[0].Detail())
+				}
+			}
+		})
+	}
 }
