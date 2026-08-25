@@ -1,4 +1,4 @@
-## 2.2.11 (August 24, 2026). Tested on Artifactory 7.161.17 with Terraform 1.15.9 and OpenTofu 1.12.6
+## 2.2.11 (August 24, 2026). Tested on Artifactory 7.161.19 with Terraform 1.15.9 and OpenTofu 1.12.6
 
 SECURITY:
 * Updated Go to 1.26.6, remediating CVE-2026-39821 (Critical, 9.6), CVE-2026-56865, CVE-2026-56864, CVE-2026-33818, CVE-2026-46600, CVE-2026-56862, CVE-2026-56859, CVE-2026-56860, CVE-2026-56858, and CVE-2026-56853.
