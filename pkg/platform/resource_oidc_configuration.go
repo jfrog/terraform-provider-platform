@@ -159,7 +159,7 @@ func (r *oidcConfigurationResource) Schema(ctx context.Context, req resource.Sch
 			},
 			"enable_permissive_configuration": schema.BoolAttribute{
 				Optional:            true,
-				MarkdownDescription: fmt.Sprintf("Only applicable when `provider_type` is %s or %s; for any other `provider_type` the attribute is ignored and a warning is emitted. When set, Allows authentication without any restrictions. For security best practices, it is recommended to add restrictions to limit access and enforce stricter controls. Use with caution, as this may grant broader access.", gitHubProviderType, githubEnterpriseType),
+				MarkdownDescription: fmt.Sprintf("Only enforced when `provider_type` is `%s`. The JFrog platform ignores this attribute for `%s` (where it is sent but not applied), and for `generic` and `%s` (where it is not sent at all), reporting permissive authentication as enabled regardless; for those provider types a plan-time warning is emitted and Terraform state will not reflect the platform. When set, Allows authentication without any restrictions. For security best practices, it is recommended to add restrictions to limit access and enforce stricter controls. Use with caution, as this may grant broader access.", gitHubProviderType, githubEnterpriseType, azureProviderType),
 			},
 		},
 		MarkdownDescription: "Manage OIDC configuration in JFrog platform. See the JFrog [OIDC configuration documentation](https://jfrog.com/help/r/jfrog-platform-administration-documentation/configure-an-oidc-integration) for more information.",
@@ -248,19 +248,46 @@ func (r oidcConfigurationResource) ValidateConfig(ctx context.Context, req resou
 		)
 	}
 
+	// The platform only enforces `enable_permissive_configuration` for `GitHub`. For
+	// `GitHubEnterprise` the value is sent but ignored, and for every other provider type
+	// it is not sent at all; either way the platform keeps reporting permissive
+	// authentication as enabled, so the configured value never takes effect and state
+	// cannot be refreshed to the truth without producing a diff that never converges.
 	if !data.EnablePermissiveConfiguration.IsNull() &&
 		!data.ProviderType.IsNull() && !data.ProviderType.IsUnknown() &&
-		data.ProviderType.ValueString() != gitHubProviderType &&
-		data.ProviderType.ValueString() != githubEnterpriseType {
+		data.ProviderType.ValueString() != gitHubProviderType {
+		providerType := data.ProviderType.ValueString()
+
+		transmission := fmt.Sprintf("It is not sent to the JFrog platform for provider_type '%s'.", providerType)
+		if providerType == githubEnterpriseType {
+			transmission = "It is sent to the JFrog platform, which ignores it."
+		}
+
+		var detail string
+		if !data.EnablePermissiveConfiguration.IsUnknown() && !data.EnablePermissiveConfiguration.ValueBool() {
+			detail = fmt.Sprintf(
+				"Security impact: enable_permissive_configuration = false does NOT restrict authentication when provider_type is '%s'. "+
+					"The JFrog platform only enforces this attribute for provider_type '%s'. %s "+
+					"The platform keeps reporting enable_permissive_configuration as true, so authentication without restrictions remains permitted, "+
+					"Terraform state records false and does not reflect the platform, and the plan stays empty so no later run surfaces the difference. "+
+					"Restrict access through the claims and token_spec.scope of your platform_oidc_identity_mapping resources instead, "+
+					"or remove the attribute from your configuration to silence this warning.",
+				providerType, gitHubProviderType, transmission,
+			)
+		} else {
+			detail = fmt.Sprintf(
+				"enable_permissive_configuration is only enforced when provider_type is '%s'. %s "+
+					"The platform reports enable_permissive_configuration as true for provider_type '%s' regardless of the configured value, "+
+					"so Terraform state does not reflect the platform and the plan stays empty. "+
+					"Remove the attribute from your configuration to silence this warning.",
+				gitHubProviderType, transmission, providerType,
+			)
+		}
+
 		resp.Diagnostics.AddAttributeWarning(
 			path.Root("enable_permissive_configuration"),
-			"Ignored Attribute Configuration",
-			fmt.Sprintf(
-				"enable_permissive_configuration is only applicable when provider_type is set to '%s' or '%s'. "+
-					"It is ignored for provider_type '%s' and is not sent to the JFrog platform. "+
-					"Remove the attribute from your configuration to silence this warning.",
-				gitHubProviderType, githubEnterpriseType, data.ProviderType.ValueString(),
-			),
+			"Unenforced Attribute Configuration",
+			detail,
 		)
 	}
 }
