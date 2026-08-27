@@ -1,3 +1,9 @@
+## Unreleased
+
+IMPROVEMENTS:
+* resource/platform_workers_service: Added `GENERIC_EVENT` as a valid action for HTTP-triggered workers. Workers with this action do not accept a `filter_criteria` block. PR: [#326](https://github.com/jfrog/terraform-provider-platform/pull/326)
+* resource/platform_workers_service: Added `shared` boolean attribute (optional, computed). When `true`, allows other users to execute the worker (UI: 'Allow other users to execute the worker'). PR: [#326](https://github.com/jfrog/terraform-provider-platform/pull/326)
+
 ## 2.2.11 (August 24, 2026). Tested on Artifactory 7.161.19 with Terraform 1.15.9 and OpenTofu 1.12.6
 
 SECURITY:
