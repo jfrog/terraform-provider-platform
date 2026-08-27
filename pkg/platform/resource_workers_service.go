@@ -28,6 +28,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -53,6 +54,7 @@ var validActions = []string{
 	"AFTER_PROPERTY_CREATE",
 	"AFTER_PROPERTY_DELETE",
 	"SCHEDULED_EVENT",
+	"GENERIC_EVENT",
 }
 
 // actionFilterRequirement is what `filter_criteria` an action expects.
@@ -84,6 +86,7 @@ var actionFilterRequirements = map[string]actionFilterRequirement{
 	"AFTER_PROPERTY_CREATE":  filterArtifactRequired,
 	"AFTER_PROPERTY_DELETE":  filterArtifactRequired,
 	"SCHEDULED_EVENT":        filterScheduleRequired,
+	"GENERIC_EVENT":          filterRejected,
 }
 
 var _ resource.Resource = (*workersServiceResource)(nil)
@@ -134,7 +137,7 @@ func (r *workersServiceResource) Schema(ctx context.Context, req resource.Schema
 			},
 			"filter_criteria": schema.SingleNestedAttribute{
 				Optional:    true,
-				Description: "Defines the criteria for triggering the worker, either by specifying repositories and path patterns for artifact-based filtering or by defining a schedule using a Cron expression. Most actions require a filter once the worker is enabled: every artifact action requires `artifact_filter_criteria`, and `SCHEDULED_EVENT` requires `schedule`. `AFTER_BUILD_INFO_SAVE` is the only action that rejects a filter, so omit this attribute for it.",
+				Description: "Defines the criteria for triggering the worker, either by specifying repositories and path patterns for artifact-based filtering or by defining a schedule using a Cron expression. Most actions require a filter once the worker is enabled: every artifact action requires `artifact_filter_criteria`, and `SCHEDULED_EVENT` requires `schedule`. `AFTER_BUILD_INFO_SAVE` and `GENERIC_EVENT` reject a filter, so omit this attribute for them.",
 				Attributes: map[string]schema.Attribute{
 					"artifact_filter_criteria": schema.SingleNestedAttribute{
 						Optional: true,
@@ -200,6 +203,14 @@ func (r *workersServiceResource) Schema(ctx context.Context, req resource.Schema
 					},
 				},
 			},
+			"shared": schema.BoolAttribute{
+				Optional:    true,
+				Computed:    true,
+				Description: "When true, allows other users to execute the worker (UI: 'Allow other users to execute the worker').",
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"secrets": schema.SetNestedAttribute{
 				Optional:    true,
 				Description: "The secrets to be added to the worker.",
@@ -229,6 +240,7 @@ type workersServiceResourceModel struct {
 	Action         types.String `tfsdk:"action"`
 	FilterCriteria types.Object `tfsdk:"filter_criteria"`
 	Enabled        types.Bool   `tfsdk:"enabled"`
+	Shared         types.Bool   `tfsdk:"shared"`
 	Secrets        types.Set    `tfsdk:"secrets"`
 }
 
@@ -344,6 +356,7 @@ func (r *workersServiceResourceModel) toAPIModel(ctx context.Context, apiModel *
 			Schedule:               scheduleObject,
 		},
 		Enabled: r.Enabled.ValueBool(),
+		Shared:  r.Shared.ValueBool(),
 		Secrets: secrets,
 	}
 
@@ -467,6 +480,7 @@ func (r *workersServiceResourceModel) fromAPIModel(ctx context.Context, apiModel
 
 	r.FilterCriteria = filterCriteriaObject
 	r.Enabled = types.BoolValue(apiModel.Enabled)
+	r.Shared = types.BoolValue(apiModel.Shared)
 
 	return
 }
@@ -478,6 +492,7 @@ type WorkersServiceAPIModel struct {
 	Action         string                 `json:"action"`
 	FilterCriteria filterCriteriaAPIModel `json:"filterCriteria"`
 	Enabled        bool                   `json:"enabled"`
+	Shared         bool                   `json:"shared"`
 	Secrets        []secretAPIModel       `json:"secrets"`
 }
 
@@ -627,7 +642,7 @@ func validateFilterCriteria(ctx context.Context, action types.String, enabled ty
 		if !filterCriteria.IsNull() {
 			addDiagnostic(
 				"Invalid Attribute Configuration",
-				fmt.Sprintf("filter_criteria must be omitted when action is set to '%s'. This is the only worker action that does not accept a filter, and the JFrog platform rejects an enabled worker that supplies one with \"Filter must not be set for this action\".", actionName),
+				fmt.Sprintf("filter_criteria must be omitted when action is set to '%s'. This worker action does not accept a filter, and the JFrog platform rejects an enabled worker that supplies one with \"Filter must not be set for this action\".", actionName),
 				"The JFrog platform does not reject this while enabled is false: it accepts the worker and silently discards the filter. The refresh that follows the apply then reads filter_criteria back as null, so every subsequent terraform plan reports a difference that no apply can resolve. Remove filter_criteria from the configuration.",
 			)
 		}

@@ -221,6 +221,96 @@ func TestOptionalSlicePtrToStringSet(t *testing.T) {
 	}
 }
 
+func TestWorkersServiceResourceModel_genericEventSharedRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	sourceCode := "export default async () => ({ status: 200 })"
+
+	model := workersServiceResourceModel{
+		Key:            types.StringValue("generic-worker"),
+		Description:    types.StringValue("HTTP-triggered worker"),
+		SourceCode:     types.StringValue(sourceCode),
+		Action:         types.StringValue("GENERIC_EVENT"),
+		Enabled:        types.BoolValue(true),
+		Shared:         types.BoolValue(true),
+		FilterCriteria: types.ObjectNull(filterCriteriaResourceModelAttributeTypes),
+		Secrets:        types.SetNull(types.ObjectType{AttrTypes: map[string]attr.Type{"key": types.StringType, "value": types.StringType}}),
+	}
+
+	var apiModel WorkersServiceAPIModel
+	ds := model.toAPIModel(ctx, &apiModel, nil)
+	if ds.HasError() {
+		t.Fatalf("toAPIModel() diagnostics = %v", ds)
+	}
+
+	if apiModel.Action != "GENERIC_EVENT" {
+		t.Fatalf("apiModel.Action = %q, want GENERIC_EVENT", apiModel.Action)
+	}
+	if !apiModel.Shared {
+		t.Fatalf("apiModel.Shared = false, want true")
+	}
+	if apiModel.FilterCriteria.ArtifactFilterCriteria != nil {
+		t.Fatalf("ArtifactFilterCriteria: want nil, got non-nil")
+	}
+	if apiModel.FilterCriteria.Schedule != nil {
+		t.Fatalf("Schedule: want nil, got non-nil")
+	}
+
+	var roundTrip workersServiceResourceModel
+	ds = roundTrip.fromAPIModel(ctx, &apiModel)
+	if ds.HasError() {
+		t.Fatalf("fromAPIModel() diagnostics = %v", ds)
+	}
+
+	if !roundTrip.FilterCriteria.IsNull() {
+		t.Fatalf("roundTrip.FilterCriteria: want null, got %v", roundTrip.FilterCriteria)
+	}
+	if !roundTrip.Shared.ValueBool() {
+		t.Fatalf("roundTrip.Shared = false, want true")
+	}
+}
+
+func TestValidateFilterCriteria_genericEvent(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	// GENERIC_EVENT with no filter_criteria — should produce no diagnostics.
+	ds := validateFilterCriteria(
+		ctx,
+		types.StringValue("GENERIC_EVENT"),
+		types.BoolValue(true),
+		types.ObjectNull(filterCriteriaResourceModelAttributeTypes),
+	)
+	if ds.HasError() {
+		t.Fatalf("expected no error diagnostics for GENERIC_EVENT without filter, got: %v", ds)
+	}
+
+	// GENERIC_EVENT with a filter_criteria — should produce an error (enabled) since
+	// GENERIC_EVENT rejects filters, same as AFTER_BUILD_INFO_SAVE.
+	artifactObj := mustArtifactFilterCriteriaObject(t, ctx, artifactFilterCriteriaResourceModel{
+		RepoKeys: mustStringSet(t, ctx, "repo-a"),
+	})
+	filterCriteria, d := types.ObjectValueFrom(ctx, filterCriteriaResourceModelAttributeTypes, filterCriteriaResourceModel{
+		ArtifactFilterCriteria: artifactObj,
+		Schedule:               types.ObjectNull(scheduleResourceModelAttributeTypes),
+	})
+	if len(d) > 0 {
+		t.Fatalf("ObjectValueFrom() diagnostics = %v", d)
+	}
+
+	ds = validateFilterCriteria(
+		ctx,
+		types.StringValue("GENERIC_EVENT"),
+		types.BoolValue(true),
+		filterCriteria,
+	)
+	if !ds.HasError() {
+		t.Fatalf("expected error diagnostics for GENERIC_EVENT with filter, got none")
+	}
+}
+
 func boolPtr(v bool) *bool {
 	return &v
 }
