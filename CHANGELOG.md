@@ -1,9 +1,15 @@
+## 2.2.12 (August 29, 2026).
+
+BUG FIXES:
+* resource/platform_permission: Fixed spurious no-op diff where `targets`, `actions.users`, and `actions.groups` elements would swap positions on every `terraform plan` even when no real change occurred. The provider was iterating Go maps non-deterministically when building the state slice; the slice is now sorted by `name` before being wrapped in a `types.Set`.
+
 ## 2.2.11 (August 24, 2026). Tested on Artifactory 7.161.19 with Terraform 1.15.9 and OpenTofu 1.12.6
 
 SECURITY:
 * Updated Go to 1.26.6, remediating CVE-2026-39821 (Critical, 9.6), CVE-2026-56865, CVE-2026-56864, CVE-2026-33818, CVE-2026-46600, CVE-2026-56862, CVE-2026-56859, CVE-2026-56860, CVE-2026-56858, and CVE-2026-56853.
 * Updated `golang.org/x/crypto` to v0.55.0, remediating CVE-2026-46595 (Critical, 10.0), CVE-2026-42508, CVE-2026-39834, CVE-2026-39833, CVE-2026-39832, CVE-2026-39831, CVE-2026-39830, CVE-2026-39829, CVE-2026-46597, CVE-2026-39828, CVE-2026-39827, CVE-2026-39835, and CVE-2026-46598.
 * Updated `golang.org/x/net` to v0.58.0, remediating CVE-2026-25680, CVE-2026-42506, CVE-2026-42502, CVE-2026-25681, and CVE-2026-27136.
+
 
 IMPROVEMENTS:
 * resource/platform_oidc_configuration: Added `azure_app_id` (`Azure` only) and `token_issuer` (`generic` and `Azure` only) attributes. Issue: [#312](https://github.com/jfrog/terraform-provider-platform/issues/312)
