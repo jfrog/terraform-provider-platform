@@ -32,15 +32,15 @@ resource "platform_permission" "my-permission" {
         include_patterns = ["**"]
       },
       {
-        name = "ALL-LOCAL"
+        name = "ANY LOCAL"
         include_patterns = ["**", "*.js"]
       },
       {
-        name = "ALL-REMOTE"
+        name = "ANY REMOTE"
         include_patterns = ["**", "*.js"]
       },
       {
-        name = "ALL-DISTRIBUTION"
+        name = "ANY DISTRIBUTION"
         include_patterns = ["**", "*.js"]
       }
     ]

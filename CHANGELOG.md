@@ -1,15 +1,34 @@
-## 2.2.12 (May 13, 2026).
+## 2.2.12 (August 29, 2026).
 
 BUG FIXES:
 * resource/platform_permission: Fixed spurious no-op diff where `targets`, `actions.users`, and `actions.groups` elements would swap positions on every `terraform plan` even when no real change occurred. The provider was iterating Go maps non-deterministically when building the state slice; the slice is now sorted by `name` before being wrapped in a `types.Set`.
 
-## 2.2.11 (May 12, 2025).
+## 2.2.11 (August 24, 2026). Tested on Artifactory 7.161.19 with Terraform 1.15.9 and OpenTofu 1.12.6
+
+SECURITY:
+* Updated Go to 1.26.6, remediating CVE-2026-39821 (Critical, 9.6), CVE-2026-56865, CVE-2026-56864, CVE-2026-33818, CVE-2026-46600, CVE-2026-56862, CVE-2026-56859, CVE-2026-56860, CVE-2026-56858, and CVE-2026-56853.
+* Updated `golang.org/x/crypto` to v0.55.0, remediating CVE-2026-46595 (Critical, 10.0), CVE-2026-42508, CVE-2026-39834, CVE-2026-39833, CVE-2026-39832, CVE-2026-39831, CVE-2026-39830, CVE-2026-39829, CVE-2026-46597, CVE-2026-39828, CVE-2026-39827, CVE-2026-39835, and CVE-2026-46598.
+* Updated `golang.org/x/net` to v0.58.0, remediating CVE-2026-25680, CVE-2026-42506, CVE-2026-42502, CVE-2026-25681, and CVE-2026-27136.
+
 
 IMPROVEMENTS:
-* resource/platform_workers_service: Added support for `SCHEDULED_EVENT` action type [#197](https://github.com/jfrog/terraform-provider-platform/issues/197) PR: [#281](https://github.com/jfrog/terraform-provider-platform/pull/281)
+* resource/platform_oidc_configuration: Added `azure_app_id` (`Azure` only) and `token_issuer` (`generic` and `Azure` only) attributes. Issue: [#312](https://github.com/jfrog/terraform-provider-platform/issues/312)
+* resource/platform_workers_service: Added support for the `SCHEDULED_EVENT` action type via `filter_criteria.schedule`, with `cron` and an optional `timezone`. Issue: [#197](https://github.com/jfrog/terraform-provider-platform/issues/197) PR: [#281](https://github.com/jfrog/terraform-provider-platform/pull/281)
+* resource/platform_workers_service: Added `any_local`, `any_remote`, and `any_federated` to `filter_criteria.artifact_filter_criteria`, so a worker can target every local, remote, or federated repository without naming each one in `repo_keys`. Issue: [#226](https://github.com/jfrog/terraform-provider-platform/issues/226)
+* resource/platform_workers_service: `filter_criteria` is now validated against `action` at plan time (artifact actions require `artifact_filter_criteria`, `SCHEDULED_EVENT` requires `schedule`, `AFTER_BUILD_INFO_SAVE` rejects both, and exactly one of the two may be set). Violations are errors when `enabled` is `true` and warnings when it is `false`.
 
 BUG FIXES:
-* resource/platform_oidc_identity_mapping: Fixed `project_key` being silently ignored. The `project_key` value is now correctly sent as a `?project_key=` query parameter on create, read, update, and delete requests, and is populated back into state from the API response. Previously, all mappings were created as global regardless of `project_key`. Issue: [#311](https://github.com/jfrog/terraform-provider-platform/issues/311) PR: [#317](https://github.com/jfrog/terraform-provider-platform/pull/317)
+* resource/platform_oidc_configuration: Plan-time validation now rejects provider-type-specific attributes the platform does not honour. `organization` is rejected unless `provider_type` is `GitHub` or `GitHubEnterprise`; `enable_permissive_configuration = false` is rejected unless `provider_type` is `GitHub`. Configurations that previously planned with these values for other provider types must remove the attributes — they never took effect on the platform. Validation for `organization`, `azure_app_id`, and `enable_permissive_configuration` is deferred while `provider_type` is unknown.
+* resource/platform_oidc_configuration: `organization` is now sent to the platform for `GitHubEnterprise` on create and update, and refreshed from the platform for both GitHub provider types (the platform stores it in `token_issuer`). Provider versions 2.2.6 through 2.2.10 recorded `organization` in state but never transmitted it due to a provider-type comparison bug. See NOTES for upgrade remediation when the configuration is unchanged.
+* resource/platform_lifecycle: `terraform plan` no longer fails with `Lifecycle Not Found` after a project and its lifecycle are deleted through the UI; the resource is removed from state so it can be recreated.
+* resource/platform_workers_service: `filter_criteria` and `filter_criteria.artifact_filter_criteria.repo_keys` are now optional, allowing actions that reject a filter (such as `AFTER_BUILD_INFO_SAVE`) and filters expressed only with `any_local`, `any_remote`, or `any_federated`. Create and update read planned values instead of raw configuration, fixing `Provider produced inconsistent result after apply` when `filter_criteria.schedule` omits `timezone`. Explicit empty sets for `repo_keys`, `include_patterns`, and `exclude_patterns` round-trip as empty sets; omitted attributes remain null.
+* resource/platform_permission: Corrected the wildcard repository values in documentation and examples to `ANY LOCAL`, `ANY REMOTE`, and `ANY DISTRIBUTION`.
+* resource/platform_oidc_identity_mapping: Corrected the `project_key` documentation; the attribute is accepted but has no effect, as the platform derives the project from `token_spec.scope`. Behaviour is unchanged from 2.2.10. Issue: [#311](https://github.com/jfrog/terraform-provider-platform/issues/311)
+
+NOTES:
+* resource/platform_oidc_configuration: `enable_permissive_configuration` is only enforced for `GitHub`. On Access 7.176.x, `GitHubEnterprise`, `generic`, and `Azure` report `true` regardless of configuration, and the attribute is not refreshed into state for those provider types.
+* resource/platform_oidc_configuration: Upgrading from provider 2.2.6 through 2.2.10 with an unchanged `GitHubEnterprise` configuration that sets `organization` leaves the restriction absent on the platform while state still records the value — `terraform plan` and `terraform plan -refresh-only` report no changes. Perform a one-time remediation: change any attribute (for example `description`) and apply, run `terraform apply -replace='platform_oidc_configuration.<name>'`, change `organization` and apply, or re-import and apply. Leaving the configuration unchanged leaves a silent security gap.
+* resource/platform_oidc_configuration: For `GitHubEnterprise`, `terraform import` may show `organization` as an addition when the platform has no stored value; applying once reconciles state.
 
 ## 2.2.10 (May 6, 2026). Tested on Artifactory 7.146.10 with Terraform 1.15.2 and OpenTofu 1.11.6
 

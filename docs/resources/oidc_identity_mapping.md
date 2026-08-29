@@ -67,7 +67,6 @@ resource "platform_oidc_identity_mapping" "my-github-oidc-project-roles-identity
     expires_in = 7200
   }
 
-  project_key = "my-project"
 }
 
 resource "platform_oidc_identity_mapping" "my-github-oidc-username-pattern-identity-mapping" {
@@ -121,7 +120,7 @@ resource "platform_oidc_identity_mapping" "my-github-oidc-groups-pattern-identit
 ### Optional
 
 - `description` (String) Description of the OIDC mapping
-- `project_key` (String) If set, this Identity Mapping will be available in the scope of the given project (editable by platform admin and project admin). If not set, this Identity Mapping will be global and only editable by platform admin. Once set, the projectKey cannot be changed.
+- `project_key` (String) This attribute has no effect and is ignored by the JFrog platform. The project scope is derived from `token_spec.scope`: only a scope matching `applied-permissions/roles:<project_key>:<role>` produces a project-scoped Identity Mapping. Every other scope type (`applied-permissions/user`, `applied-permissions/groups`) produces a global Identity Mapping regardless of this value.
 
 <a id="nestedatt--token_spec"></a>
 ### Nested Schema for `token_spec`

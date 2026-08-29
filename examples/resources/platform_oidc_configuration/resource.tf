@@ -22,14 +22,16 @@ resource "platform_oidc_configuration" "my-generic-oidc-configuration" {
   issuer_url    = "https://tempurl.org"
   provider_type = "generic"
   audience      = "jfrog-generic"
+  token_issuer  = "https://tempurl.org"
 }
 
 
 resource "platform_oidc_configuration" "my-azure-oidc-configuration" {
-  name              = "{{ .name }}"
+  name              = "my-azure-oidc-configuration"
   description       = "My Azure OIDC configuration"
   issuer_url        = "https://sts.windows.net/your-tenant-id/"
   provider_type     = "Azure"
   audience          = "azure-audience"
+  azure_app_id      = "00000000-0000-0000-0000-000000000000"
   use_default_proxy = true
 }

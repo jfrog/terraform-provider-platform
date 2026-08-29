@@ -17,6 +17,19 @@ provider "platform" {
   // supply JFROG_ACCESS_TOKEN as env var
 }
 
+# Generic OIDC provider with explicit token_issuer (not allowed for GitHub or GitHubEnterprise)
+resource "platform_oidc_configuration" "generic-token-issuer" {
+  name          = "tf-generic-token-issuer"
+  issuer_url    = "https://tempurl.org"
+  provider_type = "generic"
+  audience      = "jfrog-platform"
+  token_issuer  = "https://tempurl.org"
+}
+
+output "generic_token_issuer" {
+  value = platform_oidc_configuration.generic-token-issuer.token_issuer
+}
+
 resource "platform_workers_service" "my-workers-service" {
   key         = "my-workers-service"
   enabled     = true
