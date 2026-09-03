@@ -22,6 +22,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/jfrog/terraform-provider-shared/testutil"
 	"github.com/jfrog/terraform-provider-shared/util"
 )
@@ -169,9 +170,12 @@ func TestAccGroup_full(t *testing.T) {
 				),
 			},
 			{
+				// This group manages membership inline (use_group_members_resource
+				// = false), so import with the ":members" opt-in to load members
+				// into state; ImportStateVerify then round-trips cleanly.
 				ResourceName:                         fqrn,
 				ImportState:                          true,
-				ImportStateId:                        updated2TestData["groupName"],
+				ImportStateId:                        updated2TestData["groupName"] + ":members",
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
 				ImportStateVerifyIgnore:              []string{"use_group_members_resource"},
@@ -451,6 +455,151 @@ func TestAccGroup_import_no_description(t *testing.T) {
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
 				ImportStateVerifyIgnore:              []string{"use_group_members_resource"},
+			},
+		},
+	})
+}
+
+// TestAccGroup_import_skips_members guards against issue #250: importing a
+// platform_group must not pull the group's membership into state. Import seeds
+// use_group_members_resource = true and leaves members null, so the follow-up
+// Read skips the members block and membership stays owned by
+// platform_group_members. This keeps state small and plans fast when adopting
+// large AD/LDAP-synced groups.
+func TestAccGroup_import_skips_members(t *testing.T) {
+	_, fqrn, groupName := testutil.MkNames("test-group", "platform_group")
+
+	temp := `
+		resource "platform_group" "{{ .groupName }}" {
+			name                       = "{{ .groupName }}"
+			description                = "Test group"
+			use_group_members_resource = false
+			members                    = ["anonymous", "admin"]
+		}
+	`
+	config := util.ExecuteTemplate(groupName, temp, map[string]string{"groupName": groupName})
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "name", groupName),
+					resource.TestCheckResourceAttr(fqrn, "members.#", "2"),
+					resource.TestCheckResourceAttr(fqrn, "use_group_members_resource", "false"),
+				),
+			},
+			{
+				// Default import ("<name>") must NOT capture members into state and
+				// must set use_group_members_resource = true. ImportStateVerify is
+				// not used here because the imported state intentionally differs
+				// from the applied state (members dropped, flag flipped).
+				ResourceName:  fqrn,
+				ImportState:   true,
+				ImportStateId: groupName,
+				ImportStateCheck: func(states []*terraform.InstanceState) error {
+					if len(states) != 1 {
+						return fmt.Errorf("expected 1 imported instance, got %d", len(states))
+					}
+					attrs := states[0].Attributes
+
+					if got := attrs["use_group_members_resource"]; got != "true" {
+						return fmt.Errorf("expected use_group_members_resource = true after import, got %q", got)
+					}
+
+					if got := attrs["members.#"]; got != "" && got != "0" {
+						return fmt.Errorf("expected no members in imported state, got members.# = %q", got)
+					}
+
+					return nil
+				},
+			},
+		},
+	})
+}
+
+// TestAccGroup_import_members_mode covers the ":members" import opt-in: the
+// group manages membership inline (use_group_members_resource = false), so
+// importing with "<name>:members" must seed the flag false and load the current
+// members into state.
+func TestAccGroup_import_members_mode(t *testing.T) {
+	_, fqrn, groupName := testutil.MkNames("test-group", "platform_group")
+
+	temp := `
+		resource "platform_group" "{{ .groupName }}" {
+			name                       = "{{ .groupName }}"
+			description                = "Test group"
+			use_group_members_resource = false
+			members                    = ["anonymous", "admin"]
+		}
+	`
+	config := util.ExecuteTemplate(groupName, temp, map[string]string{"groupName": groupName})
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(fqrn, "members.#", "2"),
+					resource.TestCheckResourceAttr(fqrn, "use_group_members_resource", "false"),
+				),
+			},
+			{
+				// "<name>:members" opt-in: flag seeded false, members loaded.
+				ResourceName:  fqrn,
+				ImportState:   true,
+				ImportStateId: groupName + ":members",
+				ImportStateCheck: func(states []*terraform.InstanceState) error {
+					if len(states) != 1 {
+						return fmt.Errorf("expected 1 imported instance, got %d", len(states))
+					}
+					attrs := states[0].Attributes
+
+					if got := attrs["use_group_members_resource"]; got != "false" {
+						return fmt.Errorf("expected use_group_members_resource = false after :members import, got %q", got)
+					}
+
+					if got := attrs["members.#"]; got != "2" {
+						return fmt.Errorf("expected 2 members in imported state, got members.# = %q", got)
+					}
+
+					return nil
+				},
+			},
+			{
+				// An unknown mode suffix must be rejected.
+				ResourceName:  fqrn,
+				ImportState:   true,
+				ImportStateId: groupName + ":bogus",
+				ExpectError:   regexp.MustCompile(`(?i)invalid import id`),
+			},
+		},
+	})
+}
+
+// TestAccGroup_name_invalid_chars verifies the name validator rejects the
+// characters the Access service forbids in group names at plan time.
+func TestAccGroup_name_invalid_chars(t *testing.T) {
+	_, _, groupName := testutil.MkNames("test-group", "platform_group")
+
+	temp := `
+		resource "platform_group" "{{ .groupName }}" {
+			name = "{{ .groupName }}:bad"
+		}
+	`
+	config := util.ExecuteTemplate(groupName, temp, map[string]string{"groupName": groupName})
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProviders(),
+		Steps: []resource.TestStep{
+			{
+				Config:      config,
+				ExpectError: regexp.MustCompile(`(?i)must not contain any of the following characters`),
 			},
 		},
 	})
