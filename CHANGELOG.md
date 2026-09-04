@@ -1,4 +1,4 @@
-## 2.2.12 (Unreleased)
+## 2.2.12 (Unreleased). Tested on Artifactory 7.161.20 with Terraform 1.16.1 and OpenTofu 1.12.6
 
 IMPROVEMENTS:
 * resource/platform_group: `terraform import` accepts an optional `:members` suffix on the import ID to choose how membership is handled. `terraform import platform_group.x "<name>"` (default) keeps membership out of state, while `terraform import platform_group.x "<name>:members"` loads the group's current members into state for groups that manage membership inline. Use `:members` only when membership is declared on `platform_group` and not via `platform_group_members`. Issues: [#250](https://github.com/jfrog/terraform-provider-platform/issues/250), [#222](https://github.com/jfrog/terraform-provider-platform/issues/222)
