@@ -18,6 +18,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -42,6 +44,19 @@ var _ resource.ResourceWithValidateConfig = (*groupResource)(nil)
 
 const groupRolesArtifactoryVersion = "7.128.0"
 
+// groupNameRegex rejects the characters the Access service forbids in group
+// names (/ \ : ; | ? * " < >). Enforcing it at plan time surfaces a clear
+// error instead of a server-side failure on create. The colon in particular
+// must stay illegal because ImportState uses it as the delimiter in the
+// composite import ID (see ImportState).
+var groupNameRegex = regexp.MustCompile(`^[^/\\:;|?*"<>]+$`)
+
+// groupImportMembersMode is the optional import ID suffix (name:members) that
+// opts a group in to loading its membership into state on import. A group name
+// can never contain a colon (see groupNameRegex), so the delimiter is
+// unambiguous.
+const groupImportMembersMode = "members"
+
 type groupResource struct {
 	util.JFrogResource
 }
@@ -64,11 +79,15 @@ var groupSchemaV0 = schema.Schema{
 			Required: true,
 			Validators: []validator.String{
 				stringvalidator.LengthBetween(1, 64),
+				stringvalidator.RegexMatches(
+					groupNameRegex,
+					`must not contain any of the following characters: / \ : ; | ? * " < >`,
+				),
 			},
 			PlanModifiers: []planmodifier.String{
 				stringplanmodifier.RequiresReplace(),
 			},
-			MarkdownDescription: "Name of the group.",
+			MarkdownDescription: "Name of the group. Cannot contain any of the following characters: `/`, `\\`, `:`, `;`, `|`, `?`, `*`, `\"`, `<`, `>`.",
 		},
 		"description": schema.StringAttribute{
 			Optional: true,
@@ -634,6 +653,53 @@ func (r *groupResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 }
 
 // ImportState imports the resource into the Terraform state.
+//
+// The import ID selects how membership is handled:
+//
+//   - "<name>"          (default) adopt the group without pulling its
+//     membership into state. use_group_members_resource is seeded true and
+//     members is left null, so the follow-up Read skips the members block (see
+//     fromAPIModel). Membership stays owned by platform_group_members / the
+//     platform. This is the safe default for AD/LDAP-synced groups whose member
+//     lists can be huge, and it avoids the state bloat / plan churn of loading
+//     every member (see issue #250).
+//
+//   - "<name>:members"  opt in to managing membership on the group resource
+//     itself. use_group_members_resource is seeded false and members is left
+//     unset, so the follow-up Read loads the current members from
+//     access/api/v2/groups/{name} into state. Use this ONLY when membership is
+//     declared inline on platform_group and NOT via platform_group_members;
+//     otherwise the two resources fight over membership. After import, ensure
+//     your configuration lists the members you want to keep - members present
+//     on the server but absent from config are removed on the next apply (the
+//     removal is shown in the plan first).
+//
+// A group name can never contain a colon (see groupNameRegex), so the ":"
+// delimiter is unambiguous.
 func (r *groupResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	resource.ImportStatePassthroughID(ctx, path.Root("name"), req, resp)
+	name, mode, hasMode := strings.Cut(req.ID, ":")
+
+	if hasMode && mode != groupImportMembersMode {
+		resp.Diagnostics.AddError(
+			"Invalid Import ID",
+			fmt.Sprintf("Expected import ID in the form %q or %q, got mode %q.", "<name>", "<name>:"+groupImportMembersMode, mode),
+		)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), name)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if hasMode {
+		// name:members - manage membership on this resource; leave members unset
+		// so the follow-up Read populates it from the server.
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("use_group_members_resource"), types.BoolValue(false))...)
+		return
+	}
+
+	// Default - keep membership out of state.
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("use_group_members_resource"), types.BoolValue(true))...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("members"), types.SetNull(types.StringType))...)
 }

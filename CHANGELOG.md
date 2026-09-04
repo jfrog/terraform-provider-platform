@@ -1,3 +1,12 @@
+## 2.2.12 (Unreleased). Tested on Artifactory 7.161.20 with Terraform 1.16.1 and OpenTofu 1.12.6
+
+IMPROVEMENTS:
+* resource/platform_group: `terraform import` accepts an optional `:members` suffix on the import ID to choose how membership is handled. `terraform import platform_group.x "<name>"` (default) keeps membership out of state, while `terraform import platform_group.x "<name>:members"` loads the group's current members into state for groups that manage membership inline. Use `:members` only when membership is declared on `platform_group` and not via `platform_group_members`. Issues: [#250](https://github.com/jfrog/terraform-provider-platform/issues/250), [#222](https://github.com/jfrog/terraform-provider-platform/issues/222)
+* resource/platform_group: `name` is now validated at plan time to reject the characters the Access service forbids in group names (`/`, `\`, `:`, `;`, `|`, `?`, `*`, `"`, `<`, `>`), surfacing a clear error instead of a server-side failure on create.
+
+BUG FIXES:
+* resource/platform_group: `terraform import` no longer loads a group's full membership into state by default. Import now seeds `use_group_members_resource = true` and leaves `members` null, matching the attribute's default and keeping membership owned by `platform_group_members`. This avoids large state files and slow plans when adopting AD/LDAP-synced groups. Members can still be loaded on import via the `:members` suffix (see IMPROVEMENTS). Issues: [#250](https://github.com/jfrog/terraform-provider-platform/issues/250), [#222](https://github.com/jfrog/terraform-provider-platform/issues/222)
+
 ## 2.2.11 (August 24, 2026). Tested on Artifactory 7.161.19 with Terraform 1.15.9 and OpenTofu 1.12.6
 
 SECURITY:
