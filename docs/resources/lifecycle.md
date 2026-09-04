@@ -96,7 +96,8 @@ Import is supported using the following syntax:
 #!/bin/bash
 
 # Import a global lifecycle
-terraform import platform_lifecycle.global ""
+# "_global_" is the special import id for the global lifecycle.
+terraform import platform_lifecycle.global _global_
 
 # Import a project-level lifecycle
 terraform import platform_lifecycle.project my-project

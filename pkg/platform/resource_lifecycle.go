@@ -539,8 +539,9 @@ func (r *lifecycleResource) Delete(ctx context.Context, req resource.DeleteReque
 }
 
 func (r *lifecycleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Import ID format: "project_key" or empty for global
-	if req.ID != "" {
+	// "_global_" is a special import id for the global lifecycle. It is used
+	// instead of "global" because "global" is a syntactically valid project_key.
+	if req.ID != "" && req.ID != "_global_" {
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_key"), req.ID)...)
 	}
 }
