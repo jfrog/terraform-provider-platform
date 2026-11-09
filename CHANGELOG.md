@@ -1,3 +1,11 @@
+## 2.2.12 (November 9, 2026)
+
+FEATURES:
+
+**New Resource:**
+
+* `platform_ldap_group` - Resource to register an existing LDAP group in JFrog with the LDAP group import. Requires Artifactory 7.57.1 or later. Issue: [#224](https://github.com/jfrog/terraform-provider-platform/issues/224) PR: [#357](https://github.com/jfrog/terraform-provider-platform/pull/357)
+
 ## 2.2.11 (August 24, 2026). Tested on Artifactory 7.161.19 with Terraform 1.15.9 and OpenTofu 1.12.6
 
 SECURITY:
