@@ -54,6 +54,7 @@ func (p *PlatformProvider) Resources(ctx context.Context) []func() resource.Reso
 	return []func() resource.Resource{
 		NewAWSIAMRoleResource,
 		NewCrowdSettingsResource,
+		NewLDAPGroupResource,
 		NewLicenseResource,
 		NewGlobalRoleResource,
 		NewGroupResource,
